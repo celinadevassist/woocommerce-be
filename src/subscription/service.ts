@@ -1,5 +1,6 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
+import { ConfigService } from '@nestjs/config';
 import { Model, Types } from 'mongoose';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
@@ -11,6 +12,7 @@ import {
   InvoiceStatus,
 } from './schema';
 import { STORE_PRICE_PER_MONTH, BILLING_CYCLE_DAYS } from '../organization/enum';
+import { ZiinaService } from '../shared/payment/ziina';
 
 @Injectable()
 export class SubscriptionService {
@@ -19,6 +21,8 @@ export class SubscriptionService {
   constructor(
     @InjectModel(Subscription.name) private subscriptionModel: Model<SubscriptionDocument>,
     @InjectModel(Invoice.name) private invoiceModel: Model<InvoiceDocument>,
+    private readonly ziinaService: ZiinaService,
+    private readonly configService: ConfigService,
   ) {}
 
   /**
@@ -360,5 +364,187 @@ export class SubscriptionService {
       pendingInvoices,
       overdueInvoices,
     };
+  }
+
+  // ==========================================
+  // Payment Methods (Ziina Integration)
+  // ==========================================
+
+  /**
+   * Initiate payment for an invoice
+   * Creates a Ziina payment intent and returns the payment URL
+   */
+  async initiatePayment(invoiceId: string): Promise<{
+    paymentUrl: string;
+    paymentIntentId: string;
+    expiresAt: Date;
+  }> {
+    const invoice = await this.invoiceModel.findById(invoiceId);
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    if (invoice.status === InvoiceStatus.PAID) {
+      throw new BadRequestException('Invoice is already paid');
+    }
+
+    if (invoice.status === InvoiceStatus.CANCELLED) {
+      throw new BadRequestException('Invoice has been cancelled');
+    }
+
+    // Get frontend URL for callbacks
+    const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:5173');
+    const isTest = this.configService.get('NODE_ENV') !== 'production';
+
+    // Create payment intent with Ziina
+    const paymentIntent = await this.ziinaService.createPaymentIntent(
+      invoice.amount,
+      invoice.currency,
+      {
+        message: `Payment for Invoice ${invoice.invoiceNumber}`,
+        successUrl: `${frontendUrl}/payment/success?invoiceId=${invoiceId}`,
+        cancelUrl: `${frontendUrl}/payment/cancel?invoiceId=${invoiceId}`,
+        failureUrl: `${frontendUrl}/payment/failure?invoiceId=${invoiceId}`,
+        test: isTest,
+        metadata: {
+          invoiceId: invoiceId,
+          invoiceNumber: invoice.invoiceNumber,
+          storeId: invoice.storeId.toString(),
+          organizationId: invoice.organizationId.toString(),
+        },
+      }
+    );
+
+    // Calculate expiration (30 minutes from now)
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+    // Update invoice with payment intent info
+    invoice.paymentIntentId = paymentIntent.id;
+    invoice.paymentUrl = paymentIntent.redirect_url;
+    invoice.paymentExpiresAt = expiresAt;
+    await invoice.save();
+
+    this.logger.log(`Payment initiated for invoice ${invoice.invoiceNumber}, payment intent: ${paymentIntent.id}`);
+
+    return {
+      paymentUrl: paymentIntent.redirect_url,
+      paymentIntentId: paymentIntent.id,
+      expiresAt,
+    };
+  }
+
+  /**
+   * Check payment status for an invoice
+   */
+  async checkPaymentStatus(invoiceId: string): Promise<{
+    invoiceStatus: InvoiceStatus;
+    paymentStatus?: string;
+    paymentIntentId?: string;
+  }> {
+    const invoice = await this.invoiceModel.findById(invoiceId);
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    let paymentStatus: string = null;
+
+    // If we have a payment intent, check its status with Ziina
+    if (invoice.paymentIntentId) {
+      try {
+        const paymentIntent = await this.ziinaService.getPaymentIntent(invoice.paymentIntentId);
+        paymentStatus = paymentIntent.status;
+
+        // If payment completed but invoice not marked as paid, update it
+        if (paymentIntent.status === 'completed' && invoice.status !== InvoiceStatus.PAID) {
+          await this.processPaymentSuccess(invoice.paymentIntentId, {
+            invoiceId: invoiceId,
+          });
+        }
+      } catch (error) {
+        this.logger.error(`Failed to check payment status for invoice ${invoiceId}: ${error.message}`);
+      }
+    }
+
+    return {
+      invoiceStatus: invoice.status,
+      paymentStatus,
+      paymentIntentId: invoice.paymentIntentId,
+    };
+  }
+
+  /**
+   * Process successful payment (called by webhook or status check)
+   */
+  async processPaymentSuccess(
+    paymentIntentId: string,
+    metadata: { invoiceId?: string },
+  ): Promise<InvoiceDocument> {
+    // Find invoice by payment intent ID or metadata
+    let invoice: InvoiceDocument;
+
+    if (metadata.invoiceId) {
+      invoice = await this.invoiceModel.findById(metadata.invoiceId);
+    } else {
+      invoice = await this.invoiceModel.findOne({ paymentIntentId });
+    }
+
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found for payment');
+    }
+
+    if (invoice.status === InvoiceStatus.PAID) {
+      this.logger.log(`Invoice ${invoice.invoiceNumber} already marked as paid`);
+      return invoice;
+    }
+
+    // Mark invoice as paid
+    invoice.status = InvoiceStatus.PAID;
+    invoice.paidAt = new Date();
+    invoice.paymentMethod = 'ziina';
+    invoice.paymentReference = paymentIntentId;
+    await invoice.save();
+
+    // Ensure subscription status is active
+    const subscription = await this.subscriptionModel.findById(invoice.subscriptionId);
+    if (subscription && subscription.status !== SubscriptionStatus.ACTIVE) {
+      subscription.status = SubscriptionStatus.ACTIVE;
+      subscription.suspendedAt = undefined;
+      subscription.suspensionReason = undefined;
+      await subscription.save();
+    }
+
+    this.logger.log(`Payment successful for invoice ${invoice.invoiceNumber}. Store ${invoice.storeId} is now accessible.`);
+    return invoice;
+  }
+
+  /**
+   * Process failed payment (called by webhook)
+   */
+  async processPaymentFailure(
+    paymentIntentId: string,
+    failureReason?: string,
+  ): Promise<void> {
+    const invoice = await this.invoiceModel.findOne({ paymentIntentId });
+
+    if (!invoice) {
+      this.logger.warn(`Invoice not found for failed payment intent: ${paymentIntentId}`);
+      return;
+    }
+
+    // Log the failure but don't change invoice status (it remains pending/overdue)
+    this.logger.log(`Payment failed for invoice ${invoice.invoiceNumber}: ${failureReason || 'Unknown reason'}`);
+
+    // Clear payment intent so user can try again
+    invoice.paymentIntentId = undefined;
+    invoice.paymentUrl = undefined;
+    invoice.paymentExpiresAt = undefined;
+    await invoice.save();
+  }
+
+  /**
+   * Verify webhook signature
+   */
+  verifyWebhookSignature(payload: any, signature: string): boolean {
+    return this.ziinaService.verifyWebhookSignature(payload, signature);
   }
 }

@@ -14,6 +14,7 @@ import { ActionLogModule } from './modules/actionLog.module';
 import { MetadataModule } from './common_metadata_module/module';
 import { SearchAnalyticsModule } from './modules/search-analytics/search-analytics.module';
 import { S3UploadModule } from './modules/s3-upload/s3-upload.module';
+import { ZiinaModule } from './shared/payment/ziina';
 
 // CartFlow modules
 import { OrganizationModule } from './organization/module';
@@ -52,6 +53,7 @@ import { SubscriptionModule } from './subscription/module';
 
     // Shared modules
     S3UploadModule,
+    ZiinaModule,
 
     // CartFlow modules
     OrganizationModule,

@@ -46,21 +46,17 @@ services:
       EMAIL_VERIFICATION_URL: '${EMAIL_VERIFICATION_URL}'
       PASSWORD_RESET_URL: '${PASSWORD_RESET_URL}'
 
-      # Mailrelay (Alternative)
-      MAILRELAY_API_URL: '${MAILRELAY_API_URL}'
-      MAILRELAY_AUTH_TOKEN: '${MAILRELAY_AUTH_TOKEN}'
+      # ===========================================
+      # Ziina Payment Gateway
+      # ===========================================
+      ZIINA_API_URL: '${ZIINA_API_URL:-https://api-v2.ziina.com/api}'
+      ZIINA_ACCESS_TOKEN: '${ZIINA_ACCESS_TOKEN}'
+      ZIINA_WEBHOOK_SECRET: '${ZIINA_WEBHOOK_SECRET}'
 
       # ===========================================
       # OpenAI
       # ===========================================
       OPENAI_API_KEY: '${OPENAI_API_KEY}'
-
-      # ===========================================
-      # Zoom Integration
-      # ===========================================
-      ZOOM_ACCOUNT_ID: '${ZOOM_ACCOUNT_ID}'
-      ZOOM_CLIENT_ID: '${ZOOM_CLIENT_ID}'
-      ZOOM_CLIENT_SECRET: '${ZOOM_CLIENT_SECRET}'
 
       # ===========================================
       # AWS S3

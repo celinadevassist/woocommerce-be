@@ -1,10 +1,12 @@
 import { Module, Global } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ConfigModule } from '@nestjs/config';
 import { Subscription, SubscriptionSchema, Invoice, InvoiceSchema } from './schema';
 import { SubscriptionService } from './service';
-import { SubscriptionController, InvoiceController } from './controller';
+import { SubscriptionController, InvoiceController, PaymentWebhookController } from './controller';
 import { SubscriptionGuard } from './guard';
+import { ZiinaModule } from '../shared/payment/ziina';
 
 @Global() // Make this module global so SubscriptionGuard can be used anywhere
 @Module({
@@ -14,8 +16,10 @@ import { SubscriptionGuard } from './guard';
       { name: Invoice.name, schema: InvoiceSchema },
     ]),
     ScheduleModule.forRoot(),
+    ConfigModule,
+    ZiinaModule,
   ],
-  controllers: [SubscriptionController, InvoiceController],
+  controllers: [SubscriptionController, InvoiceController, PaymentWebhookController],
   providers: [SubscriptionService, SubscriptionGuard],
   exports: [SubscriptionService, SubscriptionGuard],
 })

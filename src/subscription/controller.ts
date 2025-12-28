@@ -6,10 +6,16 @@ import {
   Param,
   Query,
   Body,
+  Headers,
+  Req,
+  Res,
   UseGuards,
+  Logger,
+  HttpStatus,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { Request, Response } from 'express';
 import { SubscriptionService } from './service';
 import { SkipSubscriptionCheck } from './guard';
 import { InvoiceStatus } from './schema';
@@ -142,5 +148,112 @@ export class InvoiceController {
       body.paymentReference,
     );
     return { invoice, message: 'Invoice marked as paid' };
+  }
+
+  /**
+   * Initiate payment for an invoice
+   * Creates a Ziina payment intent and returns the payment URL
+   */
+  @Post(':invoiceId/initiate-payment')
+  @SkipSubscriptionCheck()
+  @ApiOperation({ summary: 'Initiate payment for invoice' })
+  async initiatePayment(@Param('invoiceId') invoiceId: string) {
+    const result = await this.subscriptionService.initiatePayment(invoiceId);
+    return {
+      success: true,
+      paymentUrl: result.paymentUrl,
+      paymentIntentId: result.paymentIntentId,
+      expiresAt: result.expiresAt,
+      message: 'Redirect to paymentUrl to complete payment',
+    };
+  }
+
+  /**
+   * Check payment status for an invoice
+   */
+  @Get(':invoiceId/payment-status')
+  @SkipSubscriptionCheck()
+  @ApiOperation({ summary: 'Check payment status for invoice' })
+  async checkPaymentStatus(@Param('invoiceId') invoiceId: string) {
+    const status = await this.subscriptionService.checkPaymentStatus(invoiceId);
+    return status;
+  }
+}
+
+/**
+ * Webhook Controller for Ziina Payment Callbacks
+ * This controller handles webhooks from Ziina when payment status changes
+ */
+@ApiTags('Payment Webhooks')
+@Controller('webhooks')
+export class PaymentWebhookController {
+  private readonly logger = new Logger(PaymentWebhookController.name);
+
+  constructor(private readonly subscriptionService: SubscriptionService) {}
+
+  /**
+   * Handle Ziina webhook events
+   * Endpoint: POST /api/webhooks/ziina
+   */
+  @Post('ziina')
+  async handleZiinaWebhook(
+    @Req() req: Request,
+    @Res() res: Response,
+    @Headers('x-ziina-signature') signature: string,
+    @Body() payload: any,
+  ) {
+    this.logger.log('Received Ziina webhook');
+    this.logger.debug('Payload:', JSON.stringify(payload, null, 2));
+
+    try {
+      // Verify webhook signature
+      if (signature) {
+        const isValid = this.subscriptionService.verifyWebhookSignature(payload, signature);
+        if (!isValid) {
+          this.logger.warn('Invalid webhook signature');
+          return res.status(HttpStatus.UNAUTHORIZED).json({ error: 'Invalid signature' });
+        }
+      }
+
+      // Process webhook event
+      const eventType = payload.type || payload.event_type;
+      const paymentIntent = payload.data?.object || payload.data;
+
+      this.logger.log(`Processing webhook event: ${eventType}`);
+
+      switch (eventType) {
+        case 'payment_intent.succeeded':
+        case 'payment.succeeded':
+          await this.subscriptionService.processPaymentSuccess(
+            paymentIntent.id,
+            paymentIntent.metadata || {},
+          );
+          break;
+
+        case 'payment_intent.failed':
+        case 'payment.failed':
+          await this.subscriptionService.processPaymentFailure(
+            paymentIntent.id,
+            paymentIntent.latest_error?.message || 'Payment failed',
+          );
+          break;
+
+        case 'payment_intent.canceled':
+        case 'payment.canceled':
+          await this.subscriptionService.processPaymentFailure(
+            paymentIntent.id,
+            'Payment was cancelled',
+          );
+          break;
+
+        default:
+          this.logger.log(`Unhandled webhook event type: ${eventType}`);
+      }
+
+      return res.status(HttpStatus.OK).json({ received: true });
+    } catch (error) {
+      this.logger.error('Webhook processing error:', error);
+      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: 'Webhook processing failed' });
+    }
   }
 }

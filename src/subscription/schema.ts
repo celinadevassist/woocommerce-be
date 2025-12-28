@@ -120,6 +120,16 @@ export class Invoice extends Document {
   @Prop()
   paymentReference?: string;
 
+  // Ziina Payment Intent
+  @Prop()
+  paymentIntentId?: string;
+
+  @Prop()
+  paymentUrl?: string;
+
+  @Prop()
+  paymentExpiresAt?: Date;
+
   // Store info snapshot (in case store name changes)
   @Prop()
   storeName?: string;
