@@ -2,16 +2,16 @@ version: '3.8'
 
 services:
   app:
-    image: ghcr.io/smartlabtech/idea-keep-be:latest
-    container_name: idea-keep-be
+    image: ghcr.io/smartlabtech/cartflow-be:latest
+    container_name: cartflow-be
     ports:
-      - '${PORT:-3055}:${PORT:-3055}'
+      - '${PORT:-3062}:${PORT:-3062}'
     environment:
       # ===========================================
       # Application
       # ===========================================
       NODE_ENV: production
-      PORT: '${PORT:-3055}'
+      PORT: '${PORT:-3062}'
       APP_NAME: '${APP_NAME}'
       APP_URL: '${APP_URL}'
       FRONTEND_URL: '${FRONTEND_URL}'
@@ -76,7 +76,7 @@ services:
         - CMD
         - curl
         - '-f'
-        - 'http://localhost:${PORT:-3055}/api'
+        - 'http://localhost:${PORT:-3062}/api'
       interval: 30s
       timeout: 10s
       retries: 3
@@ -84,18 +84,18 @@ services:
     networks:
       - proxy-network
     volumes:
-      - 'idea_keep_app_data:/app/data'
-      - 'idea_keep_app_logs:/app/logs'
-      - 'idea_keep_app_uploads:/app/uploads'
+      - 'cartflow_app_data:/app/data'
+      - 'cartflow_app_logs:/app/logs'
+      - 'cartflow_app_uploads:/app/uploads'
 
 networks:
   proxy-network:
     external: true
 
 volumes:
-  idea_keep_app_data:
+  cartflow_app_data:
     driver: local
-  idea_keep_app_logs:
+  cartflow_app_logs:
     driver: local
-  idea_keep_app_uploads:
+  cartflow_app_uploads:
     driver: local

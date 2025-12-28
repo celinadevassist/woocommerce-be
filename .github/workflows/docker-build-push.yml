@@ -5,10 +5,11 @@ on:
     branches: [ master, main ]
   pull_request:
     branches: [ master, main ]
+  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  IMAGE_NAME: smartlabtech/cartflow-be
 
 jobs:
   build-and-push:
@@ -46,7 +47,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        push: true
+        push: ${{ github.event_name != 'pull_request' }}
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
@@ -55,3 +56,8 @@ jobs:
         build-args: |
           NODE_ENV=production
         provenance: false
+
+    - name: Image digest
+      run: |
+        echo "### Docker Image Built" >> $GITHUB_STEP_SUMMARY
+        echo "Image: ghcr.io/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY

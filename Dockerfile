@@ -47,8 +47,8 @@ COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 # Switch to non-root user
 USER nodejs
 
-# Expose port (Coolify will handle port mapping)
-EXPOSE 3041
+# Expose port (default 3062, can be overridden by PORT env)
+EXPOSE ${PORT:-3062}
 
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
