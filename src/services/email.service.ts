@@ -1,8 +1,10 @@
 import { Injectable, InternalServerErrorException, Inject, forwardRef } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { LoggerService } from '../logger/logger.service';
 import { MetadataService } from '../common_metadata_module/service';
 import { ModuleType } from '../common_metadata_module/enum';
+import { MailerService } from './mailer.service';
 
 export interface EmailData {
   recipients: string | string[];
@@ -27,6 +29,8 @@ export class EmailService {
   constructor(
     logger: LoggerService,
     @Inject(forwardRef(() => MetadataService)) private readonly metadataService: MetadataService,
+    private readonly mailerService: MailerService,
+    private readonly configService: ConfigService,
   ) {
     this.logger = logger;
 
@@ -239,7 +243,7 @@ export class EmailService {
   }
 
   /**
-   * Send team invitation email
+   * Send team invitation email using SMTP
    */
   async sendInvitationEmail(options: {
     to: string;
@@ -260,7 +264,7 @@ export class EmailService {
 
     const subject = `You've been invited to join ${organizationName} on CartFlow`;
 
-    const content = `
+    const html = `
 <!DOCTYPE html>
 <html>
 <head>
@@ -305,21 +309,23 @@ export class EmailService {
 </html>
     `.trim();
 
-    const emailData: EmailData = {
-      recipients: to,
-      subject: subject,
-      content: content,
-      contentType: 'html',
-    };
-
-    // Try to send with providers, fall back to simple logging
+    // Use MailerService (SMTP) to send the email
     try {
-      const success = await this.sendEmailWithProviders(emailData);
-      if (!success) {
-        // Log invitation for manual handling if email fails
-        this.logger.log(`Invitation email (fallback): To: ${to}, Link: ${inviteLink}`, 'EmailService');
+      this.logger.log(`Sending invitation email to ${to} via SMTP`, 'EmailService');
+
+      const result = await this.mailerService.sendMail({
+        to: to,
+        subject: subject,
+        html: html,
+      });
+
+      if (result) {
+        this.logger.log(`Invitation email sent successfully to ${to}`, 'EmailService');
+        return true;
+      } else {
+        this.logger.error(`Failed to send invitation email to ${to}`, 'EmailService');
+        return false;
       }
-      return success;
     } catch (error) {
       this.logger.error(`Failed to send invitation email: ${error.message}`, 'EmailService');
       // Log invitation details for manual handling
