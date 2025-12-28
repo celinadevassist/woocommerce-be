@@ -196,6 +196,44 @@ export class SubscriptionService {
   }
 
   /**
+   * Transfer subscription and related invoices to a new organization
+   * Called when a store is transferred between organizations
+   */
+  async transferSubscription(
+    storeId: string,
+    fromOrganizationId: string,
+    toOrganizationId: string,
+  ): Promise<void> {
+    // Update subscription
+    await this.subscriptionModel.updateMany(
+      {
+        storeId: new Types.ObjectId(storeId),
+        organizationId: new Types.ObjectId(fromOrganizationId),
+      },
+      {
+        organizationId: new Types.ObjectId(toOrganizationId),
+        updatedAt: new Date(),
+      },
+    );
+
+    // Update all invoices for this store to the new organization
+    await this.invoiceModel.updateMany(
+      {
+        storeId: new Types.ObjectId(storeId),
+        organizationId: new Types.ObjectId(fromOrganizationId),
+      },
+      {
+        organizationId: new Types.ObjectId(toOrganizationId),
+        updatedAt: new Date(),
+      },
+    );
+
+    this.logger.log(
+      `Transferred subscription for store ${storeId} from org ${fromOrganizationId} to org ${toOrganizationId}`,
+    );
+  }
+
+  /**
    * Get invoices for an organization
    */
   async getInvoicesByOrganization(
