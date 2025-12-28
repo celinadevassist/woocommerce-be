@@ -260,4 +260,42 @@ export class OrganizationController {
   ) {
     return await this.organizationService.acceptInvitation(id, user._id.toString());
   }
+
+  @Post(':id/transfer-ownership')
+  @ApiOperation({ summary: 'Transfer organization ownership to another member' })
+  @ApiResponse({ status: 200, description: 'Ownership transferred successfully' })
+  @ApiResponse({ status: 400, description: 'New owner must be an existing member' })
+  @ApiResponse({ status: 403, description: 'Only the current owner can transfer ownership' })
+  @ApiResponse({ status: 404, description: 'Organization not found' })
+  @ApiParam({ name: 'id', description: 'Organization ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['newOwnerId'],
+      properties: {
+        newOwnerId: { type: 'string', description: 'User ID of the new owner' },
+      },
+    },
+  })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async transferOwnership(
+    @Param('id') id: string,
+    @Body() body: { newOwnerId: string },
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    const result = await this.organizationService.transferOwnership(
+      id,
+      user._id.toString(),
+      body.newOwnerId,
+    );
+    return {
+      message: 'Ownership transferred successfully',
+      organization: result,
+    };
+  }
 }

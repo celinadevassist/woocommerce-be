@@ -11,7 +11,7 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger';
 import { StoreService } from './service';
 import { SyncService } from '../sync/service';
 import { CreateStoreDto, CreateStoreSchema } from './dto.create';
@@ -192,6 +192,64 @@ export class StoreController {
     @Param('lang') lang: string,
   ) {
     return await this.storeService.regenerateWebhookSecret(id, user._id.toString());
+  }
+
+  @Get(':id/transfer-targets')
+  @ApiOperation({ summary: 'Get organizations the store can be transferred to' })
+  @ApiResponse({ status: 200, description: 'Transfer targets retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Store not found' })
+  @ApiResponse({ status: 403, description: 'Only organization owners and admins can transfer stores' })
+  @ApiParam({ name: 'id', description: 'Store ID' })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async getTransferTargets(
+    @Param('id') id: string,
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    return await this.storeService.getTransferTargetOrganizations(id, user._id.toString());
+  }
+
+  @Post(':id/transfer')
+  @ApiOperation({ summary: 'Transfer store to another organization' })
+  @ApiResponse({ status: 200, description: 'Store transferred successfully' })
+  @ApiResponse({ status: 400, description: 'Cannot transfer to the same organization' })
+  @ApiResponse({ status: 403, description: 'Only organization owners and admins can transfer stores' })
+  @ApiResponse({ status: 404, description: 'Store or target organization not found' })
+  @ApiResponse({ status: 409, description: 'Store with this URL already exists in target organization' })
+  @ApiParam({ name: 'id', description: 'Store ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['targetOrganizationId'],
+      properties: {
+        targetOrganizationId: { type: 'string', description: 'ID of the organization to transfer the store to' },
+      },
+    },
+  })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async transferStore(
+    @Param('id') id: string,
+    @Body() body: { targetOrganizationId: string },
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    const result = await this.storeService.transferStore(
+      id,
+      user._id.toString(),
+      body.targetOrganizationId,
+    );
+    return {
+      message: 'Store transferred successfully',
+      store: result,
+    };
   }
 
   @Delete(':id')

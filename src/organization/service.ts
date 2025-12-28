@@ -393,6 +393,67 @@ export class OrganizationService {
   }
 
   /**
+   * Transfer ownership of the organization to another member
+   * Only the current owner can transfer ownership
+   */
+  async transferOwnership(
+    id: string,
+    currentOwnerId: string,
+    newOwnerId: string,
+  ): Promise<IOrganization> {
+    const organization = await this.organizationModel.findOne({
+      _id: new Types.ObjectId(id),
+      isDeleted: false,
+    });
+
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    // Only the current owner can transfer ownership
+    if (organization.ownerId.toString() !== currentOwnerId) {
+      throw new ForbiddenException('Only the current owner can transfer ownership');
+    }
+
+    // Cannot transfer to yourself
+    if (currentOwnerId === newOwnerId) {
+      throw new BadRequestException('Cannot transfer ownership to yourself');
+    }
+
+    // Check if new owner is a member of the organization
+    const newOwnerMemberIndex = organization.members.findIndex(
+      (m) => m.userId.toString() === newOwnerId,
+    );
+
+    if (newOwnerMemberIndex === -1) {
+      throw new BadRequestException(
+        'New owner must be an existing member of the organization. Please invite them first.',
+      );
+    }
+
+    // Find current owner in members array
+    const currentOwnerMemberIndex = organization.members.findIndex(
+      (m) => m.userId.toString() === currentOwnerId,
+    );
+
+    // Update the organization's ownerId
+    organization.ownerId = new Types.ObjectId(newOwnerId);
+
+    // Update roles in members array
+    // Set new owner's role to OWNER
+    (organization.members[newOwnerMemberIndex] as any).role = OrganizationMemberRole.OWNER;
+    (organization.members[newOwnerMemberIndex] as any).storeAccess = 'all';
+
+    // Set previous owner's role to ADMIN (they retain admin access)
+    if (currentOwnerMemberIndex !== -1) {
+      (organization.members[currentOwnerMemberIndex] as any).role = OrganizationMemberRole.ADMIN;
+    }
+
+    await organization.save();
+    return this.toInterface(organization);
+  }
+
+  /**
    * Check if organization can add more stores
    * Always returns true - no store limit, each store pays $19/month
    */
