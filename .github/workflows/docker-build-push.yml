@@ -9,13 +9,10 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
-  VITE_API_LANG: ${{ vars.VITE_API_LANG }}
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    environment: production  # Add this line if using GitHub Environments
     permissions:
       contents: read
       packages: write
@@ -33,11 +30,6 @@ jobs:
         registry: ${{ env.REGISTRY }}
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Debug environment variables
-      run: |
-        echo "VITE_API_BASE_URL: ${{ env.VITE_API_BASE_URL }}"
-        echo "VITE_API_LANG: ${{ env.VITE_API_LANG }}"
 
     - name: Extract metadata
       id: meta
@@ -62,5 +54,4 @@ jobs:
         platforms: linux/amd64
         build-args: |
           NODE_ENV=production
-          VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }}
-          VITE_API_LANG=${{ env.VITE_API_LANG }}
+        provenance: false
