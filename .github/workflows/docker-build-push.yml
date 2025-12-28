@@ -5,15 +5,17 @@ on:
     branches: [ master, main ]
   pull_request:
     branches: [ master, main ]
-  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
+  VITE_API_LANG: ${{ vars.VITE_API_LANG }}
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    environment: production  # Add this line if using GitHub Environments
     permissions:
       contents: read
       packages: write
@@ -32,6 +34,11 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
+    - name: Debug environment variables
+      run: |
+        echo "VITE_API_BASE_URL: ${{ env.VITE_API_BASE_URL }}"
+        echo "VITE_API_LANG: ${{ env.VITE_API_LANG }}"
+
     - name: Extract metadata
       id: meta
       uses: docker/metadata-action@v5
@@ -47,7 +54,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: .
-        push: ${{ github.event_name != 'pull_request' }}
+        push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
         cache-from: type=gha
@@ -55,9 +62,5 @@ jobs:
         platforms: linux/amd64
         build-args: |
           NODE_ENV=production
-        provenance: false
-
-    - name: Image digest
-      run: |
-        echo "### Docker Image Built" >> $GITHUB_STEP_SUMMARY
-        echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
+          VITE_API_BASE_URL=${{ env.VITE_API_BASE_URL }}
+          VITE_API_LANG=${{ env.VITE_API_LANG }}
