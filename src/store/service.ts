@@ -154,10 +154,13 @@ export class StoreService {
    * Get store by ID
    */
   async findById(id: string, userId: string): Promise<IStore> {
-    const store = await this.storeModel.findOne({
-      _id: new Types.ObjectId(id),
-      isDeleted: false,
-    });
+    const store = await this.storeModel
+      .findOne({
+        _id: new Types.ObjectId(id),
+        isDeleted: false,
+      })
+      .populate('ownerId', 'firstName lastName email')
+      .populate('members.userId', 'firstName lastName email');
 
     if (!store) {
       throw new NotFoundException('Store not found');
@@ -166,7 +169,51 @@ export class StoreService {
     // Verify user has access to store
     this.verifyStoreAccess(store, userId);
 
-    return this.toInterface(store);
+    return this.toInterfaceWithUsers(store);
+  }
+
+  /**
+   * Convert store document to interface with populated user data
+   */
+  private toInterfaceWithUsers(store: StoreDocument): IStore {
+    const base = this.toInterface(store);
+
+    // Add populated owner data
+    if (store.ownerId && typeof store.ownerId === 'object') {
+      const owner = store.ownerId as any;
+      (base as any).owner = {
+        _id: owner._id?.toString(),
+        firstName: owner.firstName,
+        lastName: owner.lastName,
+        email: owner.email,
+      };
+    }
+
+    // Add populated member user data
+    if (store.members && store.members.length > 0) {
+      (base as any).members = store.members.map((member: any) => {
+        const memberData: any = {
+          userId: member.userId?._id?.toString() || member.userId?.toString(),
+          role: member.role,
+          invitedAt: member.invitedAt,
+          acceptedAt: member.acceptedAt,
+        };
+
+        // Add user info if populated
+        if (member.userId && typeof member.userId === 'object' && member.userId.email) {
+          memberData.user = {
+            _id: member.userId._id?.toString(),
+            firstName: member.userId.firstName,
+            lastName: member.userId.lastName,
+            email: member.userId.email,
+          };
+        }
+
+        return memberData;
+      });
+    }
+
+    return base;
   }
 
   /**
