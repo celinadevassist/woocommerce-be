@@ -793,8 +793,12 @@ Create webhooks for all the topics you want to sync in real-time.`,
     userId: string,
     allowedRoles?: StoreMemberRole[],
   ): void {
-    const isOwner = store.ownerId.toString() === userId;
-    const member = store.members.find((m) => m.userId.toString() === userId);
+    // Handle both populated and non-populated ownerId
+    const ownerIdStr = this.getIdString(store.ownerId);
+    const isOwner = ownerIdStr === userId;
+
+    // Handle both populated and non-populated member userIds
+    const member = store.members.find((m) => this.getIdString(m.userId) === userId);
 
     if (!isOwner && !member) {
       throw new ForbiddenException('You do not have access to this store');
@@ -813,13 +817,26 @@ Create webhooks for all the topics you want to sync in real-time.`,
   }
 
   /**
+   * Helper to get ID string from either ObjectId or populated object
+   */
+  private getIdString(idOrObject: any): string {
+    if (!idOrObject) return '';
+    // If it's a populated object with _id
+    if (idOrObject._id) {
+      return idOrObject._id.toString();
+    }
+    // If it's an ObjectId or string
+    return idOrObject.toString();
+  }
+
+  /**
    * Get user's role in store
    */
   getUserRole(store: StoreDocument, userId: string): StoreMemberRole | null {
-    if (store.ownerId.toString() === userId) {
+    if (this.getIdString(store.ownerId) === userId) {
       return StoreMemberRole.OWNER;
     }
-    const member = store.members.find((m) => m.userId.toString() === userId);
+    const member = store.members.find((m) => this.getIdString(m.userId) === userId);
     return member?.role || null;
   }
 
