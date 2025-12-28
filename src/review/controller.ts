@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Put,
+  Patch,
   Post,
   Delete,
   Param,
@@ -161,7 +162,7 @@ export class ReviewController {
     return this.reviewService.createResponseTemplate(userId, dto);
   }
 
-  @Put('templates/:templateId')
+  @Patch('templates/:templateId')
   @ApiOperation({ summary: 'Update a response template' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'templateId', description: 'Template ID' })
