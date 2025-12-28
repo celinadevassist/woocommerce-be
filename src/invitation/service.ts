@@ -111,7 +111,7 @@ export class InvitationService {
         inviterName,
         storeName: store.name,
         role,
-        inviteLink: `${process.env.FRONTEND_URL}/accept-invitation?token=${token}`,
+        inviteLink: `${this.getFrontendUrl()}/accept-invitation?token=${token}`,
         expiresAt,
       });
     } catch (error) {
@@ -367,7 +367,7 @@ export class InvitationService {
         inviterName,
         storeName: store.name,
         role: invitation.role,
-        inviteLink: `${process.env.FRONTEND_URL}/accept-invitation?token=${invitation.token}`,
+        inviteLink: `${this.getFrontendUrl()}/accept-invitation?token=${invitation.token}`,
         expiresAt,
       });
     } catch (error) {
@@ -409,6 +409,12 @@ export class InvitationService {
   // Helper methods
   private generateToken(): string {
     return randomBytes(32).toString('hex');
+  }
+
+  private getFrontendUrl(): string {
+    const url = process.env.FRONTEND_URL || 'http://localhost:5173';
+    // Remove trailing slash to prevent double-slash in URLs
+    return url.replace(/\/+$/, '');
   }
 
   private userHasAccess(store: StoreDocument, userId: string): boolean {
