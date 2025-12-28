@@ -14,7 +14,7 @@ import { QueryCustomerDto } from './dto.query';
 import { CreateSegmentDto, UpdateSegmentDto, ICustomerSegment } from './segment.dto';
 import { ICustomer, ICustomerResponse, ICustomerAggregateStats, ICustomerNote } from './interface';
 import { CustomerStatus, CustomerSource } from './enum';
-import { Organization, OrganizationDocument } from '../organization/schema';
+import { Store, StoreDocument } from '../store/schema';
 import { Order, OrderDocument } from '../order/schema';
 import { WooCustomer } from '../integrations/woocommerce/woocommerce.types';
 import { PhoneService } from '../phone/service';
@@ -25,13 +25,50 @@ export class CustomerService {
   constructor(
     @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
     @InjectModel(CustomerSegment.name) private segmentModel: Model<CustomerSegmentDocument>,
-    @InjectModel(Organization.name) private organizationModel: Model<OrganizationDocument>,
+    @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     @Inject(forwardRef(() => PhoneService))
     private readonly phoneService: PhoneService,
     @Inject(forwardRef(() => EmailService))
     private readonly emailService: EmailService,
   ) {}
+
+  /**
+   * Get store IDs that user has access to (owner or member)
+   */
+  private async getUserStoreIds(userId: string): Promise<Types.ObjectId[]> {
+    const stores = await this.storeModel.find({
+      isDeleted: false,
+      $or: [
+        { ownerId: new Types.ObjectId(userId) },
+        { 'members.userId': new Types.ObjectId(userId) },
+      ],
+    }).select('_id');
+    return stores.map((store) => store._id);
+  }
+
+  /**
+   * Verify user has access to a specific store
+   */
+  private async verifyStoreAccess(storeId: string, userId: string): Promise<StoreDocument> {
+    const store = await this.storeModel.findOne({
+      _id: new Types.ObjectId(storeId),
+      isDeleted: false,
+    });
+
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+
+    const isOwner = store.ownerId.toString() === userId;
+    const isMember = store.members?.some((m) => m.userId.toString() === userId);
+
+    if (!isOwner && !isMember) {
+      throw new ForbiddenException('You do not have access to this store');
+    }
+
+    return store;
+  }
 
   /**
    * Normalize phone number to unified format: +{countryCode}{number}
@@ -197,20 +234,16 @@ export class CustomerService {
    * Get customers with filtering and pagination
    */
   async findAll(userId: string, query: QueryCustomerDto): Promise<ICustomerResponse> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
     // Apply filters
     if (query.storeId) {
       filter.storeId = new Types.ObjectId(query.storeId);
-    }
-    if (query.organizationId) {
-      filter.organizationId = new Types.ObjectId(query.organizationId);
     }
     if (query.status) {
       filter.status = query.status;
@@ -318,7 +351,7 @@ export class CustomerService {
       throw new NotFoundException('Customer not found');
     }
 
-    await this.verifyOrganizationAccess(customer.organizationId.toString(), userId);
+    await this.verifyStoreAccess(customer.storeId.toString(), userId);
 
     // Calculate dynamic stats from orders
     const stats = await this.calculateCustomerStats(id);
@@ -353,7 +386,7 @@ export class CustomerService {
       throw new NotFoundException('Customer not found');
     }
 
-    await this.verifyOrganizationAccess(customer.organizationId.toString(), userId);
+    await this.verifyStoreAccess(customer.storeId.toString(), userId);
 
     // Update fields
     if (dto.status) customer.status = dto.status;
@@ -377,7 +410,7 @@ export class CustomerService {
       throw new NotFoundException('Customer not found');
     }
 
-    await this.verifyOrganizationAccess(customer.organizationId.toString(), userId);
+    await this.verifyStoreAccess(customer.storeId.toString(), userId);
 
     const note = {
       _id: new Types.ObjectId(),
@@ -406,7 +439,7 @@ export class CustomerService {
       throw new NotFoundException('Customer not found');
     }
 
-    await this.verifyOrganizationAccess(customer.organizationId.toString(), userId);
+    await this.verifyStoreAccess(customer.storeId.toString(), userId);
 
     const noteIndex = customer.notes.findIndex(
       (n: any) => n._id.toString() === noteId,
@@ -472,16 +505,15 @@ export class CustomerService {
    * Get customer statistics (calculated dynamically from orders)
    */
   async getStats(userId: string, storeId?: string): Promise<ICustomerAggregateStats> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const customerFilter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
     const orderFilter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       status: { $nin: ['cancelled', 'canceled', 'refunded', 'failed', 'trash'] },
       isDeleted: { $ne: true },
     };
@@ -607,16 +639,15 @@ export class CustomerService {
     storeId?: string,
     period: 'week' | 'month' | 'quarter' | 'year' = 'month',
   ): Promise<any> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const customerFilter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
     const orderFilter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       status: { $nin: ['cancelled', 'canceled', 'refunded', 'failed', 'trash'] },
       isDeleted: { $ne: true },
     };
@@ -982,7 +1013,6 @@ export class CustomerService {
    */
   async upsertFromWoo(
     storeId: string,
-    organizationId: string,
     wooCustomer: WooCustomer,
   ): Promise<CustomerDocument | null> {
     const normalizedPhone = this.normalizePhoneNumber(wooCustomer.billing?.phone);
@@ -1000,7 +1030,6 @@ export class CustomerService {
 
     const customerData = {
       storeId: new Types.ObjectId(storeId),
-      organizationId: new Types.ObjectId(organizationId),
       externalId: wooCustomer.id,
       email: wooCustomer.email?.toLowerCase(),
       firstName: wooCustomer.first_name,
@@ -1066,7 +1095,6 @@ export class CustomerService {
    */
   async findOrCreateFromOrder(
     storeId: string,
-    organizationId: string,
     billing: {
       email?: string;
       firstName?: string;
@@ -1220,7 +1248,6 @@ export class CustomerService {
     // Set createdAt to order date (customer's first order) instead of now
     customer = await this.customerModel.create({
       storeId: new Types.ObjectId(storeId),
-      organizationId: new Types.ObjectId(organizationId),
       externalId: customerId,
       ...(normalizedEmail && { email: normalizedEmail }),
       firstName: billing.firstName,
@@ -1410,7 +1437,6 @@ export class CustomerService {
     // Add to phones collection
     await this.phoneService.findOrCreate(
       customer.storeId.toString(),
-      customer.organizationId.toString(),
       normalizedPhone,
       customerId,
       source,
@@ -1493,11 +1519,10 @@ export class CustomerService {
    * Export customers to CSV
    */
   async exportToCsv(userId: string, query: QueryCustomerDto): Promise<string> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
@@ -1598,15 +1623,14 @@ export class CustomerService {
   // ==================== Customer Segments ====================
 
   /**
-   * Get all segments for user's organizations
+   * Get all segments for user's stores
    */
   async getSegments(userId: string): Promise<ICustomerSegment[]> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const segments = await this.segmentModel
       .find({
-        organizationId: { $in: orgIds },
+        storeId: { $in: storeIds },
         isDeleted: false,
       })
       .sort({ name: 1 });
@@ -1618,15 +1642,16 @@ export class CustomerService {
    * Create a customer segment
    */
   async createSegment(userId: string, dto: CreateSegmentDto): Promise<ICustomerSegment> {
-    const organizations = await this.getUserOrganizations(userId);
-    if (organizations.length === 0) {
-      throw new ForbiddenException('No organization found');
+    const storeIds = await this.getUserStoreIds(userId);
+    if (storeIds.length === 0) {
+      throw new ForbiddenException('No store found');
     }
 
-    const organizationId = organizations[0]._id;
+    // Use the first store as default (or require storeId in dto)
+    const storeId = dto.storeId ? new Types.ObjectId(dto.storeId) : storeIds[0];
 
     const segment = await this.segmentModel.create({
-      organizationId,
+      storeId,
       name: dto.name,
       description: dto.description,
       color: dto.color,
@@ -1660,7 +1685,7 @@ export class CustomerService {
       throw new NotFoundException('Segment not found');
     }
 
-    await this.verifyOrganizationAccess(segment.organizationId.toString(), userId);
+    await this.verifyStoreAccess(segment.storeId.toString(), userId);
 
     if (dto.name !== undefined) segment.name = dto.name;
     if (dto.description !== undefined) segment.description = dto.description;
@@ -1691,7 +1716,7 @@ export class CustomerService {
       throw new NotFoundException('Segment not found');
     }
 
-    await this.verifyOrganizationAccess(segment.organizationId.toString(), userId);
+    await this.verifyStoreAccess(segment.storeId.toString(), userId);
 
     segment.isDeleted = true;
     await segment.save();
@@ -1715,10 +1740,10 @@ export class CustomerService {
       throw new NotFoundException('Segment not found');
     }
 
-    await this.verifyOrganizationAccess(segment.organizationId.toString(), userId);
+    await this.verifyStoreAccess(segment.storeId.toString(), userId);
 
     const filter = this.buildSegmentFilter(segment);
-    filter.organizationId = segment.organizationId;
+    filter.storeId = segment.storeId;
     filter.isDeleted = false;
 
     const skip = (page - 1) * size;
@@ -1747,7 +1772,7 @@ export class CustomerService {
     if (!segment) return 0;
 
     const filter = this.buildSegmentFilter(segment);
-    filter.organizationId = segment.organizationId;
+    filter.storeId = segment.storeId;
     filter.isDeleted = false;
 
     const count = await this.customerModel.countDocuments(filter);
@@ -1803,7 +1828,7 @@ export class CustomerService {
     const obj = doc.toObject();
     return {
       _id: obj._id.toString(),
-      organizationId: obj.organizationId.toString(),
+      storeId: obj.storeId.toString(),
       name: obj.name,
       description: obj.description,
       color: obj.color,
@@ -1817,42 +1842,12 @@ export class CustomerService {
     };
   }
 
-  // Helper methods
-  private async getUserOrganizations(userId: string): Promise<OrganizationDocument[]> {
-    return this.organizationModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    });
-  }
-
-  private async verifyOrganizationAccess(organizationId: string, userId: string): Promise<void> {
-    const organization = await this.organizationModel.findOne({
-      _id: new Types.ObjectId(organizationId),
-      isDeleted: false,
-    });
-
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
-    }
-
-    const isOwner = organization.ownerId.toString() === userId;
-    const isMember = organization.members.some((m) => m.userId.toString() === userId);
-
-    if (!isOwner && !isMember) {
-      throw new ForbiddenException('You do not have access to this organization');
-    }
-  }
-
   private toInterface(doc: CustomerDocument): ICustomer {
     const obj = doc.toObject();
     return {
       _id: obj._id.toString(),
       externalId: obj.externalId,
       storeId: obj.storeId.toString(),
-      organizationId: obj.organizationId.toString(),
       email: obj.email,
       firstName: obj.firstName,
       lastName: obj.lastName,

@@ -23,9 +23,6 @@ export class Subscription extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, unique: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
-
   @Prop({ type: String, enum: Object.values(SubscriptionStatus), default: SubscriptionStatus.ACTIVE })
   status: SubscriptionStatus;
 
@@ -70,7 +67,7 @@ export type SubscriptionDocument = Subscription & Document;
 export const SubscriptionSchema = SchemaFactory.createForClass(Subscription);
 
 // Indexes
-SubscriptionSchema.index({ organizationId: 1, status: 1 });
+SubscriptionSchema.index({ storeId: 1, status: 1 });
 SubscriptionSchema.index({ nextInvoiceDate: 1, status: 1 }); // For cron job to find due invoices
 
 
@@ -82,9 +79,6 @@ export class Invoice extends Document {
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
-
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Subscription', required: true })
   subscriptionId: MongooseSchema.Types.ObjectId;
@@ -137,10 +131,6 @@ export class Invoice extends Document {
   @Prop()
   storeUrl?: string;
 
-  // Organization info snapshot
-  @Prop()
-  organizationName?: string;
-
   @Prop()
   billingEmail?: string;
 
@@ -162,7 +152,6 @@ export type InvoiceDocument = Invoice & Document;
 export const InvoiceSchema = SchemaFactory.createForClass(Invoice);
 
 // Indexes
-InvoiceSchema.index({ organizationId: 1, status: 1, createdAt: -1 });
 InvoiceSchema.index({ storeId: 1, status: 1, createdAt: -1 });
 InvoiceSchema.index({ dueDate: 1, status: 1 }); // For finding overdue invoices
 InvoiceSchema.index({ invoiceNumber: 1 });

@@ -69,7 +69,6 @@ export interface IDashboardAnalytics {
 
 export interface IAnalyticsQuery {
   storeId?: string;
-  organizationId?: string;
   startDate?: string;
   endDate?: string;
   period?: 'day' | 'week' | 'month' | 'year';

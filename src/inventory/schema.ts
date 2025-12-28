@@ -13,9 +13,6 @@ export class InventoryLog extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
-
   @Prop({ required: true })
   previousQuantity: number;
 
@@ -54,7 +51,6 @@ export const InventoryLogSchema = SchemaFactory.createForClass(InventoryLog);
 // Indexes
 InventoryLogSchema.index({ productId: 1, createdAt: -1 });
 InventoryLogSchema.index({ storeId: 1, createdAt: -1 });
-InventoryLogSchema.index({ organizationId: 1, createdAt: -1 });
 InventoryLogSchema.index({ changeType: 1, createdAt: -1 });
 
 // Stock Alert schema
@@ -68,9 +64,6 @@ export class StockAlert extends Document {
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
-
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: String, enum: Object.values(AlertType), required: true })
   alertType: AlertType;
@@ -109,5 +102,4 @@ export const StockAlertSchema = SchemaFactory.createForClass(StockAlert);
 
 // Indexes
 StockAlertSchema.index({ storeId: 1, status: 1 });
-StockAlertSchema.index({ organizationId: 1, status: 1 });
 StockAlertSchema.index({ productId: 1, alertType: 1, status: 1 }, { unique: true });

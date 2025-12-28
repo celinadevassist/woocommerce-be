@@ -37,7 +37,6 @@ export class EmailService {
    */
   async findOrCreate(
     storeId: string,
-    organizationId: string,
     emailAddress: string,
     customerId?: string,
     source: string = 'order',
@@ -82,7 +81,6 @@ export class EmailService {
     email = await this.emailModel.create({
       email: normalizedEmail,
       storeId: new Types.ObjectId(storeId),
-      organizationId: new Types.ObjectId(organizationId),
       customerId: customerId ? new Types.ObjectId(customerId) : undefined,
       source,
       sourceOrderId,

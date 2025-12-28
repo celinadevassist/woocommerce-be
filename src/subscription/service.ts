@@ -11,7 +11,7 @@ import {
   InvoiceDocument,
   InvoiceStatus,
 } from './schema';
-import { STORE_PRICE_PER_MONTH, BILLING_CYCLE_DAYS } from '../organization/enum';
+import { STORE_PRICE_PER_MONTH, BILLING_CYCLE_DAYS } from '../store/enum';
 import { ZiinaService } from '../shared/payment/ziina';
 
 @Injectable()
@@ -31,7 +31,6 @@ export class SubscriptionService {
    */
   async createSubscription(
     storeId: string,
-    organizationId: string,
     storeName?: string,
     storeUrl?: string,
   ): Promise<SubscriptionDocument> {
@@ -41,7 +40,6 @@ export class SubscriptionService {
 
     const subscription = await this.subscriptionModel.create({
       storeId: new Types.ObjectId(storeId),
-      organizationId: new Types.ObjectId(organizationId),
       status: SubscriptionStatus.ACTIVE,
       pricePerMonth: STORE_PRICE_PER_MONTH,
       currency: 'USD',
@@ -61,16 +59,6 @@ export class SubscriptionService {
       storeId: new Types.ObjectId(storeId),
       isDeleted: false,
     });
-  }
-
-  /**
-   * Get all subscriptions for an organization
-   */
-  async getByOrganizationId(organizationId: string): Promise<SubscriptionDocument[]> {
-    return this.subscriptionModel.find({
-      organizationId: new Types.ObjectId(organizationId),
-      isDeleted: false,
-    }).sort({ createdAt: -1 });
   }
 
   /**
@@ -115,7 +103,7 @@ export class SubscriptionService {
    * Generate invoice for a subscription
    * Store will be blocked immediately until invoice is paid
    */
-  async generateInvoice(subscription: SubscriptionDocument, storeName?: string, storeUrl?: string, organizationName?: string): Promise<InvoiceDocument> {
+  async generateInvoice(subscription: SubscriptionDocument, storeName?: string, storeUrl?: string): Promise<InvoiceDocument> {
     const now = new Date();
     const periodStart = subscription.billingCycleStart;
     const periodEnd = new Date(periodStart);
@@ -134,7 +122,6 @@ export class SubscriptionService {
     const invoice = await this.invoiceModel.create({
       invoiceNumber,
       storeId: subscription.storeId,
-      organizationId: subscription.organizationId,
       subscriptionId: subscription._id,
       status: InvoiceStatus.PENDING,
       periodStart,
@@ -144,7 +131,6 @@ export class SubscriptionService {
       dueDate,
       storeName,
       storeUrl,
-      organizationName,
     });
 
     // Update subscription with new billing cycle
@@ -196,61 +182,18 @@ export class SubscriptionService {
   }
 
   /**
-   * Transfer subscription and related invoices to a new organization
-   * Called when a store is transferred between organizations
+   * Get invoices for a store
    */
-  async transferSubscription(
+  async getInvoicesByStore(
     storeId: string,
-    fromOrganizationId: string,
-    toOrganizationId: string,
-  ): Promise<void> {
-    // Update subscription
-    await this.subscriptionModel.updateMany(
-      {
-        storeId: new Types.ObjectId(storeId),
-        organizationId: new Types.ObjectId(fromOrganizationId),
-      },
-      {
-        organizationId: new Types.ObjectId(toOrganizationId),
-        updatedAt: new Date(),
-      },
-    );
-
-    // Update all invoices for this store to the new organization
-    await this.invoiceModel.updateMany(
-      {
-        storeId: new Types.ObjectId(storeId),
-        organizationId: new Types.ObjectId(fromOrganizationId),
-      },
-      {
-        organizationId: new Types.ObjectId(toOrganizationId),
-        updatedAt: new Date(),
-      },
-    );
-
-    this.logger.log(
-      `Transferred subscription for store ${storeId} from org ${fromOrganizationId} to org ${toOrganizationId}`,
-    );
-  }
-
-  /**
-   * Get invoices for an organization
-   */
-  async getInvoicesByOrganization(
-    organizationId: string,
-    storeId?: string,
     status?: InvoiceStatus,
     page: number = 1,
     limit: number = 20,
   ): Promise<{ invoices: InvoiceDocument[]; total: number }> {
     const filter: any = {
-      organizationId: new Types.ObjectId(organizationId),
+      storeId: new Types.ObjectId(storeId),
       isDeleted: false,
     };
-
-    if (storeId) {
-      filter.storeId = new Types.ObjectId(storeId);
-    }
 
     if (status) {
       filter.status = status;
@@ -448,7 +391,6 @@ export class SubscriptionService {
           invoiceId: invoiceId,
           invoiceNumber: invoice.invoiceNumber,
           storeId: invoice.storeId.toString(),
-          organizationId: invoice.organizationId.toString(),
         },
       }
     );

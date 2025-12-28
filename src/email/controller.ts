@@ -91,7 +91,6 @@ export class EmailController {
   async addEmail(
     @Body() dto: {
       storeId: string;
-      organizationId: string;
       email: string;
       customerId?: string;
       source?: string;
@@ -99,7 +98,6 @@ export class EmailController {
   ) {
     return this.emailService.findOrCreate(
       dto.storeId,
-      dto.organizationId,
       dto.email,
       dto.customerId,
       dto.source || 'manual',

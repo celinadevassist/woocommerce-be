@@ -65,7 +65,6 @@ export class SyncService {
     // Create sync job
     const job = await this.syncJobModel.create({
       storeId: new Types.ObjectId(storeId),
-      organizationId: store.organizationId,
       entityType: SyncEntityType.PRODUCTS,
       type,
       status: SyncJobStatus.PENDING,
@@ -282,7 +281,6 @@ export class SyncService {
             // Upsert product to database
             const savedProduct = await this.productService.upsertFromWoo(
               store._id.toString(),
-              store.organizationId.toString(),
               wooProduct,
             );
 
@@ -304,7 +302,6 @@ export class SyncService {
                       await this.productService.upsertVariantFromWoo(
                         savedProduct._id.toString(),
                         store._id.toString(),
-                        store.organizationId.toString(),
                         wooProduct.id,
                         variation,
                       );
@@ -397,7 +394,6 @@ export class SyncService {
 
     const job = await this.syncJobModel.create({
       storeId: new Types.ObjectId(storeId),
-      organizationId: store.organizationId,
       entityType: SyncEntityType.ORDERS,
       type,
       status: SyncJobStatus.PENDING,
@@ -453,7 +449,6 @@ export class SyncService {
           try {
             await this.orderService.upsertFromWoo(
               store._id.toString(),
-              store.organizationId.toString(),
               wooOrder,
             );
             job.processedItems++;
@@ -524,7 +519,6 @@ export class SyncService {
 
     const job = await this.syncJobModel.create({
       storeId: new Types.ObjectId(storeId),
-      organizationId: store.organizationId,
       entityType: SyncEntityType.CUSTOMERS,
       type,
       status: SyncJobStatus.PENDING,
@@ -580,7 +574,6 @@ export class SyncService {
           try {
             await this.customerService.upsertFromWoo(
               store._id.toString(),
-              store.organizationId.toString(),
               wooCustomer,
             );
             job.processedItems++;
@@ -651,7 +644,6 @@ export class SyncService {
 
     const job = await this.syncJobModel.create({
       storeId: new Types.ObjectId(storeId),
-      organizationId: store.organizationId,
       entityType: SyncEntityType.REVIEWS,
       type,
       status: SyncJobStatus.PENDING,
@@ -707,7 +699,6 @@ export class SyncService {
           try {
             await this.reviewService.upsertFromWoo(
               store._id.toString(),
-              store.organizationId.toString(),
               wooReview,
             );
             job.processedItems++;
@@ -822,7 +813,6 @@ export class SyncService {
     return {
       _id: obj._id.toString(),
       storeId: obj.storeId.toString(),
-      organizationId: obj.organizationId.toString(),
       entityType: obj.entityType,
       type: obj.type,
       status: obj.status,

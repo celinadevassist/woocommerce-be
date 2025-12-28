@@ -16,7 +16,6 @@ import {
 } from './interface';
 import { Product, ProductDocument } from '../product/schema';
 import { ProductVariant, ProductVariantDocument } from '../product/variant.schema';
-import { Organization, OrganizationDocument } from '../organization/schema';
 import { Store, StoreDocument } from '../store/schema';
 import { StockStatus } from '../product/enum';
 
@@ -27,7 +26,6 @@ export class InventoryService {
     @InjectModel(StockAlert.name) private stockAlertModel: Model<StockAlertDocument>,
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     @InjectModel(ProductVariant.name) private variantModel: Model<ProductVariantDocument>,
-    @InjectModel(Organization.name) private organizationModel: Model<OrganizationDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
   ) {}
 
@@ -55,7 +53,6 @@ export class InventoryService {
       productId: new Types.ObjectId(productId),
       variantId: options.variantId ? new Types.ObjectId(options.variantId) : undefined,
       storeId: product.storeId,
-      organizationId: product.organizationId,
       previousQuantity,
       newQuantity,
       quantityChange: newQuantity - previousQuantity,
@@ -81,7 +78,6 @@ export class InventoryService {
     options: {
       productId?: string;
       storeId?: string;
-      organizationId?: string;
       changeType?: InventoryChangeType;
       startDate?: Date;
       endDate?: Date;
@@ -89,22 +85,20 @@ export class InventoryService {
       size?: number;
     } = {},
   ): Promise<IInventoryLogsResponse> {
-    // Verify user access
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    // Get user's accessible stores
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
     };
 
     if (options.productId) {
       filter.productId = new Types.ObjectId(options.productId);
     }
     if (options.storeId) {
+      // Verify user has access to this specific store
+      await this.getStoreWithAccess(options.storeId, userId);
       filter.storeId = new Types.ObjectId(options.storeId);
-    }
-    if (options.organizationId) {
-      filter.organizationId = new Types.ObjectId(options.organizationId);
     }
     if (options.changeType) {
       filter.changeType = options.changeType;
@@ -142,25 +136,22 @@ export class InventoryService {
     userId: string,
     options: {
       storeId?: string;
-      organizationId?: string;
       status?: AlertStatus;
       alertType?: AlertType;
       page?: number;
       size?: number;
     } = {},
   ): Promise<IStockAlertsResponse> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
     };
 
     if (options.storeId) {
+      // Verify user has access to this specific store
+      await this.getStoreWithAccess(options.storeId, userId);
       filter.storeId = new Types.ObjectId(options.storeId);
-    }
-    if (options.organizationId) {
-      filter.organizationId = new Types.ObjectId(options.organizationId);
     }
     if (options.status) {
       filter.status = options.status;
@@ -192,18 +183,19 @@ export class InventoryService {
   }
 
   /**
-   * Get inventory overview for a store or organization
+   * Get inventory overview for a store
    */
   async getOverview(userId: string, storeId?: string): Promise<IInventoryOverview> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
     if (storeId) {
+      // Verify user has access to this specific store
+      await this.getStoreWithAccess(storeId, userId);
       filter.storeId = new Types.ObjectId(storeId);
     }
 
@@ -236,8 +228,8 @@ export class InventoryService {
       throw new NotFoundException('Alert not found');
     }
 
-    // Verify user has access
-    await this.verifyOrganizationAccess(alert.organizationId.toString(), userId);
+    // Verify user has access to the store
+    await this.getStoreWithAccess(alert.storeId.toString(), userId);
 
     alert.status = AlertStatus.DISMISSED;
     (alert as any).dismissedBy = new Types.ObjectId(userId);
@@ -250,15 +242,16 @@ export class InventoryService {
    * Get alert count for dashboard
    */
   async getAlertCount(userId: string, storeId?: string): Promise<{ lowStock: number; outOfStock: number }> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       status: AlertStatus.ACTIVE,
     };
 
     if (storeId) {
+      // Verify user has access to this specific store
+      await this.getStoreWithAccess(storeId, userId);
       filter.storeId = new Types.ObjectId(storeId);
     }
 
@@ -306,7 +299,6 @@ export class InventoryService {
         await this.stockAlertModel.create({
           productId: product._id,
           storeId: product.storeId,
-          organizationId: product.organizationId,
           alertType,
           status: AlertStatus.ACTIVE,
           currentQuantity: quantity,
@@ -326,7 +318,6 @@ export class InventoryService {
         await this.stockAlertModel.create({
           productId: product._id,
           storeId: product.storeId,
-          organizationId: product.organizationId,
           alertType: AlertType.BACK_IN_STOCK,
           status: AlertStatus.RESOLVED, // Auto-resolve back-in-stock alerts
           currentQuantity: quantity,
@@ -338,32 +329,35 @@ export class InventoryService {
     }
   }
 
-  private async getUserOrganizations(userId: string): Promise<OrganizationDocument[]> {
-    return this.organizationModel.find({
+  private async getUserStoreIds(userId: string): Promise<Types.ObjectId[]> {
+    const stores = await this.storeModel.find({
       isDeleted: false,
       $or: [
         { ownerId: new Types.ObjectId(userId) },
         { 'members.userId': new Types.ObjectId(userId) },
       ],
     });
+    return stores.map((store) => store._id);
   }
 
-  private async verifyOrganizationAccess(organizationId: string, userId: string): Promise<void> {
-    const organization = await this.organizationModel.findOne({
-      _id: new Types.ObjectId(organizationId),
+  private async getStoreWithAccess(storeId: string, userId: string): Promise<StoreDocument> {
+    const store = await this.storeModel.findOne({
+      _id: new Types.ObjectId(storeId),
       isDeleted: false,
     });
 
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
+    if (!store) {
+      throw new NotFoundException('Store not found');
     }
 
-    const isOwner = organization.ownerId.toString() === userId;
-    const isMember = organization.members.some((m) => m.userId.toString() === userId);
+    const isOwner = store.ownerId?.toString() === userId;
+    const isMember = store.members?.some((m) => m.userId.toString() === userId);
 
     if (!isOwner && !isMember) {
-      throw new ForbiddenException('You do not have access to this organization');
+      throw new ForbiddenException('You do not have access to this store');
     }
+
+    return store;
   }
 
   private toLogInterface(doc: InventoryLogDocument): IInventoryLog {
@@ -373,7 +367,6 @@ export class InventoryService {
       productId: obj.productId.toString(),
       variantId: obj.variantId?.toString(),
       storeId: obj.storeId.toString(),
-      organizationId: obj.organizationId.toString(),
       previousQuantity: obj.previousQuantity,
       newQuantity: obj.newQuantity,
       quantityChange: obj.quantityChange,
@@ -394,7 +387,6 @@ export class InventoryService {
       productId: obj.productId.toString(),
       variantId: obj.variantId?.toString(),
       storeId: obj.storeId.toString(),
-      organizationId: obj.organizationId.toString(),
       alertType: obj.alertType,
       status: obj.status,
       currentQuantity: obj.currentQuantity,

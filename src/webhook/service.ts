@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model } from 'mongoose';
 import * as crypto from 'crypto';
 import { Store, StoreDocument } from '../store/schema';
 import { OrderService } from '../order/service';
@@ -104,12 +104,11 @@ export class WebhookService {
     payload: WooOrder,
   ): Promise<{ success: boolean; message: string }> {
     const storeId = store._id.toString();
-    const organizationId = store.organizationId.toString();
 
     switch (event) {
       case 'created':
       case 'updated':
-        await this.orderService.upsertFromWoo(storeId, organizationId, payload);
+        await this.orderService.upsertFromWoo(storeId, payload);
         return { success: true, message: `Order ${payload.id} ${event}` };
 
       case 'deleted':
@@ -118,7 +117,7 @@ export class WebhookService {
         return { success: true, message: `Order ${payload.id} deletion noted` };
 
       case 'restored':
-        await this.orderService.upsertFromWoo(storeId, organizationId, payload);
+        await this.orderService.upsertFromWoo(storeId, payload);
         return { success: true, message: `Order ${payload.id} restored` };
 
       default:
@@ -136,12 +135,11 @@ export class WebhookService {
     payload: WooProduct,
   ): Promise<{ success: boolean; message: string }> {
     const storeId = store._id.toString();
-    const organizationId = store.organizationId.toString();
 
     switch (event) {
       case 'created':
       case 'updated':
-        await this.productService.upsertFromWoo(storeId, organizationId, payload);
+        await this.productService.upsertFromWoo(storeId, payload);
         return { success: true, message: `Product ${payload.id} ${event}` };
 
       case 'deleted':
@@ -150,7 +148,7 @@ export class WebhookService {
         return { success: true, message: `Product ${payload.id} deletion noted` };
 
       case 'restored':
-        await this.productService.upsertFromWoo(storeId, organizationId, payload);
+        await this.productService.upsertFromWoo(storeId, payload);
         return { success: true, message: `Product ${payload.id} restored` };
 
       default:
@@ -168,12 +166,11 @@ export class WebhookService {
     payload: WooCustomer,
   ): Promise<{ success: boolean; message: string }> {
     const storeId = store._id.toString();
-    const organizationId = store.organizationId.toString();
 
     switch (event) {
       case 'created':
       case 'updated':
-        await this.customerService.upsertFromWoo(storeId, organizationId, payload);
+        await this.customerService.upsertFromWoo(storeId, payload);
         return { success: true, message: `Customer ${payload.id} ${event}` };
 
       case 'deleted':
@@ -195,12 +192,11 @@ export class WebhookService {
     payload: WooProductReview,
   ): Promise<{ success: boolean; message: string }> {
     const storeId = store._id.toString();
-    const organizationId = store.organizationId.toString();
 
     switch (event) {
       case 'created':
       case 'updated':
-        await this.reviewService.upsertFromWoo(storeId, organizationId, payload);
+        await this.reviewService.upsertFromWoo(storeId, payload);
         return { success: true, message: `Review ${payload.id} ${event}` };
 
       case 'deleted':

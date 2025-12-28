@@ -7,7 +7,6 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Store, StoreDocument } from '../store/schema';
-import { Organization, OrganizationDocument } from '../organization/schema';
 import { Attribute, AttributeDocument, AttributeTerm, AttributeTermDocument } from './schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 
@@ -39,7 +38,6 @@ export class AttributeService {
     @InjectModel(Attribute.name) private attributeModel: Model<AttributeDocument>,
     @InjectModel(AttributeTerm.name) private termModel: Model<AttributeTermDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
-    @InjectModel(Organization.name) private organizationModel: Model<OrganizationDocument>,
     private readonly wooCommerceService: WooCommerceService,
   ) {}
 
@@ -610,17 +608,9 @@ export class AttributeService {
       throw new NotFoundException('Store not found');
     }
 
-    const organization = await this.organizationModel.findOne({
-      _id: store.organizationId,
-      isDeleted: false,
-    });
-
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
-    }
-
-    const isOwner = organization.ownerId.toString() === userId;
-    const isMember = organization.members.some((m) => m.userId.toString() === userId);
+    // Verify store access - check if user is owner or member
+    const isOwner = store.ownerId?.toString() === userId;
+    const isMember = store.members?.some((m) => m.userId.toString() === userId);
 
     if (!isOwner && !isMember) {
       throw new ForbiddenException('You do not have access to this store');

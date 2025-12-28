@@ -1,7 +1,6 @@
 export interface ITag {
   _id: string;
   storeId: string;
-  organizationId: string;
   externalId: number;
   name: string;
   slug: string;

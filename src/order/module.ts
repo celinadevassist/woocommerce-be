@@ -4,7 +4,6 @@ import { PassportModule } from '@nestjs/passport';
 import { Order, OrderSchema } from './schema';
 import { OrderController } from './controller';
 import { OrderService } from './service';
-import { OrganizationModule } from '../organization/module';
 import { Store, StoreSchema } from '../store/schema';
 import { WooCommerceModule } from '../integrations/woocommerce/woocommerce.module';
 import { CustomerModule } from '../customer/module';
@@ -18,7 +17,6 @@ import { EmailModule } from '../email/module';
       { name: Order.name, schema: OrderSchema },
       { name: Store.name, schema: StoreSchema },
     ]),
-    forwardRef(() => OrganizationModule),
     forwardRef(() => CustomerModule),
     forwardRef(() => PhoneModule),
     forwardRef(() => EmailModule),

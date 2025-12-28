@@ -3,7 +3,6 @@ import { SyncJobType, SyncJobStatus, SyncEntityType } from './enum';
 export interface ISyncJob {
   _id: string;
   storeId: string;
-  organizationId: string;
   entityType: SyncEntityType;
   type: SyncJobType;
   status: SyncJobStatus;

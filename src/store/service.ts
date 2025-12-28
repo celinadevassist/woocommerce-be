@@ -10,14 +10,12 @@ import {
 } from '@nestjs/common';
 import { InjectModel, InjectConnection } from '@nestjs/mongoose';
 import { Model, Types, Connection } from 'mongoose';
-import { Store, StoreDocument } from './schema';
+import { Store, StoreDocument, StoreMember } from './schema';
 import { CreateStoreDto } from './dto.create';
 import { UpdateStoreDto, UpdateCredentialsDto } from './dto.update';
 import { QueryStoreDto } from './dto.query';
-import { IStore, IStoreResponse, IConnectionTestResult } from './interface';
-import { StoreStatus, SyncStatus } from './enum';
-import { Organization, OrganizationDocument } from '../organization/schema';
-import { OrganizationMemberRole } from '../organization/enum';
+import { IStore, IStoreResponse, IConnectionTestResult, IStoreMember } from './interface';
+import { StoreStatus, SyncStatus, StoreMemberRole } from './enum';
 import { UserDocument } from '../schema/user.schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 import { SubscriptionService } from '../subscription/service';
@@ -28,7 +26,6 @@ export class StoreService {
 
   constructor(
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
-    @InjectModel(Organization.name) private organizationModel: Model<OrganizationDocument>,
     @InjectConnection() private readonly connection: Connection,
     private readonly wooCommerceService: WooCommerceService,
     @Inject(forwardRef(() => SubscriptionService))
@@ -37,26 +34,23 @@ export class StoreService {
 
   /**
    * Create a new store connection
-   * No store limit - each store is billed $19/month
+   * The creating user becomes the owner
    */
   async create(user: UserDocument, dto: CreateStoreDto): Promise<IStore> {
-    // Verify organization access
-    await this.verifyOrganizationAccess(dto.organizationId, user._id.toString());
-
-    // Check for duplicate URL within organization
+    // Check for duplicate URL (globally unique)
     const existingStore = await this.storeModel.findOne({
-      organizationId: new Types.ObjectId(dto.organizationId),
       url: dto.url,
       isDeleted: false,
     });
 
     if (existingStore) {
-      throw new ConflictException('A store with this URL already exists in your organization');
+      throw new ConflictException('A store with this URL already exists');
     }
 
-    // Create store with initial status
+    // Create store with user as owner
     const store = await this.storeModel.create({
-      organizationId: new Types.ObjectId(dto.organizationId),
+      ownerId: user._id,
+      members: [], // Owner is tracked separately, not in members array
       name: dto.name,
       platform: dto.platform,
       url: dto.url.replace(/\/+$/, ''), // Remove trailing slashes
@@ -82,7 +76,6 @@ export class StoreService {
     try {
       await this.subscriptionService.createSubscription(
         store._id.toString(),
-        dto.organizationId,
         dto.name,
         dto.url,
       );
@@ -95,29 +88,20 @@ export class StoreService {
   }
 
   /**
-   * Get stores for user's organizations
+   * Get stores for user (owned or member of)
    */
   async findByUser(userId: string, query: QueryStoreDto): Promise<IStoreResponse> {
-    // Get organizations user has access to
-    const organizations = await this.organizationModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    }).select('_id');
-
-    const orgIds = organizations.map((org) => org._id);
+    const userObjectId = new Types.ObjectId(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
       isDeleted: false,
+      $or: [
+        { ownerId: userObjectId },
+        { 'members.userId': userObjectId },
+      ],
     };
 
     // Apply additional filters
-    if (query.organizationId) {
-      filter.organizationId = new Types.ObjectId(query.organizationId);
-    }
     if (query.platform) {
       filter.platform = query.platform;
     }
@@ -125,10 +109,21 @@ export class StoreService {
       filter.status = query.status;
     }
     if (query.keyword) {
-      filter.$or = [
-        { name: { $regex: query.keyword, $options: 'i' } },
-        { url: { $regex: query.keyword, $options: 'i' } },
+      filter.$and = [
+        {
+          $or: [
+            { ownerId: userObjectId },
+            { 'members.userId': userObjectId },
+          ],
+        },
+        {
+          $or: [
+            { name: { $regex: query.keyword, $options: 'i' } },
+            { url: { $regex: query.keyword, $options: 'i' } },
+          ],
+        },
       ];
+      delete filter.$or;
     }
 
     const page = query.page || 1;
@@ -168,8 +163,8 @@ export class StoreService {
       throw new NotFoundException('Store not found');
     }
 
-    // Verify user has access to organization
-    await this.verifyOrganizationAccess(store.organizationId.toString(), userId);
+    // Verify user has access to store
+    this.verifyStoreAccess(store, userId);
 
     return this.toInterface(store);
   }
@@ -187,8 +182,8 @@ export class StoreService {
       throw new NotFoundException('Store not found');
     }
 
-    // Verify user has access
-    await this.verifyOrganizationAccess(store.organizationId.toString(), userId);
+    // Verify user has access (at least manager role)
+    this.verifyStoreAccess(store, userId, [StoreMemberRole.OWNER, StoreMemberRole.ADMIN, StoreMemberRole.MANAGER]);
 
     // Update fields
     if (dto.name) store.name = dto.name;
@@ -216,8 +211,8 @@ export class StoreService {
       throw new NotFoundException('Store not found');
     }
 
-    // Verify user has access
-    await this.verifyOrganizationAccess(store.organizationId.toString(), userId);
+    // Only owner and admin can update credentials
+    this.verifyStoreAccess(store, userId, [StoreMemberRole.OWNER, StoreMemberRole.ADMIN]);
 
     // Update credentials
     if (dto.consumerKey) store.credentials.consumerKey = dto.consumerKey;
@@ -246,7 +241,7 @@ export class StoreService {
     }
 
     // Verify user has access
-    await this.verifyOrganizationAccess(store.organizationId.toString(), userId);
+    this.verifyStoreAccess(store, userId);
 
     try {
       const result = await this.wooCommerceService.testConnection({
@@ -337,8 +332,10 @@ export class StoreService {
       throw new NotFoundException('Store not found');
     }
 
-    // Verify user has access
-    await this.verifyOrganizationAccess(store.organizationId.toString(), userId);
+    // Only owner can delete store
+    if (store.ownerId.toString() !== userId) {
+      throw new ForbiddenException('Only the store owner can delete the store');
+    }
 
     store.isDeleted = true;
     store.status = StoreStatus.DISCONNECTED;
@@ -363,7 +360,7 @@ export class StoreService {
       throw new NotFoundException('Store not found');
     }
 
-    await this.verifyOrganizationAccess(store.organizationId.toString(), userId);
+    this.verifyStoreAccess(store, userId);
 
     // Generate webhook secret if not exists
     if (!store.webhookSecret) {
@@ -417,7 +414,7 @@ Create webhooks for all the topics you want to sync in real-time.`,
       throw new NotFoundException('Store not found');
     }
 
-    await this.verifyOrganizationAccess(store.organizationId.toString(), userId);
+    this.verifyStoreAccess(store, userId, [StoreMemberRole.OWNER, StoreMemberRole.ADMIN]);
 
     store.webhookSecret = this.generateWebhookSecret();
     await store.save();
@@ -437,11 +434,11 @@ Create webhooks for all the topics you want to sync in real-time.`,
   }
 
   /**
-   * Get store count for an organization
+   * Get store count for a user
    */
-  async getStoreCountByOrganization(organizationId: string): Promise<number> {
+  async getStoreCountByUser(userId: string): Promise<number> {
     return this.storeModel.countDocuments({
-      organizationId: new Types.ObjectId(organizationId),
+      ownerId: new Types.ObjectId(userId),
       isDeleted: false,
     });
   }
@@ -458,15 +455,16 @@ Create webhooks for all the topics you want to sync in real-time.`,
       .select('+credentials');
   }
 
+  // ==================== MEMBER MANAGEMENT ====================
+
   /**
-   * Transfer store ownership to another organization
-   * Only the current organization owner/admin can transfer a store
-   * Updates ALL related records (products, orders, customers, reviews, etc.)
+   * Add a member to the store
    */
-  async transferStore(
+  async addMember(
     storeId: string,
     userId: string,
-    targetOrganizationId: string,
+    memberUserId: string,
+    role: StoreMemberRole,
   ): Promise<IStore> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
@@ -477,120 +475,43 @@ Create webhooks for all the topics you want to sync in real-time.`,
       throw new NotFoundException('Store not found');
     }
 
-    // Verify user has management access to the source organization
-    await this.verifyOrganizationManagementAccess(
-      store.organizationId.toString(),
-      userId,
+    // Only owner and admin can add members
+    this.verifyStoreAccess(store, userId, [StoreMemberRole.OWNER, StoreMemberRole.ADMIN]);
+
+    // Cannot add owner role via this method
+    if (role === StoreMemberRole.OWNER) {
+      throw new BadRequestException('Cannot add a member with owner role. Use transferOwnership instead.');
+    }
+
+    // Check if user is already owner
+    if (store.ownerId.toString() === memberUserId) {
+      throw new ConflictException('This user is already the store owner');
+    }
+
+    // Check if user is already a member
+    const existingMember = store.members.find(
+      (m) => m.userId.toString() === memberUserId,
     );
 
-    // Cannot transfer to the same organization
-    if (store.organizationId.toString() === targetOrganizationId) {
-      throw new BadRequestException('Store is already in this organization');
+    if (existingMember) {
+      throw new ConflictException('User is already a member of this store');
     }
 
-    // Verify target organization exists and user has access to it
-    const targetOrg = await this.organizationModel.findOne({
-      _id: new Types.ObjectId(targetOrganizationId),
-      isDeleted: false,
-    });
+    // Add member
+    store.members.push({
+      userId: new Types.ObjectId(memberUserId) as any,
+      role,
+      joinedAt: new Date(),
+    } as StoreMember);
 
-    if (!targetOrg) {
-      throw new NotFoundException('Target organization not found');
-    }
-
-    // Verify user has access to the target organization
-    const isTargetOwner = targetOrg.ownerId.toString() === userId;
-    const isTargetMember = targetOrg.members.some((m) => m.userId.toString() === userId);
-
-    if (!isTargetOwner && !isTargetMember) {
-      throw new ForbiddenException(
-        'You must be a member of the target organization to transfer a store to it',
-      );
-    }
-
-    // Check if a store with the same URL already exists in the target organization
-    const existingStore = await this.storeModel.findOne({
-      organizationId: new Types.ObjectId(targetOrganizationId),
-      url: store.url,
-      isDeleted: false,
-    });
-
-    if (existingStore) {
-      throw new ConflictException(
-        'A store with this URL already exists in the target organization',
-      );
-    }
-
-    const previousOrgId = store.organizationId.toString();
-    const storeObjectId = new Types.ObjectId(storeId);
-    const newOrgObjectId = new Types.ObjectId(targetOrganizationId);
-
-    this.logger.log(
-      `Transferring store ${storeId} from org ${previousOrgId} to org ${targetOrganizationId}`,
-    );
-
-    // Update store's organization
-    (store as any).organizationId = newOrgObjectId;
     await store.save();
-
-    // Update all related collections that have storeId and organizationId
-    // Using direct collection access for bulk updates
-    const collectionsToUpdate = [
-      'products',
-      'product_variants',
-      'orders',
-      'customers',
-      'reviews',
-      'response_templates',
-      'categories',
-      'tags',
-      'attributes',
-      'inventory_logs',
-      'stock_alerts',
-      'sync_jobs',
-      'phones',
-      'emails',
-      'audit_logs',
-      'customer_segments',
-      'subscriptions',
-      'invoices',
-    ];
-
-    const updatePromises = collectionsToUpdate.map(async (collectionName) => {
-      try {
-        const collection = this.connection.collection(collectionName);
-        const result = await collection.updateMany(
-          { storeId: storeObjectId },
-          { $set: { organizationId: newOrgObjectId, updatedAt: new Date() } },
-        );
-        if (result.modifiedCount > 0) {
-          this.logger.log(
-            `Updated ${result.modifiedCount} records in ${collectionName} for store ${storeId}`,
-          );
-        }
-        return { collection: collectionName, updated: result.modifiedCount };
-      } catch (error) {
-        this.logger.warn(
-          `Failed to update ${collectionName} for store ${storeId}: ${error.message}`,
-        );
-        return { collection: collectionName, updated: 0, error: error.message };
-      }
-    });
-
-    const results = await Promise.all(updatePromises);
-    const totalUpdated = results.reduce((sum, r) => sum + r.updated, 0);
-    this.logger.log(`Total records updated for store ${storeId}: ${totalUpdated}`);
-
     return this.toInterface(store);
   }
 
   /**
-   * Get organizations user can transfer stores to
+   * Remove a member from the store
    */
-  async getTransferTargetOrganizations(
-    storeId: string,
-    userId: string,
-  ): Promise<{ id: string; name: string }[]> {
+  async removeMember(storeId: string, userId: string, memberUserId: string): Promise<IStore> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       isDeleted: false,
@@ -600,77 +521,271 @@ Create webhooks for all the topics you want to sync in real-time.`,
       throw new NotFoundException('Store not found');
     }
 
-    // Verify user has management access to the current organization
-    await this.verifyOrganizationManagementAccess(store.organizationId.toString(), userId);
+    // Only owner and admin can remove members
+    this.verifyStoreAccess(store, userId, [StoreMemberRole.OWNER, StoreMemberRole.ADMIN]);
 
-    // Get all organizations user has access to (except the current one)
-    const organizations = await this.organizationModel.find({
-      isDeleted: false,
-      _id: { $ne: store.organizationId },
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    }).select('_id name');
+    // Cannot remove owner
+    if (store.ownerId.toString() === memberUserId) {
+      throw new BadRequestException('Cannot remove the store owner. Use transferOwnership first.');
+    }
 
-    return organizations.map((org) => ({
-      id: org._id.toString(),
-      name: org.name,
-    }));
+    // Find and remove member
+    const memberIndex = store.members.findIndex(
+      (m) => m.userId.toString() === memberUserId,
+    );
+
+    if (memberIndex === -1) {
+      throw new NotFoundException('Member not found in this store');
+    }
+
+    // Admin cannot remove another admin (only owner can)
+    const isOwner = store.ownerId.toString() === userId;
+    const memberToRemove = store.members[memberIndex];
+    if (!isOwner && memberToRemove.role === StoreMemberRole.ADMIN) {
+      throw new ForbiddenException('Only the owner can remove admin members');
+    }
+
+    store.members.splice(memberIndex, 1);
+    await store.save();
+    return this.toInterface(store);
   }
 
-  // Helper methods
-  private async verifyOrganizationManagementAccess(
-    organizationId: string,
+  /**
+   * Update a member's role
+   */
+  async updateMemberRole(
+    storeId: string,
     userId: string,
-  ): Promise<OrganizationDocument> {
-    const organization = await this.organizationModel.findOne({
-      _id: new Types.ObjectId(organizationId),
+    memberUserId: string,
+    newRole: StoreMemberRole,
+  ): Promise<IStore> {
+    const store = await this.storeModel.findOne({
+      _id: new Types.ObjectId(storeId),
       isDeleted: false,
     });
 
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
+    if (!store) {
+      throw new NotFoundException('Store not found');
     }
 
-    const isOwner = organization.ownerId.toString() === userId;
-    const member = organization.members.find((m) => m.userId.toString() === userId);
-    const isAdmin = member?.role === OrganizationMemberRole.ADMIN;
-
-    if (!isOwner && !isAdmin) {
-      throw new ForbiddenException('Only organization owners and admins can transfer stores');
+    // Only owner can change roles
+    if (store.ownerId.toString() !== userId) {
+      throw new ForbiddenException('Only the store owner can change member roles');
     }
 
-    return organization;
+    // Cannot change owner role via this method
+    if (newRole === StoreMemberRole.OWNER) {
+      throw new BadRequestException('Cannot assign owner role. Use transferOwnership instead.');
+    }
+
+    // Find member
+    const member = store.members.find(
+      (m) => m.userId.toString() === memberUserId,
+    );
+
+    if (!member) {
+      throw new NotFoundException('Member not found in this store');
+    }
+
+    member.role = newRole;
+    await store.save();
+    return this.toInterface(store);
   }
-  private async verifyOrganizationAccess(
-    organizationId: string,
-    userId: string,
-  ): Promise<OrganizationDocument> {
-    const organization = await this.organizationModel.findOne({
-      _id: new Types.ObjectId(organizationId),
+
+  /**
+   * Transfer store ownership to another user
+   * The old owner becomes an admin
+   */
+  async transferOwnership(
+    storeId: string,
+    currentOwnerId: string,
+    newOwnerId: string,
+  ): Promise<IStore> {
+    const store = await this.storeModel.findOne({
+      _id: new Types.ObjectId(storeId),
       isDeleted: false,
     });
 
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
+    if (!store) {
+      throw new NotFoundException('Store not found');
     }
 
-    const isOwner = organization.ownerId.toString() === userId;
-    const isMember = organization.members.some((m) => m.userId.toString() === userId);
-
-    if (!isOwner && !isMember) {
-      throw new ForbiddenException('You do not have access to this organization');
+    // Only current owner can transfer ownership
+    if (store.ownerId.toString() !== currentOwnerId) {
+      throw new ForbiddenException('Only the store owner can transfer ownership');
     }
 
-    return organization;
+    // Cannot transfer to self
+    if (currentOwnerId === newOwnerId) {
+      throw new BadRequestException('Cannot transfer ownership to yourself');
+    }
+
+    const newOwnerObjectId = new Types.ObjectId(newOwnerId);
+    const oldOwnerObjectId = store.ownerId;
+
+    this.logger.log(
+      `Transferring store ${storeId} ownership from ${currentOwnerId} to ${newOwnerId}`,
+    );
+
+    // Check if new owner is already a member
+    const existingMemberIndex = store.members.findIndex(
+      (m) => m.userId.toString() === newOwnerId,
+    );
+
+    // Remove new owner from members if they were a member
+    if (existingMemberIndex !== -1) {
+      store.members.splice(existingMemberIndex, 1);
+    }
+
+    // Add old owner as admin member
+    store.members.push({
+      userId: oldOwnerObjectId as any,
+      role: StoreMemberRole.ADMIN,
+      joinedAt: new Date(),
+    } as StoreMember);
+
+    // Set new owner
+    store.ownerId = newOwnerObjectId as any;
+
+    await store.save();
+
+    this.logger.log(
+      `Store ${storeId} ownership transferred. Old owner ${currentOwnerId} is now admin.`,
+    );
+
+    return this.toInterface(store);
+  }
+
+  /**
+   * Get store members with user details
+   */
+  async getMembers(storeId: string, userId: string): Promise<IStoreMember[]> {
+    const store = await this.storeModel
+      .findOne({
+        _id: new Types.ObjectId(storeId),
+        isDeleted: false,
+      })
+      .populate('ownerId', 'name email')
+      .populate('members.userId', 'name email');
+
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+
+    this.verifyStoreAccess(store, userId);
+
+    // Build members list including owner
+    const members: IStoreMember[] = [];
+
+    // Add owner first
+    const ownerUser = store.ownerId as any;
+    members.push({
+      userId: ownerUser._id?.toString() || store.ownerId.toString(),
+      role: StoreMemberRole.OWNER,
+      joinedAt: store.createdAt,
+      name: ownerUser.name,
+      email: ownerUser.email,
+    });
+
+    // Add other members
+    for (const member of store.members) {
+      const memberUser = member.userId as any;
+      members.push({
+        userId: memberUser._id?.toString() || member.userId.toString(),
+        role: member.role,
+        joinedAt: member.joinedAt,
+        name: memberUser.name,
+        email: memberUser.email,
+      });
+    }
+
+    return members;
+  }
+
+  /**
+   * Leave a store (for non-owner members)
+   */
+  async leaveStore(storeId: string, userId: string): Promise<void> {
+    const store = await this.storeModel.findOne({
+      _id: new Types.ObjectId(storeId),
+      isDeleted: false,
+    });
+
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+
+    // Owner cannot leave, must transfer ownership first
+    if (store.ownerId.toString() === userId) {
+      throw new BadRequestException('Owner cannot leave the store. Transfer ownership first.');
+    }
+
+    // Find and remove member
+    const memberIndex = store.members.findIndex(
+      (m) => m.userId.toString() === userId,
+    );
+
+    if (memberIndex === -1) {
+      throw new NotFoundException('You are not a member of this store');
+    }
+
+    store.members.splice(memberIndex, 1);
+    await store.save();
+  }
+
+  // ==================== HELPER METHODS ====================
+
+  /**
+   * Verify user has access to store
+   * @param store The store document
+   * @param userId The user ID to check
+   * @param allowedRoles Optional array of roles that have access (defaults to all roles)
+   */
+  private verifyStoreAccess(
+    store: StoreDocument,
+    userId: string,
+    allowedRoles?: StoreMemberRole[],
+  ): void {
+    const isOwner = store.ownerId.toString() === userId;
+    const member = store.members.find((m) => m.userId.toString() === userId);
+
+    if (!isOwner && !member) {
+      throw new ForbiddenException('You do not have access to this store');
+    }
+
+    // If specific roles are required
+    if (allowedRoles && allowedRoles.length > 0) {
+      if (isOwner && allowedRoles.includes(StoreMemberRole.OWNER)) {
+        return; // Owner has access
+      }
+      if (member && allowedRoles.includes(member.role)) {
+        return; // Member has required role
+      }
+      throw new ForbiddenException('You do not have sufficient permissions for this action');
+    }
+  }
+
+  /**
+   * Get user's role in store
+   */
+  getUserRole(store: StoreDocument, userId: string): StoreMemberRole | null {
+    if (store.ownerId.toString() === userId) {
+      return StoreMemberRole.OWNER;
+    }
+    const member = store.members.find((m) => m.userId.toString() === userId);
+    return member?.role || null;
   }
 
   private toInterface(doc: StoreDocument): IStore {
     const obj = doc.toObject();
     return {
       _id: obj._id.toString(),
-      organizationId: obj.organizationId.toString(),
+      ownerId: obj.ownerId.toString(),
+      members: obj.members.map((m: any) => ({
+        userId: m.userId.toString(),
+        role: m.role,
+        joinedAt: m.joinedAt,
+      })),
       name: obj.name,
       platform: obj.platform,
       url: obj.url,
@@ -678,6 +793,8 @@ Create webhooks for all the topics you want to sync in real-time.`,
       lastSyncAt: obj.lastSyncAt,
       syncStatus: obj.syncStatus,
       settings: obj.settings,
+      productCount: obj.productCount,
+      orderCount: obj.orderCount,
       createdAt: obj.createdAt,
       updatedAt: obj.updatedAt,
     };

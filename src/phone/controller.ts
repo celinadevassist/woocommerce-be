@@ -91,7 +91,6 @@ export class PhoneController {
   async addPhone(
     @Body() dto: {
       storeId: string;
-      organizationId: string;
       phone: string;
       customerId?: string;
       source?: string;
@@ -99,7 +98,6 @@ export class PhoneController {
   ) {
     return this.phoneService.findOrCreate(
       dto.storeId,
-      dto.organizationId,
       dto.phone,
       dto.customerId,
       dto.source || 'manual',

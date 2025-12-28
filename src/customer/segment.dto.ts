@@ -13,6 +13,9 @@ export class SegmentRuleDto {
 }
 
 export class CreateSegmentDto {
+  @ApiPropertyOptional({ description: 'Store ID (optional if user has only one store)' })
+  storeId?: string;
+
   @ApiProperty({ description: 'Segment name' })
   name: string;
 
@@ -30,6 +33,7 @@ export class CreateSegmentDto {
 }
 
 export const CreateSegmentSchema = Joi.object().keys({
+  storeId: Joi.string().optional(),
   name: Joi.string().required().min(1).max(100),
   description: Joi.string().max(500).optional(),
   color: Joi.string().required(),
@@ -82,7 +86,7 @@ export interface ISegmentRule {
 
 export interface ICustomerSegment {
   _id: string;
-  organizationId: string;
+  storeId: string;
   name: string;
   description?: string;
   color: string;

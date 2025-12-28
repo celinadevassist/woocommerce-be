@@ -6,7 +6,6 @@ import { InventoryService } from './service';
 import { InventoryLog, InventoryLogSchema, StockAlert, StockAlertSchema } from './schema';
 import { Product, ProductSchema } from '../product/schema';
 import { ProductVariant, ProductVariantSchema } from '../product/variant.schema';
-import { Organization, OrganizationSchema } from '../organization/schema';
 import { Store, StoreSchema } from '../store/schema';
 
 @Module({
@@ -17,7 +16,6 @@ import { Store, StoreSchema } from '../store/schema';
       { name: StockAlert.name, schema: StockAlertSchema },
       { name: Product.name, schema: ProductSchema },
       { name: ProductVariant.name, schema: ProductVariantSchema },
-      { name: Organization.name, schema: OrganizationSchema },
       { name: Store.name, schema: StoreSchema },
     ]),
   ],

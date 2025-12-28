@@ -13,7 +13,6 @@ import { UpdateCategoryDto } from './dto';
 import { QueryCategoryDto } from './dto';
 import { ICategory, ICategoryResponse, ICategoryTree } from './interface';
 import { Store, StoreDocument } from '../store/schema';
-import { Organization, OrganizationDocument } from '../organization/schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 import { WooCategoryFull } from '../integrations/woocommerce/woocommerce.types';
 
@@ -24,7 +23,6 @@ export class CategoryService {
   constructor(
     @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
-    @InjectModel(Organization.name) private organizationModel: Model<OrganizationDocument>,
     private readonly wooCommerceService: WooCommerceService,
   ) {}
 
@@ -70,7 +68,6 @@ export class CategoryService {
     // Create in local database
     const category = await this.categoryModel.create({
       storeId: store._id,
-      organizationId: store.organizationId,
       externalId: wooCategory.id,
       name: wooCategory.name,
       slug: wooCategory.slug,
@@ -355,7 +352,6 @@ export class CategoryService {
 
       const categoryData = {
         storeId: store._id,
-        organizationId: store.organizationId,
         externalId: wooCat.id,
         name: wooCat.name,
         slug: wooCat.slug,
@@ -436,18 +432,9 @@ export class CategoryService {
       throw new NotFoundException('Store not found');
     }
 
-    // Verify organization access
-    const organization = await this.organizationModel.findOne({
-      _id: store.organizationId,
-      isDeleted: false,
-    });
-
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
-    }
-
-    const isOwner = organization.ownerId.toString() === userId;
-    const isMember = organization.members.some((m) => m.userId.toString() === userId);
+    // Verify store access - check if user is owner or member
+    const isOwner = store.ownerId?.toString() === userId;
+    const isMember = store.members?.some((m) => m.userId.toString() === userId);
 
     if (!isOwner && !isMember) {
       throw new ForbiddenException('You do not have access to this store');
@@ -507,7 +494,6 @@ export class CategoryService {
     return {
       _id: obj._id.toString(),
       storeId: obj.storeId.toString(),
-      organizationId: obj.organizationId.toString(),
       externalId: obj.externalId,
       name: obj.name,
       slug: obj.slug,

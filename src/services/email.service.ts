@@ -248,12 +248,12 @@ export class EmailService {
   async sendInvitationEmail(options: {
     to: string;
     inviterName: string;
-    organizationName: string;
+    storeName: string;
     role: string;
     inviteLink: string;
     expiresAt: Date;
   }): Promise<boolean> {
-    const { to, inviterName, organizationName, role, inviteLink, expiresAt } = options;
+    const { to, inviterName, storeName, role, inviteLink, expiresAt } = options;
 
     const expiryDate = new Date(expiresAt).toLocaleDateString('en-US', {
       weekday: 'long',
@@ -262,7 +262,7 @@ export class EmailService {
       day: 'numeric',
     });
 
-    const subject = `You've been invited to join ${organizationName} on CartFlow`;
+    const subject = `You've been invited to join ${storeName} on CartFlow`;
 
     const html = `
 <!DOCTYPE html>
@@ -288,7 +288,7 @@ export class EmailService {
     <div class="content">
       <h2>You're Invited!</h2>
       <p>Hi there,</p>
-      <p><strong>${inviterName}</strong> has invited you to join <strong>${organizationName}</strong> on CartFlow as a <span class="role-badge">${role}</span>.</p>
+      <p><strong>${inviterName}</strong> has invited you to join <strong>${storeName}</strong> on CartFlow as a <span class="role-badge">${role}</span>.</p>
       <p>CartFlow helps teams manage their WooCommerce stores efficiently from a single dashboard.</p>
       <center>
         <a href="${inviteLink}" class="button">Accept Invitation</a>

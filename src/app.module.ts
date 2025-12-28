@@ -18,7 +18,6 @@ import { ZiinaModule } from './shared/payment/ziina';
 import { SharedEmailModule } from './services/shared-email.module';
 
 // CartFlow modules
-import { OrganizationModule } from './organization/module';
 import { StoreModule } from './store/module';
 import { SyncModule } from './sync/module';
 import { ProductModule } from './product/module';
@@ -58,7 +57,6 @@ import { SubscriptionModule } from './subscription/module';
     SharedEmailModule,
 
     // CartFlow modules
-    OrganizationModule,
     StoreModule,
     SyncModule,
     ProductModule,

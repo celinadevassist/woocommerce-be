@@ -4,7 +4,6 @@ import { Model, Types } from 'mongoose';
 import { AuditLog, AuditLogDocument, AuditAction, AuditSeverity } from './schema';
 
 export interface CreateAuditLogDto {
-  organizationId?: string;
   storeId?: string;
   userId?: string;
   action: AuditAction;
@@ -21,7 +20,6 @@ export interface CreateAuditLogDto {
 }
 
 export interface AuditLogQueryDto {
-  organizationId?: string;
   storeId?: string;
   userId?: string;
   action?: AuditAction | AuditAction[];
@@ -49,9 +47,6 @@ export class AuditLogService {
   async log(data: CreateAuditLogDto): Promise<AuditLogDocument> {
     try {
       const auditLog = await this.auditLogModel.create({
-        organizationId: data.organizationId
-          ? new Types.ObjectId(data.organizationId)
-          : undefined,
         storeId: data.storeId
           ? new Types.ObjectId(data.storeId)
           : undefined,
@@ -98,10 +93,6 @@ export class AuditLogService {
     const skip = (page - 1) * limit;
 
     const filter: any = {};
-
-    if (query.organizationId) {
-      filter.organizationId = new Types.ObjectId(query.organizationId);
-    }
 
     if (query.storeId) {
       filter.storeId = new Types.ObjectId(query.storeId);
@@ -163,19 +154,6 @@ export class AuditLogService {
   }
 
   /**
-   * Get audit logs for an organization
-   */
-  async getOrganizationAuditLogs(
-    organizationId: string,
-    options?: Partial<AuditLogQueryDto>,
-  ) {
-    return this.getAuditLogs({
-      ...options,
-      organizationId,
-    });
-  }
-
-  /**
    * Get audit logs for a store
    */
   async getStoreAuditLogs(
@@ -202,24 +180,24 @@ export class AuditLogService {
   }
 
   /**
-   * Get recent activity for an organization
+   * Get recent activity for a store
    */
   async getRecentActivity(
-    organizationId: string,
+    storeId: string,
     limit: number = 10,
   ): Promise<AuditLogDocument[]> {
     return this.auditLogModel
-      .find({ organizationId: new Types.ObjectId(organizationId) })
+      .find({ storeId: new Types.ObjectId(storeId) })
       .sort({ createdAt: -1 })
       .limit(limit)
       .lean() as Promise<AuditLogDocument[]>;
   }
 
   /**
-   * Get activity summary for an organization
+   * Get activity summary for a store
    */
   async getActivitySummary(
-    organizationId: string,
+    storeId: string,
     days: number = 30,
   ): Promise<{
     totalActions: number;
@@ -230,7 +208,7 @@ export class AuditLogService {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const orgId = new Types.ObjectId(organizationId);
+    const storeObjectId = new Types.ObjectId(storeId);
 
     const [actionBreakdown, userActivity, dailyActivity, totalActions] =
       await Promise.all([
@@ -238,7 +216,7 @@ export class AuditLogService {
         this.auditLogModel.aggregate([
           {
             $match: {
-              organizationId: orgId,
+              storeId: storeObjectId,
               createdAt: { $gte: startDate },
             },
           },
@@ -254,7 +232,7 @@ export class AuditLogService {
         this.auditLogModel.aggregate([
           {
             $match: {
-              organizationId: orgId,
+              storeId: storeObjectId,
               createdAt: { $gte: startDate },
               userId: { $exists: true },
             },
@@ -273,7 +251,7 @@ export class AuditLogService {
         this.auditLogModel.aggregate([
           {
             $match: {
-              organizationId: orgId,
+              storeId: storeObjectId,
               createdAt: { $gte: startDate },
             },
           },
@@ -290,7 +268,7 @@ export class AuditLogService {
 
         // Total count
         this.auditLogModel.countDocuments({
-          organizationId: orgId,
+          storeId: storeObjectId,
           createdAt: { $gte: startDate },
         }),
       ]);
@@ -315,14 +293,14 @@ export class AuditLogService {
   // Convenience methods for common audit events
 
   async logMemberInvited(params: {
-    organizationId: string;
+    storeId: string;
     userId: string;
     email: string;
     role: string;
     ipAddress?: string;
   }) {
     return this.log({
-      organizationId: params.organizationId,
+      storeId: params.storeId,
       userId: params.userId,
       action: AuditAction.INVITATION_SENT,
       resourceType: 'invitation',
@@ -333,13 +311,13 @@ export class AuditLogService {
   }
 
   async logMemberJoined(params: {
-    organizationId: string;
+    storeId: string;
     userId: string;
     email: string;
     role: string;
   }) {
     return this.log({
-      organizationId: params.organizationId,
+      storeId: params.storeId,
       userId: params.userId,
       action: AuditAction.MEMBER_JOINED,
       resourceType: 'member',
@@ -350,14 +328,12 @@ export class AuditLogService {
   }
 
   async logStoreConnected(params: {
-    organizationId: string;
     storeId: string;
     userId: string;
     storeName: string;
     storeUrl: string;
   }) {
     return this.log({
-      organizationId: params.organizationId,
       storeId: params.storeId,
       userId: params.userId,
       action: AuditAction.STORE_CONNECTED,
@@ -370,14 +346,12 @@ export class AuditLogService {
   }
 
   async logProductCreated(params: {
-    organizationId: string;
     storeId: string;
     userId: string;
     productId: string;
     productName: string;
   }) {
     return this.log({
-      organizationId: params.organizationId,
       storeId: params.storeId,
       userId: params.userId,
       action: AuditAction.PRODUCT_CREATED,
@@ -389,7 +363,6 @@ export class AuditLogService {
   }
 
   async logProductUpdated(params: {
-    organizationId: string;
     storeId: string;
     userId: string;
     productId: string;
@@ -397,7 +370,6 @@ export class AuditLogService {
     changes?: Record<string, any>;
   }) {
     return this.log({
-      organizationId: params.organizationId,
       storeId: params.storeId,
       userId: params.userId,
       action: AuditAction.PRODUCT_UPDATED,
@@ -410,7 +382,6 @@ export class AuditLogService {
   }
 
   async logSync(params: {
-    organizationId: string;
     storeId: string;
     userId?: string;
     resourceType: 'product' | 'order' | 'customer' | 'category' | 'attribute' | 'tag' | 'review';
@@ -429,7 +400,6 @@ export class AuditLogService {
     };
 
     return this.log({
-      organizationId: params.organizationId,
       storeId: params.storeId,
       userId: params.userId,
       action: actionMap[params.resourceType] || AuditAction.STORE_SYNCED,

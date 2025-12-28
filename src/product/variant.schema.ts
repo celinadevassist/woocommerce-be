@@ -26,9 +26,6 @@ export class ProductVariant extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
-
   @Prop({ required: true, index: true })
   externalId: number;
 

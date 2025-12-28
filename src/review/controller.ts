@@ -159,7 +159,7 @@ export class ReviewController {
     @User('_id') userId: string,
     @Body() dto: CreateResponseTemplateDto,
   ) {
-    return this.reviewService.createResponseTemplate(userId, dto);
+    return this.reviewService.createResponseTemplate(userId, dto.storeId, dto);
   }
 
   @Patch('templates/:templateId')

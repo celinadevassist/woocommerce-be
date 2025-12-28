@@ -10,8 +10,8 @@ export enum InvitationStatus {
 
 @Schema({ timestamps: true, versionKey: false, collection: 'invitations' })
 export class Invitation extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true, index: true })
   email: string;
@@ -21,9 +21,6 @@ export class Invitation extends Document {
 
   @Prop({ required: true })
   role: string; // admin, manager, staff, viewer
-
-  @Prop({ type: MongooseSchema.Types.Mixed, default: 'all' })
-  storeAccess: string[] | 'all';
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
   invitedBy: MongooseSchema.Types.ObjectId;
@@ -56,6 +53,6 @@ export type InvitationDocument = Invitation & Document;
 export const InvitationSchema = SchemaFactory.createForClass(Invitation);
 
 // Indexes
-InvitationSchema.index({ organizationId: 1, email: 1 });
+InvitationSchema.index({ storeId: 1, email: 1 });
 InvitationSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // TTL index
 InvitationSchema.index({ status: 1 });

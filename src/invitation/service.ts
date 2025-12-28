@@ -9,9 +9,9 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Invitation, InvitationDocument, InvitationStatus } from './schema';
-import { Organization, OrganizationDocument } from '../organization/schema';
+import { Store, StoreDocument } from '../store/schema';
 import { User, UserDocument } from '../schema/user.schema';
-import { OrganizationMemberRole } from '../organization/enum';
+import { StoreMemberRole } from '../store/enum';
 import { EmailService } from '../services/email.service';
 import { randomBytes } from 'crypto';
 
@@ -22,54 +22,58 @@ export class InvitationService {
 
   constructor(
     @InjectModel(Invitation.name) private invitationModel: Model<InvitationDocument>,
-    @InjectModel(Organization.name) private organizationModel: Model<OrganizationDocument>,
+    @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private readonly emailService: EmailService,
   ) {}
 
   /**
-   * Send an invitation to join an organization
+   * Send an invitation to join a store
    */
   async sendInvitation(
-    organizationId: string,
+    storeId: string,
     userId: string,
     email: string,
     role: string,
-    storeAccess: string[] | 'all' = 'all',
   ): Promise<{ message: string; invitation: any }> {
-    const organization = await this.organizationModel.findOne({
-      _id: new Types.ObjectId(organizationId),
+    const store = await this.storeModel.findOne({
+      _id: new Types.ObjectId(storeId),
       isDeleted: false,
     });
 
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
+    if (!store) {
+      throw new NotFoundException('Store not found');
     }
 
     // Check if user can invite (owner or admin)
-    if (!this.userCanManage(organization, userId)) {
+    if (!this.userCanManage(store, userId)) {
       throw new ForbiddenException('You do not have permission to invite members');
     }
 
     // Cannot invite as OWNER
-    if (role === OrganizationMemberRole.OWNER) {
+    if (role === StoreMemberRole.OWNER) {
       throw new BadRequestException('Cannot invite member as OWNER role');
     }
 
     // Check if user is already a member (by email)
     const existingUser = await this.userModel.findOne({ email: email.toLowerCase() });
     if (existingUser) {
-      const existingMember = organization.members.find(
+      // Check if already owner
+      if (store.ownerId?.toString() === existingUser._id.toString()) {
+        throw new ConflictException('User is already the owner of this store');
+      }
+      // Check if already member
+      const existingMember = store.members?.find(
         (m) => m.userId.toString() === existingUser._id.toString(),
       );
       if (existingMember) {
-        throw new ConflictException('User is already a member of this organization');
+        throw new ConflictException('User is already a member of this store');
       }
     }
 
     // Check if there's a pending invitation for this email
     const existingInvitation = await this.invitationModel.findOne({
-      organizationId: new Types.ObjectId(organizationId),
+      storeId: new Types.ObjectId(storeId),
       email: email.toLowerCase(),
       status: InvitationStatus.PENDING,
     });
@@ -85,11 +89,10 @@ export class InvitationService {
 
     // Create invitation
     const invitation = await this.invitationModel.create({
-      organizationId: new Types.ObjectId(organizationId),
+      storeId: new Types.ObjectId(storeId),
       email: email.toLowerCase(),
       token,
       role,
-      storeAccess,
       invitedBy: new Types.ObjectId(userId),
       status: InvitationStatus.PENDING,
       expiresAt,
@@ -106,7 +109,7 @@ export class InvitationService {
       await this.emailService.sendInvitationEmail({
         to: email,
         inviterName,
-        organizationName: organization.name,
+        storeName: store.name,
         role,
         inviteLink: `${process.env.FRONTEND_URL}/accept-invitation?token=${token}`,
         expiresAt,
@@ -148,14 +151,14 @@ export class InvitationService {
       throw new BadRequestException('Invitation has expired');
     }
 
-    const organization = await this.organizationModel.findById(invitation.organizationId);
+    const store = await this.storeModel.findById(invitation.storeId);
 
     return {
       id: invitation._id.toString(),
       email: invitation.email,
       role: invitation.role,
-      organizationName: organization?.name || 'Unknown',
-      organizationId: invitation.organizationId.toString(),
+      storeName: store?.name || 'Unknown',
+      storeId: invitation.storeId.toString(),
       expiresAt: invitation.expiresAt,
     };
   }
@@ -163,7 +166,7 @@ export class InvitationService {
   /**
    * Accept an invitation
    */
-  async acceptInvitation(token: string, userId: string): Promise<{ message: string; organizationId: string }> {
+  async acceptInvitation(token: string, userId: string): Promise<{ message: string; storeId: string }> {
     const invitation = await this.invitationModel.findOne({ token });
 
     if (!invitation) {
@@ -193,39 +196,51 @@ export class InvitationService {
       );
     }
 
-    // Get organization
-    const organization = await this.organizationModel.findOne({
-      _id: invitation.organizationId,
+    // Get store
+    const store = await this.storeModel.findOne({
+      _id: invitation.storeId,
       isDeleted: false,
     });
 
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
+    if (!store) {
+      throw new NotFoundException('Store not found');
     }
 
-    // Check if already a member
-    const existingMember = organization.members.find(
-      (m) => m.userId.toString() === userId,
-    );
-    if (existingMember) {
-      // Mark invitation as accepted anyway
+    // Check if already owner
+    if (store.ownerId?.toString() === userId) {
       invitation.status = InvitationStatus.ACCEPTED;
       invitation.acceptedBy = new Types.ObjectId(userId) as any;
       invitation.acceptedAt = new Date();
       await invitation.save();
-      throw new ConflictException('You are already a member of this organization');
+      throw new ConflictException('You are already the owner of this store');
     }
 
-    // Add user to organization
-    organization.members.push({
+    // Check if already a member
+    const existingMember = store.members?.find(
+      (m) => m.userId.toString() === userId,
+    );
+    if (existingMember) {
+      invitation.status = InvitationStatus.ACCEPTED;
+      invitation.acceptedBy = new Types.ObjectId(userId) as any;
+      invitation.acceptedAt = new Date();
+      await invitation.save();
+      throw new ConflictException('You are already a member of this store');
+    }
+
+    // Initialize members array if needed
+    if (!store.members) {
+      store.members = [];
+    }
+
+    // Add user to store
+    store.members.push({
       userId: new Types.ObjectId(userId),
-      role: invitation.role as OrganizationMemberRole,
-      storeAccess: invitation.storeAccess,
+      role: invitation.role as StoreMemberRole,
       invitedAt: invitation.createdAt,
       acceptedAt: new Date(),
     } as any);
 
-    await organization.save();
+    await store.save();
 
     // Mark invitation as accepted
     invitation.status = InvitationStatus.ACCEPTED;
@@ -234,31 +249,31 @@ export class InvitationService {
     await invitation.save();
 
     return {
-      message: `Successfully joined ${organization.name}`,
-      organizationId: organization._id.toString(),
+      message: `Successfully joined ${store.name}`,
+      storeId: store._id.toString(),
     };
   }
 
   /**
-   * Get pending invitations for an organization
+   * Get pending invitations for a store
    */
-  async getOrganizationInvitations(organizationId: string, userId: string): Promise<any[]> {
-    const organization = await this.organizationModel.findOne({
-      _id: new Types.ObjectId(organizationId),
+  async getStoreInvitations(storeId: string, userId: string): Promise<any[]> {
+    const store = await this.storeModel.findOne({
+      _id: new Types.ObjectId(storeId),
       isDeleted: false,
     });
 
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
+    if (!store) {
+      throw new NotFoundException('Store not found');
     }
 
-    if (!this.userHasAccess(organization, userId)) {
-      throw new ForbiddenException('You do not have access to this organization');
+    if (!this.userHasAccess(store, userId)) {
+      throw new ForbiddenException('You do not have access to this store');
     }
 
     const invitations = await this.invitationModel
       .find({
-        organizationId: new Types.ObjectId(organizationId),
+        storeId: new Types.ObjectId(storeId),
         status: InvitationStatus.PENDING,
       })
       .sort({ createdAt: -1 });
@@ -267,7 +282,6 @@ export class InvitationService {
       id: inv._id.toString(),
       email: inv.email,
       role: inv.role,
-      storeAccess: inv.storeAccess,
       status: inv.status,
       createdAt: inv.createdAt,
       expiresAt: inv.expiresAt,
@@ -284,16 +298,16 @@ export class InvitationService {
       throw new NotFoundException('Invitation not found');
     }
 
-    const organization = await this.organizationModel.findOne({
-      _id: invitation.organizationId,
+    const store = await this.storeModel.findOne({
+      _id: invitation.storeId,
       isDeleted: false,
     });
 
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
+    if (!store) {
+      throw new NotFoundException('Store not found');
     }
 
-    if (!this.userCanManage(organization, userId)) {
+    if (!this.userCanManage(store, userId)) {
       throw new ForbiddenException('You do not have permission to revoke invitations');
     }
 
@@ -317,16 +331,16 @@ export class InvitationService {
       throw new NotFoundException('Invitation not found');
     }
 
-    const organization = await this.organizationModel.findOne({
-      _id: invitation.organizationId,
+    const store = await this.storeModel.findOne({
+      _id: invitation.storeId,
       isDeleted: false,
     });
 
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
+    if (!store) {
+      throw new NotFoundException('Store not found');
     }
 
-    if (!this.userCanManage(organization, userId)) {
+    if (!this.userCanManage(store, userId)) {
       throw new ForbiddenException('You do not have permission to resend invitations');
     }
 
@@ -351,7 +365,7 @@ export class InvitationService {
       await this.emailService.sendInvitationEmail({
         to: invitation.email,
         inviterName,
-        organizationName: organization.name,
+        storeName: store.name,
         role: invitation.role,
         inviteLink: `${process.env.FRONTEND_URL}/accept-invitation?token=${invitation.token}`,
         expiresAt,
@@ -377,13 +391,13 @@ export class InvitationService {
 
     const result = [];
     for (const inv of invitations) {
-      const organization = await this.organizationModel.findById(inv.organizationId);
+      const store = await this.storeModel.findById(inv.storeId);
       result.push({
         id: inv._id.toString(),
         token: inv.token,
         role: inv.role,
-        organizationId: inv.organizationId.toString(),
-        organizationName: organization?.name || 'Unknown',
+        storeId: inv.storeId.toString(),
+        storeName: store?.name || 'Unknown',
         createdAt: inv.createdAt,
         expiresAt: inv.expiresAt,
       });
@@ -397,14 +411,14 @@ export class InvitationService {
     return randomBytes(32).toString('hex');
   }
 
-  private userHasAccess(organization: OrganizationDocument, userId: string): boolean {
-    if (organization.ownerId.toString() === userId) return true;
-    return organization.members.some((m) => m.userId.toString() === userId);
+  private userHasAccess(store: StoreDocument, userId: string): boolean {
+    if (store.ownerId?.toString() === userId) return true;
+    return store.members?.some((m) => m.userId.toString() === userId) || false;
   }
 
-  private userCanManage(organization: OrganizationDocument, userId: string): boolean {
-    if (organization.ownerId.toString() === userId) return true;
-    const member = organization.members.find((m) => m.userId.toString() === userId);
-    return member?.role === OrganizationMemberRole.ADMIN;
+  private userCanManage(store: StoreDocument, userId: string): boolean {
+    if (store.ownerId?.toString() === userId) return true;
+    const member = store.members?.find((m) => m.userId.toString() === userId);
+    return member?.role === StoreMemberRole.ADMIN;
   }
 }

@@ -5,7 +5,6 @@ import { AttributeController } from './controller';
 import { AttributeService } from './service';
 import { Attribute, AttributeSchema, AttributeTerm, AttributeTermSchema } from './schema';
 import { Store, StoreSchema } from '../store/schema';
-import { Organization, OrganizationSchema } from '../organization/schema';
 import { WooCommerceModule } from '../integrations/woocommerce/woocommerce.module';
 
 @Module({
@@ -15,7 +14,6 @@ import { WooCommerceModule } from '../integrations/woocommerce/woocommerce.modul
       { name: Attribute.name, schema: AttributeSchema },
       { name: AttributeTerm.name, schema: AttributeTermSchema },
       { name: Store.name, schema: StoreSchema },
-      { name: Organization.name, schema: OrganizationSchema },
     ]),
     WooCommerceModule,
   ],

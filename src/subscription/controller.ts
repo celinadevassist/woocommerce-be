@@ -30,14 +30,14 @@ export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
   /**
-   * Get all subscriptions for the user's organization
+   * Get subscription for a specific store
    */
   @Get()
   @SkipSubscriptionCheck()
-  @ApiOperation({ summary: 'Get all subscriptions for organization' })
-  async getSubscriptions(@User() user: UserDocument, @Query('organizationId') organizationId: string) {
-    const subscriptions = await this.subscriptionService.getByOrganizationId(organizationId);
-    return { subscriptions };
+  @ApiOperation({ summary: 'Get subscription for a store' })
+  async getSubscription(@Query('storeId') storeId: string) {
+    const subscription = await this.subscriptionService.getByStoreId(storeId);
+    return { subscription };
   }
 
   /**
@@ -82,26 +82,22 @@ export class InvoiceController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
   /**
-   * Get all invoices for the user's organization
+   * Get all invoices for a store
    */
   @Get()
   @SkipSubscriptionCheck()
-  @ApiOperation({ summary: 'Get all invoices for organization' })
-  @ApiQuery({ name: 'organizationId', required: true })
-  @ApiQuery({ name: 'storeId', required: false })
+  @ApiOperation({ summary: 'Get all invoices for a store' })
+  @ApiQuery({ name: 'storeId', required: true })
   @ApiQuery({ name: 'status', required: false, enum: InvoiceStatus })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   async getInvoices(
-    @User() user: UserDocument,
-    @Query('organizationId') organizationId: string,
-    @Query('storeId') storeId?: string,
+    @Query('storeId') storeId: string,
     @Query('status') status?: InvoiceStatus,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const result = await this.subscriptionService.getInvoicesByOrganization(
-      organizationId,
+    const result = await this.subscriptionService.getInvoicesByStore(
       storeId,
       status,
       parseInt(page) || 1,

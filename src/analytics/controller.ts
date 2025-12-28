@@ -24,7 +24,6 @@ export class AnalyticsController {
   @ApiOperation({ summary: 'Get dashboard analytics' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: false })
-  @ApiQuery({ name: 'organizationId', required: false })
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
   @ApiQuery({ name: 'period', required: false, enum: ['day', 'week', 'month', 'year'] })

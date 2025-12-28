@@ -72,7 +72,6 @@ export interface IOrderNote {
 export interface IOrder {
   _id: string;
   storeId: string;
-  organizationId: string;
   externalId: number;
   orderNumber: string;
   orderKey?: string;

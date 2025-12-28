@@ -13,7 +13,6 @@ import { UpdateOrderDto, AddTrackingDto, AddOrderNoteDto } from './dto.update';
 import { QueryOrderDto } from './dto.query';
 import { IOrder, IOrderResponse, IOrderStats } from './interface';
 import { OrderStatus, PaymentStatus, FulfillmentStatus } from './enum';
-import { Organization, OrganizationDocument } from '../organization/schema';
 import { Store, StoreDocument } from '../store/schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 import { WooOrder } from '../integrations/woocommerce/woocommerce.types';
@@ -27,7 +26,6 @@ export class OrderService {
 
   constructor(
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
-    @InjectModel(Organization.name) private organizationModel: Model<OrganizationDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     private readonly wooCommerceService: WooCommerceService,
     @Inject(forwardRef(() => CustomerService))
@@ -39,23 +37,56 @@ export class OrderService {
   ) {}
 
   /**
+   * Get store IDs that user has access to (owner or member)
+   */
+  private async getUserStoreIds(userId: string): Promise<Types.ObjectId[]> {
+    const stores = await this.storeModel.find({
+      isDeleted: false,
+      $or: [
+        { ownerId: new Types.ObjectId(userId) },
+        { 'members.userId': new Types.ObjectId(userId) },
+      ],
+    }).select('_id');
+    return stores.map((store) => store._id);
+  }
+
+  /**
+   * Verify user has access to a specific store
+   */
+  private async verifyStoreAccess(storeId: string, userId: string): Promise<StoreDocument> {
+    const store = await this.storeModel.findOne({
+      _id: new Types.ObjectId(storeId),
+      isDeleted: false,
+    });
+
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+
+    const isOwner = store.ownerId.toString() === userId;
+    const isMember = store.members?.some((m) => m.userId.toString() === userId);
+
+    if (!isOwner && !isMember) {
+      throw new ForbiddenException('You do not have access to this store');
+    }
+
+    return store;
+  }
+
+  /**
    * Get orders with filtering and pagination
    */
   async findAll(userId: string, query: QueryOrderDto): Promise<IOrderResponse> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
     // Apply filters
     if (query.storeId) {
       filter.storeId = new Types.ObjectId(query.storeId);
-    }
-    if (query.organizationId) {
-      filter.organizationId = new Types.ObjectId(query.organizationId);
     }
     if (query.status) {
       filter.status = query.status;
@@ -130,7 +161,7 @@ export class OrderService {
       throw new NotFoundException('Order not found');
     }
 
-    await this.verifyOrganizationAccess(order.organizationId.toString(), userId);
+    await this.verifyStoreAccess(order.storeId.toString(), userId);
 
     return this.toInterface(order);
   }
@@ -149,7 +180,7 @@ export class OrderService {
       throw new NotFoundException('Order not found');
     }
 
-    await this.verifyOrganizationAccess(order.organizationId.toString(), userId);
+    await this.verifyStoreAccess(order.storeId.toString(), userId);
 
     const oldStatus = order.status;
     const statusChanged = dto.status && dto.status !== oldStatus;
@@ -218,7 +249,7 @@ export class OrderService {
       throw new NotFoundException('Order not found');
     }
 
-    await this.verifyOrganizationAccess(order.organizationId.toString(), userId);
+    await this.verifyStoreAccess(order.storeId.toString(), userId);
 
     order.trackingNumber = dto.trackingNumber;
     order.trackingCarrier = dto.trackingCarrier;
@@ -238,12 +269,11 @@ export class OrderService {
     status: OrderStatus,
     syncToStore: boolean = true,
   ): Promise<{ updated: number; failed: number; errors: string[] }> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const orders = await this.orderModel.find({
       _id: { $in: orderIds.map((id) => new Types.ObjectId(id)) },
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     });
 
@@ -296,7 +326,7 @@ export class OrderService {
       throw new NotFoundException('Order not found');
     }
 
-    await this.verifyOrganizationAccess(order.organizationId.toString(), userId);
+    await this.verifyStoreAccess(order.storeId.toString(), userId);
 
     const note = {
       _id: new Types.ObjectId(),
@@ -327,7 +357,7 @@ export class OrderService {
       throw new NotFoundException('Order not found');
     }
 
-    await this.verifyOrganizationAccess(order.organizationId.toString(), userId);
+    await this.verifyStoreAccess(order.storeId.toString(), userId);
 
     const noteIndex = order.notes.findIndex(
       (n: any) => n._id.toString() === noteId,
@@ -348,11 +378,10 @@ export class OrderService {
    * Get order statistics
    */
   async getStats(userId: string, storeId?: string, startDate?: Date, endDate?: Date): Promise<IOrderStats> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
@@ -422,11 +451,10 @@ export class OrderService {
    * Export orders to CSV
    */
   async exportToCsv(userId: string, query: QueryOrderDto): Promise<string> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
@@ -539,7 +567,6 @@ export class OrderService {
    */
   async upsertFromWoo(
     storeId: string,
-    organizationId: string,
     wooOrder: WooOrder,
   ): Promise<OrderDocument> {
     const existingOrder = await this.orderModel.findOne({
@@ -549,7 +576,6 @@ export class OrderService {
 
     const orderData: any = {
       storeId: new Types.ObjectId(storeId),
-      organizationId: new Types.ObjectId(organizationId),
       externalId: wooOrder.id,
       orderNumber: wooOrder.number,
       orderKey: wooOrder.order_key,
@@ -641,7 +667,6 @@ export class OrderService {
     try {
       const customer = await this.customerService.findOrCreateFromOrder(
         storeId,
-        organizationId,
         {
           email: wooOrder.billing?.email,
           firstName: wooOrder.billing?.first_name,
@@ -663,14 +688,11 @@ export class OrderService {
         localCustomerId = customer._id;
         this.logger.debug(`Order ${wooOrder.id}: linked to customer ${customer._id}`);
 
-        // Note: Customer stats are now calculated dynamically from orders, no need to update here
-
         // Create/link phone record if phone number exists
         if (wooOrder.billing?.phone) {
           try {
             await this.phoneService.findOrCreate(
               storeId,
-              organizationId,
               wooOrder.billing.phone,
               customer._id.toString(),
               'order',
@@ -686,7 +708,6 @@ export class OrderService {
           try {
             await this.emailService.findOrCreate(
               storeId,
-              organizationId,
               wooOrder.billing.email,
               customer._id.toString(),
               'order',
@@ -774,7 +795,7 @@ export class OrderService {
       throw new NotFoundException('Order not found');
     }
 
-    await this.verifyOrganizationAccess(order.organizationId.toString(), userId);
+    await this.verifyStoreAccess(order.storeId.toString(), userId);
 
     // Validate refund amount
     const refundAmount = parseFloat(dto.amount);
@@ -856,41 +877,11 @@ export class OrderService {
     return order.refunds || [];
   }
 
-  // Helper methods
-  private async getUserOrganizations(userId: string): Promise<OrganizationDocument[]> {
-    return this.organizationModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    });
-  }
-
-  private async verifyOrganizationAccess(organizationId: string, userId: string): Promise<void> {
-    const organization = await this.organizationModel.findOne({
-      _id: new Types.ObjectId(organizationId),
-      isDeleted: false,
-    });
-
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
-    }
-
-    const isOwner = organization.ownerId.toString() === userId;
-    const isMember = organization.members.some((m) => m.userId.toString() === userId);
-
-    if (!isOwner && !isMember) {
-      throw new ForbiddenException('You do not have access to this organization');
-    }
-  }
-
   private toInterface(doc: OrderDocument): IOrder {
     const obj = doc.toObject();
     return {
       _id: obj._id.toString(),
       storeId: obj.storeId.toString(),
-      organizationId: obj.organizationId.toString(),
       externalId: obj.externalId,
       orderNumber: obj.orderNumber,
       orderKey: obj.orderKey,

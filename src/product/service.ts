@@ -13,7 +13,6 @@ import { UpdateProductDto, UpdateStockDto, BulkUpdateProductDto, BulkUpdateVaria
 import { QueryProductDto } from './dto.query';
 import { IProduct, IProductVariant, IProductWithVariants, IProductResponse } from './interface';
 import { StockStatus } from './enum';
-import { Organization, OrganizationDocument } from '../organization/schema';
 import { Store, StoreDocument } from '../store/schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 import { WooProduct, WooProductVariation } from '../integrations/woocommerce/woocommerce.types';
@@ -25,17 +24,15 @@ export class ProductService {
   constructor(
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     @InjectModel(ProductVariant.name) private variantModel: Model<ProductVariantDocument>,
-    @InjectModel(Organization.name) private organizationModel: Model<OrganizationDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     private readonly wooCommerceService: WooCommerceService,
   ) {}
 
   /**
-   * Get products with filtering and pagination
+   * Get stores user has access to
    */
-  async findAll(userId: string, query: QueryProductDto): Promise<IProductResponse> {
-    // Get organizations user has access to
-    const organizations = await this.organizationModel.find({
+  private async getUserStoreIds(userId: string): Promise<Types.ObjectId[]> {
+    const stores = await this.storeModel.find({
       isDeleted: false,
       $or: [
         { ownerId: new Types.ObjectId(userId) },
@@ -43,19 +40,47 @@ export class ProductService {
       ],
     }).select('_id');
 
-    const orgIds = organizations.map((org) => org._id);
+    return stores.map((store) => store._id);
+  }
+
+  /**
+   * Verify user has access to store
+   */
+  private async verifyStoreAccess(storeId: string, userId: string): Promise<StoreDocument> {
+    const store = await this.storeModel.findOne({
+      _id: new Types.ObjectId(storeId),
+      isDeleted: false,
+    });
+
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+
+    const isOwner = store.ownerId.toString() === userId;
+    const isMember = store.members.some((m) => m.userId.toString() === userId);
+
+    if (!isOwner && !isMember) {
+      throw new ForbiddenException('You do not have access to this store');
+    }
+
+    return store;
+  }
+
+  /**
+   * Get products with filtering and pagination
+   */
+  async findAll(userId: string, query: QueryProductDto): Promise<IProductResponse> {
+    // Get stores user has access to
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
     // Apply filters
     if (query.storeId) {
       filter.storeId = new Types.ObjectId(query.storeId);
-    }
-    if (query.organizationId) {
-      filter.organizationId = new Types.ObjectId(query.organizationId);
     }
     if (query.status) {
       filter.status = query.status;
@@ -125,8 +150,8 @@ export class ProductService {
       throw new NotFoundException('Product not found');
     }
 
-    // Verify user has access
-    await this.verifyOrganizationAccess(product.organizationId.toString(), userId);
+    // Verify user has access to store
+    await this.verifyStoreAccess(product.storeId.toString(), userId);
 
     // Get variants if it's a variable product
     const variants = await this.variantModel.find({
@@ -158,7 +183,7 @@ export class ProductService {
       throw new NotFoundException('Product not found');
     }
 
-    await this.verifyOrganizationAccess(product.organizationId.toString(), userId);
+    await this.verifyStoreAccess(product.storeId.toString(), userId);
 
     // Update local product
     if (dto.name) product.name = dto.name;
@@ -204,7 +229,7 @@ export class ProductService {
       throw new NotFoundException('Product not found');
     }
 
-    await this.verifyOrganizationAccess(product.organizationId.toString(), userId);
+    await this.verifyStoreAccess(product.storeId.toString(), userId);
 
     // Update stock
     product.manageStock = true;
@@ -255,7 +280,7 @@ export class ProductService {
           continue;
         }
 
-        await this.verifyOrganizationAccess(product.organizationId.toString(), userId);
+        await this.verifyStoreAccess(product.storeId.toString(), userId);
 
         // Apply updates
         if (dto.status !== undefined) {
@@ -266,7 +291,6 @@ export class ProductService {
         }
         if (dto.stockQuantity !== undefined) {
           product.stockQuantity = dto.stockQuantity;
-          // Update stock status based on quantity
           if (dto.stockQuantity === 0) {
             product.stockStatus = StockStatus.OUT_OF_STOCK;
           } else {
@@ -279,8 +303,6 @@ export class ProductService {
         if (dto.lowStockAmount !== undefined) {
           product.lowStockAmount = dto.lowStockAmount;
         }
-
-        // Handle price updates
         if (dto.regularPrice !== undefined) {
           product.regularPrice = dto.regularPrice;
         }
@@ -288,7 +310,6 @@ export class ProductService {
           product.salePrice = dto.salePrice;
         }
 
-        // Handle price adjustment (percentage or fixed increase/decrease)
         if (dto.priceAdjustment) {
           const currentPrice = parseFloat(product.regularPrice || '0');
           let adjustment = dto.priceAdjustment.value;
@@ -307,13 +328,11 @@ export class ProductService {
         product.pendingSync = !pushToWoo;
         await product.save();
 
-        // Sync to WooCommerce if requested
         if (pushToWoo && product.externalId) {
           try {
             await this.syncProductToWoo(product);
           } catch (syncError) {
             this.logger.warn(`Failed to sync product ${productId} to WooCommerce: ${syncError.message}`);
-            // Still count as updated locally
           }
         }
 
@@ -353,9 +372,8 @@ export class ProductService {
           continue;
         }
 
-        await this.verifyOrganizationAccess(variant.organizationId.toString(), userId);
+        await this.verifyStoreAccess(variant.storeId.toString(), userId);
 
-        // Apply updates
         if (dto.status !== undefined) {
           variant.status = dto.status;
         }
@@ -364,7 +382,6 @@ export class ProductService {
         }
         if (dto.stockQuantity !== undefined) {
           variant.stockQuantity = dto.stockQuantity;
-          // Update stock status based on quantity
           if (dto.stockQuantity === 0) {
             variant.stockStatus = StockStatus.OUT_OF_STOCK;
           } else {
@@ -374,8 +391,6 @@ export class ProductService {
         if (dto.stockStatus !== undefined) {
           variant.stockStatus = dto.stockStatus;
         }
-
-        // Handle price updates
         if (dto.regularPrice !== undefined) {
           variant.regularPrice = dto.regularPrice;
         }
@@ -383,7 +398,6 @@ export class ProductService {
           variant.salePrice = dto.salePrice;
         }
 
-        // Handle price adjustment (percentage or fixed increase/decrease)
         if (dto.priceAdjustment) {
           const currentPrice = parseFloat(variant.regularPrice || '0');
           let adjustment = dto.priceAdjustment.value;
@@ -402,13 +416,11 @@ export class ProductService {
         variant.pendingSync = !pushToWoo;
         await variant.save();
 
-        // Sync to WooCommerce if requested
         if (pushToWoo && variant.externalId) {
           try {
             await this.syncVariantToWoo(variant);
           } catch (syncError) {
             this.logger.warn(`Failed to sync variant ${variantId} to WooCommerce: ${syncError.message}`);
-            // Still count as updated locally
           }
         }
 
@@ -427,7 +439,6 @@ export class ProductService {
    * Sync variant changes to WooCommerce
    */
   async syncVariantToWoo(variant: ProductVariantDocument): Promise<void> {
-    // Get parent product to get the external ID
     const product = await this.productModel.findById(variant.productId);
     if (!product) {
       throw new NotFoundException('Parent product not found');
@@ -469,18 +480,10 @@ export class ProductService {
     userId: string,
     storeId?: string,
   ): Promise<{ [attributeName: string]: string[] }> {
-    const organizations = await this.organizationModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    }).select('_id');
-
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
@@ -488,7 +491,6 @@ export class ProductService {
       filter.storeId = new Types.ObjectId(storeId);
     }
 
-    // Aggregate to get unique attribute name/value pairs
     const result = await this.variantModel.aggregate([
       { $match: filter },
       { $unwind: '$attributes' },
@@ -518,25 +520,17 @@ export class ProductService {
   }
 
   /**
-   * Search variants by attributes and return matching variant IDs
+   * Search variants by attributes
    */
   async searchVariantsByAttributes(
     userId: string,
     storeId: string,
     attributeFilters: { name: string; values: string[] }[],
   ): Promise<{ variants: IProductVariant[]; total: number }> {
-    const organizations = await this.organizationModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    }).select('_id');
-
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
@@ -544,9 +538,6 @@ export class ProductService {
       filter.storeId = new Types.ObjectId(storeId);
     }
 
-    // Build attribute filter conditions
-    // Each attribute filter is an AND condition (must have Color:Red AND Size:Large)
-    // Within each attribute, values are OR (Color: Red OR Blue)
     if (attributeFilters && attributeFilters.length > 0) {
       filter.$and = attributeFilters.map((attrFilter) => ({
         attributes: {
@@ -561,7 +552,7 @@ export class ProductService {
     const variants = await this.variantModel
       .find(filter)
       .populate('productId', 'name')
-      .limit(500); // Limit to prevent overwhelming response
+      .limit(500);
 
     return {
       variants: variants.map((v) => this.toVariantInterface(v)),
@@ -570,26 +561,18 @@ export class ProductService {
   }
 
   /**
-   * Get low stock products for a store or organization
+   * Get low stock products
    */
   async getLowStockProducts(
     userId: string,
     storeId?: string,
     threshold?: number,
   ): Promise<IProduct[]> {
-    const organizations = await this.organizationModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    }).select('_id');
-
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
     const lowThreshold = threshold || 10;
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
       manageStock: true,
       stockQuantity: { $ne: null, $lte: lowThreshold },
@@ -674,7 +657,6 @@ export class ProductService {
    */
   async upsertFromWoo(
     storeId: string,
-    organizationId: string,
     wooProduct: WooProduct,
   ): Promise<ProductDocument> {
     const existingProduct = await this.productModel.findOne({
@@ -684,7 +666,6 @@ export class ProductService {
 
     const productData = {
       storeId: new Types.ObjectId(storeId),
-      organizationId: new Types.ObjectId(organizationId),
       externalId: wooProduct.id,
       sku: wooProduct.sku,
       name: wooProduct.name,
@@ -745,7 +726,6 @@ export class ProductService {
   async upsertVariantFromWoo(
     productId: string,
     storeId: string,
-    organizationId: string,
     parentExternalId: number,
     wooVariant: WooProductVariation,
   ): Promise<ProductVariantDocument> {
@@ -757,7 +737,6 @@ export class ProductService {
     const variantData = {
       productId: new Types.ObjectId(productId),
       storeId: new Types.ObjectId(storeId),
-      organizationId: new Types.ObjectId(organizationId),
       externalId: wooVariant.id,
       parentExternalId,
       sku: wooVariant.sku,
@@ -816,22 +795,13 @@ export class ProductService {
    * Export products to CSV
    */
   async exportToCsv(userId: string, query: QueryProductDto): Promise<string> {
-    const organizations = await this.organizationModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    }).select('_id');
-
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
-    // Apply filters
     if (query.storeId) {
       filter.storeId = new Types.ObjectId(query.storeId);
     }
@@ -854,9 +824,8 @@ export class ProductService {
     const products = await this.productModel
       .find(filter)
       .sort({ name: 1 })
-      .limit(10000); // Max 10k products
+      .limit(10000);
 
-    // CSV Header
     const headers = [
       'Name',
       'SKU',
@@ -871,7 +840,6 @@ export class ProductService {
       'Created Date',
     ];
 
-    // CSV Rows
     const rows = products.map((product) => {
       return [
         product.name || '',
@@ -890,7 +858,6 @@ export class ProductService {
       ];
     });
 
-    // Escape CSV values
     const escapeValue = (val: any): string => {
       const str = String(val ?? '');
       if (str.includes(',') || str.includes('"') || str.includes('\n')) {
@@ -899,7 +866,6 @@ export class ProductService {
       return str;
     };
 
-    // Build CSV with UTF-8 BOM for Arabic text support
     const BOM = '\uFEFF';
     const csvContent = BOM + [
       headers.map(escapeValue).join(','),
@@ -926,18 +892,10 @@ export class ProductService {
     typeDistribution: { type: string; count: number }[];
     priceStats: { minPrice: number; maxPrice: number; avgPrice: number; totalValue: number };
   }> {
-    const organizations = await this.organizationModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    }).select('_id');
-
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
@@ -945,7 +903,6 @@ export class ProductService {
       filter.storeId = new Types.ObjectId(storeId);
     }
 
-    // 1. Overview stats
     const [
       totalProducts,
       activeProducts,
@@ -964,13 +921,11 @@ export class ProductService {
       }),
     ]);
 
-    // 2. Stock distribution
     const [inStock, onBackorder] = await Promise.all([
       this.productModel.countDocuments({ ...filter, stockStatus: StockStatus.IN_STOCK }),
       this.productModel.countDocuments({ ...filter, stockStatus: StockStatus.ON_BACKORDER }),
     ]);
 
-    // 3. Category breakdown
     const categoryAgg = await this.productModel.aggregate([
       { $match: filter },
       { $unwind: { path: '$categories', preserveNullAndEmptyArrays: false } },
@@ -1003,7 +958,6 @@ export class ProductService {
       avgPrice: Math.round(c.avgPrice * 100) / 100,
     }));
 
-    // 4. Price ranges
     const priceRanges = await this.productModel.aggregate([
       { $match: filter },
       {
@@ -1044,21 +998,18 @@ export class ProductService {
       count: p.count,
     }));
 
-    // 5. Top rated products
     const topRatedProducts = await this.productModel
       .find({ ...filter, ratingCount: { $gt: 0 } })
       .sort({ averageRating: -1, ratingCount: -1 })
       .limit(5)
       .select('name averageRating ratingCount images');
 
-    // 6. Recently added products
     const recentlyAdded = await this.productModel
       .find(filter)
       .sort({ createdAt: -1 })
       .limit(5)
       .select('name createdAt status images');
 
-    // 7. Stock alerts (low stock products)
     const stockAlerts = await this.productModel
       .find({
         ...filter,
@@ -1070,14 +1021,12 @@ export class ProductService {
       .limit(10)
       .select('name sku stockQuantity lowStockAmount images');
 
-    // 8. Type distribution
     const typeDistribution = await this.productModel.aggregate([
       { $match: filter },
       { $group: { _id: '$type', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]);
 
-    // 9. Price stats
     const priceStats = await this.productModel.aggregate([
       { $match: { ...filter, regularPrice: { $exists: true, $ne: '' } } },
       {
@@ -1178,23 +1127,13 @@ export class ProductService {
     variants: (IProductVariant & { productName?: string })[];
     pagination: { total: number; page: number; size: number; pages: number };
   }> {
-    // Get organizations user has access to
-    const organizations = await this.organizationModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    }).select('_id');
-
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
-    // Apply filters
     if (query.storeId) {
       filter.storeId = new Types.ObjectId(query.storeId);
     }
@@ -1236,7 +1175,6 @@ export class ProductService {
       this.variantModel.countDocuments(filter),
     ]);
 
-    // Get product names for variants
     const productIds = [...new Set(variants.map((v) => v.productId.toString()))];
     const products = await this.productModel.find({
       _id: { $in: productIds.map((id) => new Types.ObjectId(id)) },
@@ -1263,31 +1201,11 @@ export class ProductService {
     };
   }
 
-  // Helper methods
-  private async verifyOrganizationAccess(organizationId: string, userId: string): Promise<void> {
-    const organization = await this.organizationModel.findOne({
-      _id: new Types.ObjectId(organizationId),
-      isDeleted: false,
-    });
-
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
-    }
-
-    const isOwner = organization.ownerId.toString() === userId;
-    const isMember = organization.members.some((m) => m.userId.toString() === userId);
-
-    if (!isOwner && !isMember) {
-      throw new ForbiddenException('You do not have access to this organization');
-    }
-  }
-
   private toProductInterface(doc: ProductDocument): IProduct {
     const obj = doc.toObject();
     return {
       _id: obj._id.toString(),
       storeId: obj.storeId.toString(),
-      organizationId: obj.organizationId.toString(),
       externalId: obj.externalId,
       sku: obj.sku,
       name: obj.name,
@@ -1335,7 +1253,6 @@ export class ProductService {
       _id: obj._id.toString(),
       productId: obj.productId.toString(),
       storeId: obj.storeId.toString(),
-      organizationId: obj.organizationId.toString(),
       externalId: obj.externalId,
       parentExternalId: obj.parentExternalId,
       sku: obj.sku,
@@ -1365,9 +1282,6 @@ export class ProductService {
 
   // ==================== IMAGE MANAGEMENT ====================
 
-  /**
-   * Update product images (add, remove, reorder)
-   */
   async updateImages(
     id: string,
     userId: string,
@@ -1383,9 +1297,8 @@ export class ProductService {
       throw new NotFoundException('Product not found');
     }
 
-    await this.verifyOrganizationAccess(product.organizationId.toString(), userId);
+    await this.verifyStoreAccess(product.storeId.toString(), userId);
 
-    // Update images with position
     product.images = images.map((img, index) => ({
       src: img.src,
       alt: img.alt || '',
@@ -1396,7 +1309,6 @@ export class ProductService {
     product.pendingSync = !pushToWoo;
     await product.save();
 
-    // Push to WooCommerce
     if (pushToWoo) {
       await this.syncImagesToWoo(product);
     }
@@ -1404,9 +1316,6 @@ export class ProductService {
     return this.toProductInterface(product);
   }
 
-  /**
-   * Delete a specific image from a product
-   */
   async deleteImage(
     id: string,
     userId: string,
@@ -1422,16 +1331,13 @@ export class ProductService {
       throw new NotFoundException('Product not found');
     }
 
-    await this.verifyOrganizationAccess(product.organizationId.toString(), userId);
+    await this.verifyStoreAccess(product.storeId.toString(), userId);
 
     if (imageIndex < 0 || imageIndex >= product.images.length) {
       throw new BadRequestException('Invalid image index');
     }
 
-    // Remove the image at the specified index
     product.images.splice(imageIndex, 1);
-
-    // Re-assign positions
     product.images.forEach((img, idx) => {
       img.position = idx;
     });
@@ -1439,7 +1345,6 @@ export class ProductService {
     product.pendingSync = !pushToWoo;
     await product.save();
 
-    // Push to WooCommerce
     if (pushToWoo) {
       await this.syncImagesToWoo(product);
     }
@@ -1447,9 +1352,6 @@ export class ProductService {
     return this.toProductInterface(product);
   }
 
-  /**
-   * Sync images to WooCommerce
-   */
   private async syncImagesToWoo(product: ProductDocument): Promise<void> {
     const store = await this.storeModel
       .findById(product.storeId)
@@ -1465,7 +1367,6 @@ export class ProductService {
       consumerSecret: store.credentials.consumerSecret,
     };
 
-    // Update product with new images
     await this.wooCommerceService.updateProduct(credentials, product.externalId, {
       images: product.images.map((img) => ({
         src: img.src,
@@ -1480,9 +1381,6 @@ export class ProductService {
 
   // ==================== CSV IMPORT ====================
 
-  /**
-   * Import products from CSV
-   */
   async importFromCsv(
     userId: string,
     storeId: string,
@@ -1494,7 +1392,6 @@ export class ProductService {
     failed: number;
     errors: { row: number; error: string }[];
   }> {
-    // Verify access
     const store = await this.storeModel
       .findById(storeId)
       .select('+credentials');
@@ -1503,7 +1400,7 @@ export class ProductService {
       throw new NotFoundException('Store not found');
     }
 
-    await this.verifyOrganizationAccess(store.organizationId.toString(), userId);
+    await this.verifyStoreAccess(storeId, userId);
 
     const credentials = {
       url: store.url,
@@ -1511,13 +1408,11 @@ export class ProductService {
       consumerSecret: store.credentials.consumerSecret,
     };
 
-    // Parse CSV
     const lines = csvContent.split('\n').map((line) => line.trim()).filter((line) => line);
     if (lines.length < 2) {
       throw new BadRequestException('CSV file is empty or has no data rows');
     }
 
-    // Parse header
     const headers = this.parseCsvLine(lines[0]).map((h) => h.toLowerCase().trim());
     const dataRows = lines.slice(1);
 
@@ -1529,15 +1424,13 @@ export class ProductService {
       errors: [] as { row: number; error: string }[],
     };
 
-    // Column mapping
     const getColumn = (row: string[], headerName: string): string => {
       const index = headers.indexOf(headerName.toLowerCase());
       return index >= 0 ? (row[index] || '').trim() : '';
     };
 
-    // Process each row
     for (let i = 0; i < dataRows.length; i++) {
-      const rowNumber = i + 2; // 1-based, skip header
+      const rowNumber = i + 2;
       try {
         const row = this.parseCsvLine(dataRows[i]);
         const name = getColumn(row, 'name');
@@ -1557,9 +1450,7 @@ export class ProductService {
         const stockQuantity = parseInt(getColumn(row, 'stock quantity'), 10) || 0;
         const description = getColumn(row, 'description');
         const shortDescription = getColumn(row, 'short description');
-        const categoriesStr = getColumn(row, 'categories');
 
-        // Check if product exists by SKU
         let existingProduct = null;
         if (sku) {
           existingProduct = await this.productModel.findOne({
@@ -1582,13 +1473,8 @@ export class ProductService {
           short_description: shortDescription || undefined,
         };
 
-        // Handle categories - WooCommerce requires category IDs
-        // For simplicity, we'll skip category matching in this version
-        // In a full implementation, you'd match category names to IDs
-
         let wooProduct;
         if (existingProduct) {
-          // Update existing product
           wooProduct = await this.wooCommerceService.updateProduct(
             credentials,
             existingProduct.externalId,
@@ -1596,12 +1482,10 @@ export class ProductService {
           );
           results.updated++;
         } else {
-          // Create new product
           wooProduct = await this.wooCommerceService.createProduct(credentials, productData);
           results.created++;
         }
 
-        // Sync to local database
         await this.upsertProductFromWoo(wooProduct, store);
 
       } catch (error) {
@@ -1614,9 +1498,6 @@ export class ProductService {
     return results;
   }
 
-  /**
-   * Parse a CSV line handling quoted values
-   */
   private parseCsvLine(line: string): string[] {
     const result: string[] = [];
     let current = '';
@@ -1629,7 +1510,7 @@ export class ProductService {
       if (char === '"') {
         if (inQuotes && nextChar === '"') {
           current += '"';
-          i++; // Skip next quote
+          i++;
         } else {
           inQuotes = !inQuotes;
         }
@@ -1645,13 +1526,9 @@ export class ProductService {
     return result;
   }
 
-  /**
-   * Upsert a product from WooCommerce data
-   */
   private async upsertProductFromWoo(wooProduct: WooProduct, store: StoreDocument): Promise<void> {
     const productData = {
       storeId: store._id,
-      organizationId: store.organizationId,
       externalId: wooProduct.id,
       sku: wooProduct.sku,
       name: wooProduct.name,

@@ -34,7 +34,6 @@ export interface ICustomer {
   _id: string;
   externalId: number;
   storeId: string;
-  organizationId: string;
   email: string;
   firstName?: string;
   lastName?: string;

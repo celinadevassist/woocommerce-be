@@ -17,3 +17,15 @@ export enum SyncStatus {
   SYNCED = 'synced',
   ERROR = 'error',
 }
+
+export enum StoreMemberRole {
+  OWNER = 'owner',
+  ADMIN = 'admin',
+  MANAGER = 'manager',
+  STAFF = 'staff',
+  VIEWER = 'viewer',
+}
+
+// Subscription billing constants
+export const STORE_PRICE_PER_MONTH = 19; // $19/month per store
+export const BILLING_CYCLE_DAYS = 30;

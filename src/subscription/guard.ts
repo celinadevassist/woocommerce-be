@@ -41,7 +41,7 @@ export class SubscriptionGuard implements CanActivate {
       request.headers?.['x-store-id'];
 
     if (!storeId) {
-      // No store context, allow access (might be organization-level operation)
+      // No store context, allow access (might be user-level operation)
       return true;
     }
 

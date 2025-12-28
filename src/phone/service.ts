@@ -1,7 +1,6 @@
 import {
   Injectable,
   NotFoundException,
-  ConflictException,
   BadRequestException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -68,7 +67,6 @@ export class PhoneService {
    */
   async findOrCreate(
     storeId: string,
-    organizationId: string,
     phoneNumber: string,
     customerId?: string,
     source: string = 'order',
@@ -113,7 +111,6 @@ export class PhoneService {
     phone = await this.phoneModel.create({
       number: normalizedPhone,
       storeId: new Types.ObjectId(storeId),
-      organizationId: new Types.ObjectId(organizationId),
       customerId: customerId ? new Types.ObjectId(customerId) : undefined,
       source,
       sourceOrderId,

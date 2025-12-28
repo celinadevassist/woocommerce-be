@@ -193,9 +193,6 @@ export class Order extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
-
   @Prop({ required: true, index: true })
   externalId: number;
 
@@ -341,7 +338,7 @@ export const OrderSchema = SchemaFactory.createForClass(Order);
 // Indexes
 OrderSchema.index({ storeId: 1, externalId: 1 }, { unique: true });
 OrderSchema.index({ storeId: 1, orderNumber: 1 });
-OrderSchema.index({ organizationId: 1, status: 1 });
+OrderSchema.index({ storeId: 1, status: 1 });
 OrderSchema.index({ customerId: 1 });
 OrderSchema.index({ localCustomerId: 1 });
 OrderSchema.index({ status: 1, createdAt: -1 });

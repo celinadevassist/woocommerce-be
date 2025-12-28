@@ -4,8 +4,6 @@ import { PassportModule } from '@nestjs/passport';
 import { StoreController } from './controller';
 import { StoreService } from './service';
 import { Store, StoreSchema } from './schema';
-import { OrganizationModule } from '../organization/module';
-import { Organization, OrganizationSchema } from '../organization/schema';
 import { WooCommerceModule } from '../integrations/woocommerce/woocommerce.module';
 import { SyncModule } from '../sync/module';
 
@@ -14,9 +12,7 @@ import { SyncModule } from '../sync/module';
     PassportModule.register({ defaultStrategy: 'jwt' }),
     MongooseModule.forFeature([
       { name: Store.name, schema: StoreSchema },
-      { name: Organization.name, schema: OrganizationSchema },
     ]),
-    forwardRef(() => OrganizationModule),
     forwardRef(() => SyncModule),
     WooCommerceModule,
   ],

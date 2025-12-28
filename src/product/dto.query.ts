@@ -6,9 +6,6 @@ export class QueryProductDto {
   @ApiPropertyOptional({ description: 'Store ID to filter by' })
   storeId?: string;
 
-  @ApiPropertyOptional({ description: 'Organization ID to filter by' })
-  organizationId?: string;
-
   @ApiPropertyOptional({ description: 'Filter by product status', enum: ProductStatus })
   status?: ProductStatus;
 
@@ -45,7 +42,6 @@ export class QueryProductDto {
 
 export const QueryProductSchema = Joi.object().keys({
   storeId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional(),
-  organizationId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional(),
   status: Joi.string().valid(...Object.values(ProductStatus)).optional(),
   stockStatus: Joi.string().valid(...Object.values(StockStatus)).optional(),
   type: Joi.string().valid(...Object.values(ProductType)).optional(),

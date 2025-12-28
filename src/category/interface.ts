@@ -1,7 +1,6 @@
 export interface ICategory {
   _id: string;
   storeId: string;
-  organizationId: string;
   externalId: number;
   name: string;
   slug: string;

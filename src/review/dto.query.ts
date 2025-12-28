@@ -3,7 +3,6 @@ import { ReviewStatus } from './enum';
 
 export class QueryReviewDto {
   storeId?: string;
-  organizationId?: string;
   productId?: string;
   status?: ReviewStatus;
   minRating?: number;
@@ -23,7 +22,6 @@ export class QueryReviewDto {
 
 export const QueryReviewSchema = Joi.object({
   storeId: Joi.string().optional(),
-  organizationId: Joi.string().optional(),
   productId: Joi.string().optional(),
   status: Joi.string()
     .valid(...Object.values(ReviewStatus))

@@ -21,6 +21,7 @@ import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
 import { User } from '../decorators/user.decorator';
 import { UserDocument } from '../schema/user.schema';
 import { LanguageSchema } from '../dtos/lang.dto';
+import { StoreMemberRole } from './enum';
 
 @ApiTags('Store')
 @ApiBearerAuth()
@@ -35,7 +36,6 @@ export class StoreController {
   @Post()
   @ApiOperation({ summary: 'Connect a new store' })
   @ApiResponse({ status: 201, description: 'Store connected successfully' })
-  @ApiResponse({ status: 400, description: 'Store limit reached' })
   @ApiResponse({ status: 409, description: 'Store URL already exists' })
   @UsePipes(
     new JoiValidationPipe({
@@ -194,39 +194,45 @@ export class StoreController {
     return await this.storeService.regenerateWebhookSecret(id, user._id.toString());
   }
 
-  @Get(':id/transfer-targets')
-  @ApiOperation({ summary: 'Get organizations the store can be transferred to' })
-  @ApiResponse({ status: 200, description: 'Transfer targets retrieved successfully' })
+  // ==================== MEMBER MANAGEMENT ====================
+
+  @Get(':id/members')
+  @ApiOperation({ summary: 'Get store members' })
+  @ApiResponse({ status: 200, description: 'Members retrieved successfully' })
   @ApiResponse({ status: 404, description: 'Store not found' })
-  @ApiResponse({ status: 403, description: 'Only organization owners and admins can transfer stores' })
   @ApiParam({ name: 'id', description: 'Store ID' })
   @UsePipes(
     new JoiValidationPipe({
       param: { lang: LanguageSchema },
     }),
   )
-  async getTransferTargets(
+  async getMembers(
     @Param('id') id: string,
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.storeService.getTransferTargetOrganizations(id, user._id.toString());
+    return await this.storeService.getMembers(id, user._id.toString());
   }
 
-  @Post(':id/transfer')
-  @ApiOperation({ summary: 'Transfer store to another organization' })
-  @ApiResponse({ status: 200, description: 'Store transferred successfully' })
-  @ApiResponse({ status: 400, description: 'Cannot transfer to the same organization' })
-  @ApiResponse({ status: 403, description: 'Only organization owners and admins can transfer stores' })
-  @ApiResponse({ status: 404, description: 'Store or target organization not found' })
-  @ApiResponse({ status: 409, description: 'Store with this URL already exists in target organization' })
+  @Post(':id/members')
+  @ApiOperation({ summary: 'Add a member to the store' })
+  @ApiResponse({ status: 200, description: 'Member added successfully' })
+  @ApiResponse({ status: 400, description: 'Cannot add member with owner role' })
+  @ApiResponse({ status: 403, description: 'Only owner and admin can add members' })
+  @ApiResponse({ status: 404, description: 'Store not found' })
+  @ApiResponse({ status: 409, description: 'User is already a member' })
   @ApiParam({ name: 'id', description: 'Store ID' })
   @ApiBody({
     schema: {
       type: 'object',
-      required: ['targetOrganizationId'],
+      required: ['userId', 'role'],
       properties: {
-        targetOrganizationId: { type: 'string', description: 'ID of the organization to transfer the store to' },
+        userId: { type: 'string', description: 'User ID to add as member' },
+        role: {
+          type: 'string',
+          enum: ['admin', 'manager', 'staff', 'viewer'],
+          description: 'Role for the new member'
+        },
       },
     },
   })
@@ -235,19 +241,153 @@ export class StoreController {
       param: { lang: LanguageSchema },
     }),
   )
-  async transferStore(
+  async addMember(
     @Param('id') id: string,
-    @Body() body: { targetOrganizationId: string },
+    @Body() body: { userId: string; role: StoreMemberRole },
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    const result = await this.storeService.transferStore(
+    const result = await this.storeService.addMember(
       id,
       user._id.toString(),
-      body.targetOrganizationId,
+      body.userId,
+      body.role,
     );
     return {
-      message: 'Store transferred successfully',
+      message: 'Member added successfully',
+      store: result,
+    };
+  }
+
+  @Patch(':id/members/:memberId/role')
+  @ApiOperation({ summary: 'Update a member\'s role' })
+  @ApiResponse({ status: 200, description: 'Member role updated successfully' })
+  @ApiResponse({ status: 400, description: 'Cannot assign owner role' })
+  @ApiResponse({ status: 403, description: 'Only store owner can change member roles' })
+  @ApiResponse({ status: 404, description: 'Store or member not found' })
+  @ApiParam({ name: 'id', description: 'Store ID' })
+  @ApiParam({ name: 'memberId', description: 'Member user ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['role'],
+      properties: {
+        role: {
+          type: 'string',
+          enum: ['admin', 'manager', 'staff', 'viewer'],
+          description: 'New role for the member'
+        },
+      },
+    },
+  })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async updateMemberRole(
+    @Param('id') id: string,
+    @Param('memberId') memberId: string,
+    @Body() body: { role: StoreMemberRole },
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    const result = await this.storeService.updateMemberRole(
+      id,
+      user._id.toString(),
+      memberId,
+      body.role,
+    );
+    return {
+      message: 'Member role updated successfully',
+      store: result,
+    };
+  }
+
+  @Delete(':id/members/:memberId')
+  @ApiOperation({ summary: 'Remove a member from the store' })
+  @ApiResponse({ status: 200, description: 'Member removed successfully' })
+  @ApiResponse({ status: 400, description: 'Cannot remove store owner' })
+  @ApiResponse({ status: 403, description: 'Only owner and admin can remove members' })
+  @ApiResponse({ status: 404, description: 'Store or member not found' })
+  @ApiParam({ name: 'id', description: 'Store ID' })
+  @ApiParam({ name: 'memberId', description: 'Member user ID' })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async removeMember(
+    @Param('id') id: string,
+    @Param('memberId') memberId: string,
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    const result = await this.storeService.removeMember(
+      id,
+      user._id.toString(),
+      memberId,
+    );
+    return {
+      message: 'Member removed successfully',
+      store: result,
+    };
+  }
+
+  @Post(':id/leave')
+  @ApiOperation({ summary: 'Leave a store (for non-owner members)' })
+  @ApiResponse({ status: 200, description: 'Left store successfully' })
+  @ApiResponse({ status: 400, description: 'Owner cannot leave the store' })
+  @ApiResponse({ status: 404, description: 'Store not found or not a member' })
+  @ApiParam({ name: 'id', description: 'Store ID' })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async leaveStore(
+    @Param('id') id: string,
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    await this.storeService.leaveStore(id, user._id.toString());
+    return { message: 'Left store successfully' };
+  }
+
+  @Post(':id/transfer-ownership')
+  @ApiOperation({ summary: 'Transfer store ownership to another user' })
+  @ApiResponse({ status: 200, description: 'Ownership transferred successfully' })
+  @ApiResponse({ status: 400, description: 'Cannot transfer ownership to yourself' })
+  @ApiResponse({ status: 403, description: 'Only store owner can transfer ownership' })
+  @ApiResponse({ status: 404, description: 'Store not found' })
+  @ApiParam({ name: 'id', description: 'Store ID' })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['newOwnerId'],
+      properties: {
+        newOwnerId: { type: 'string', description: 'User ID of the new owner' },
+      },
+    },
+  })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async transferOwnership(
+    @Param('id') id: string,
+    @Body() body: { newOwnerId: string },
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    const result = await this.storeService.transferOwnership(
+      id,
+      user._id.toString(),
+      body.newOwnerId,
+    );
+    return {
+      message: 'Ownership transferred successfully. You are now an admin.',
       store: result,
     };
   }
@@ -255,6 +395,7 @@ export class StoreController {
   @Delete(':id')
   @ApiOperation({ summary: 'Disconnect store' })
   @ApiResponse({ status: 200, description: 'Store disconnected successfully' })
+  @ApiResponse({ status: 403, description: 'Only store owner can delete the store' })
   @ApiResponse({ status: 404, description: 'Store not found' })
   @UsePipes(
     new JoiValidationPipe({

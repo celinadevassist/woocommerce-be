@@ -44,7 +44,6 @@ export class InventoryController {
   @ApiOperation({ summary: 'Get stock alerts' })
   @ApiResponse({ status: 200, description: 'Alerts retrieved successfully' })
   @ApiQuery({ name: 'storeId', required: false })
-  @ApiQuery({ name: 'organizationId', required: false })
   @ApiQuery({ name: 'status', required: false, enum: AlertStatus })
   @ApiQuery({ name: 'alertType', required: false, enum: AlertType })
   @ApiQuery({ name: 'page', required: false, type: Number })
@@ -56,7 +55,6 @@ export class InventoryController {
   )
   async getAlerts(
     @Query('storeId') storeId: string,
-    @Query('organizationId') organizationId: string,
     @Query('status') status: AlertStatus,
     @Query('alertType') alertType: AlertType,
     @Query('page') page: number = 1,
@@ -66,7 +64,6 @@ export class InventoryController {
   ) {
     return await this.inventoryService.getAlerts(user._id.toString(), {
       storeId,
-      organizationId,
       status,
       alertType,
       page: Number(page),
@@ -113,7 +110,6 @@ export class InventoryController {
   @ApiResponse({ status: 200, description: 'Logs retrieved successfully' })
   @ApiQuery({ name: 'productId', required: false })
   @ApiQuery({ name: 'storeId', required: false })
-  @ApiQuery({ name: 'organizationId', required: false })
   @ApiQuery({ name: 'changeType', required: false, enum: InventoryChangeType })
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
@@ -127,7 +123,6 @@ export class InventoryController {
   async getLogs(
     @Query('productId') productId: string,
     @Query('storeId') storeId: string,
-    @Query('organizationId') organizationId: string,
     @Query('changeType') changeType: InventoryChangeType,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
@@ -139,7 +134,6 @@ export class InventoryController {
     return await this.inventoryService.getLogs(user._id.toString(), {
       productId,
       storeId,
-      organizationId,
       changeType,
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,

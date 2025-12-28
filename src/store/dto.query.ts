@@ -3,9 +3,6 @@ import * as Joi from 'joi';
 import { StorePlatform, StoreStatus } from './enum';
 
 export class QueryStoreDto {
-  @ApiPropertyOptional({ description: 'Organization ID to filter by' })
-  organizationId?: string;
-
   @ApiPropertyOptional({ description: 'Filter by platform', enum: StorePlatform })
   platform?: StorePlatform;
 
@@ -29,7 +26,6 @@ export class QueryStoreDto {
 }
 
 export const QueryStoreSchema = Joi.object().keys({
-  organizationId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional(),
   platform: Joi.string().valid(...Object.values(StorePlatform)).optional(),
   status: Joi.string().valid(...Object.values(StoreStatus)).optional(),
   keyword: Joi.string().optional(),

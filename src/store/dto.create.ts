@@ -3,9 +3,6 @@ import * as Joi from 'joi';
 import { StorePlatform } from './enum';
 
 export class CreateStoreDto {
-  @ApiProperty({ description: 'Organization ID', example: '507f1f77bcf86cd799439011' })
-  organizationId: string;
-
   @ApiProperty({ description: 'Store name', example: 'My WooCommerce Store' })
   name: string;
 
@@ -23,7 +20,6 @@ export class CreateStoreDto {
 }
 
 export const CreateStoreSchema = Joi.object().keys({
-  organizationId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).required(),
   name: Joi.string().min(2).max(100).required(),
   platform: Joi.string().valid(...Object.values(StorePlatform)).default(StorePlatform.WOOCOMMERCE).optional(),
   url: Joi.string().uri().required(),

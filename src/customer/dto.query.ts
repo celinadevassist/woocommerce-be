@@ -3,7 +3,6 @@ import { CustomerStatus, CustomerSource, CustomerTier } from './enum';
 
 export class QueryCustomerDto {
   storeId?: string;
-  organizationId?: string;
   status?: CustomerStatus;
   source?: CustomerSource;
   tier?: CustomerTier;
@@ -26,7 +25,6 @@ export class QueryCustomerDto {
 
 export const QueryCustomerSchema = Joi.object({
   storeId: Joi.string().optional(),
-  organizationId: Joi.string().optional(),
   status: Joi.string()
     .valid(...Object.values(CustomerStatus))
     .optional(),

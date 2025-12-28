@@ -2,6 +2,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import * as Joi from 'joi';
 
 export class CreateResponseTemplateDto {
+  @ApiProperty({ description: 'Store ID' })
+  storeId: string;
+
   @ApiProperty({ description: 'Template name' })
   name: string;
 
@@ -13,6 +16,7 @@ export class CreateResponseTemplateDto {
 }
 
 export const CreateResponseTemplateSchema = Joi.object().keys({
+  storeId: Joi.string().required(),
   name: Joi.string().required().min(1).max(100),
   content: Joi.string().required().min(1).max(5000),
   category: Joi.string().valid('positive', 'negative', 'neutral', 'thank-you', 'apology', 'general').optional(),
@@ -37,7 +41,7 @@ export const UpdateResponseTemplateSchema = Joi.object().keys({
 
 export interface IResponseTemplate {
   _id: string;
-  organizationId: string;
+  storeId: string;
   name: string;
   content: string;
   category?: string;

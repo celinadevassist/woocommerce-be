@@ -44,7 +44,6 @@ export interface IVariationAttribute {
 export interface IProduct {
   _id: string;
   storeId: string;
-  organizationId: string;
   externalId: number;
   sku?: string;
   name: string;
@@ -89,7 +88,6 @@ export interface IProductVariant {
   _id: string;
   productId: string;
   storeId: string;
-  organizationId: string;
   externalId: number;
   parentExternalId: number;
   sku?: string;

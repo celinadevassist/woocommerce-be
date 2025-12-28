@@ -13,7 +13,6 @@ import { QueryReviewDto } from './dto.query';
 import { CreateResponseTemplateDto, UpdateResponseTemplateDto, IResponseTemplate } from './response-template.dto';
 import { IReview, IReviewResponse, IReviewStats } from './interface';
 import { ReviewStatus, ReviewSource } from './enum';
-import { Organization, OrganizationDocument } from '../organization/schema';
 import { Product, ProductDocument } from '../product/schema';
 import { Store, StoreDocument } from '../store/schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
@@ -25,7 +24,6 @@ export class ReviewService {
 
   constructor(
     @InjectModel(Review.name) private reviewModel: Model<ReviewDocument>,
-    @InjectModel(Organization.name) private organizationModel: Model<OrganizationDocument>,
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     @InjectModel(ResponseTemplate.name) private responseTemplateModel: Model<ResponseTemplateDocument>,
@@ -33,23 +31,56 @@ export class ReviewService {
   ) {}
 
   /**
+   * Get all store IDs the user has access to (owner or member)
+   */
+  private async getUserStoreIds(userId: string): Promise<Types.ObjectId[]> {
+    const stores = await this.storeModel.find({
+      isDeleted: false,
+      $or: [
+        { ownerId: new Types.ObjectId(userId) },
+        { 'members.userId': new Types.ObjectId(userId) },
+      ],
+    }).select('_id');
+    return stores.map((store) => store._id);
+  }
+
+  /**
+   * Verify user has access to a specific store
+   */
+  private async verifyStoreAccess(storeId: string, userId: string): Promise<StoreDocument> {
+    const store = await this.storeModel.findOne({
+      _id: new Types.ObjectId(storeId),
+      isDeleted: false,
+    });
+
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+
+    const isOwner = store.ownerId.toString() === userId;
+    const isMember = store.members?.some((m) => m.userId.toString() === userId);
+
+    if (!isOwner && !isMember) {
+      throw new ForbiddenException('You do not have access to this store');
+    }
+
+    return store;
+  }
+
+  /**
    * Get reviews with filtering and pagination
    */
   async findAll(userId: string, query: QueryReviewDto): Promise<IReviewResponse> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
     // Apply filters
     if (query.storeId) {
       filter.storeId = new Types.ObjectId(query.storeId);
-    }
-    if (query.organizationId) {
-      filter.organizationId = new Types.ObjectId(query.organizationId);
     }
     if (query.productId) {
       filter.localProductId = new Types.ObjectId(query.productId);
@@ -142,7 +173,7 @@ export class ReviewService {
       throw new NotFoundException('Review not found');
     }
 
-    await this.verifyOrganizationAccess(review.organizationId.toString(), userId);
+    await this.verifyStoreAccess(review.storeId.toString(), userId);
 
     const product = review.localProductId
       ? await this.productModel.findById(review.localProductId)
@@ -165,7 +196,7 @@ export class ReviewService {
       throw new NotFoundException('Review not found');
     }
 
-    await this.verifyOrganizationAccess(review.organizationId.toString(), userId);
+    await this.verifyStoreAccess(review.storeId.toString(), userId);
 
     const oldStatus = review.status;
     const statusChanged = dto.status && dto.status !== oldStatus;
@@ -233,7 +264,7 @@ export class ReviewService {
       throw new NotFoundException('Review not found');
     }
 
-    await this.verifyOrganizationAccess(review.organizationId.toString(), userId);
+    await this.verifyStoreAccess(review.storeId.toString(), userId);
 
     review.reply = dto.reply;
     review.repliedAt = new Date();
@@ -247,13 +278,12 @@ export class ReviewService {
    * Get new reviews count (reviews from the last 24 hours that are pending)
    */
   async getNewReviewsCount(userId: string, storeId?: string): Promise<{ count: number; reviews: IReview[] }> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
       wooCreatedAt: { $gte: twentyFourHoursAgo },
     };
@@ -289,11 +319,10 @@ export class ReviewService {
    * Get review statistics
    */
   async getStats(userId: string, storeId?: string): Promise<IReviewStats> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
@@ -401,11 +430,10 @@ export class ReviewService {
     reviewsByDayOfWeek: { day: string; count: number }[];
     verificationStats: { verified: number; unverified: number };
   }> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
@@ -605,11 +633,10 @@ export class ReviewService {
    * Export reviews to CSV
    */
   async exportToCsv(userId: string, query: QueryReviewDto): Promise<string> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
@@ -707,7 +734,6 @@ export class ReviewService {
    */
   async upsertFromWoo(
     storeId: string,
-    organizationId: string,
     wooReview: WooProductReview,
   ): Promise<ReviewDocument> {
     const existingReview = await this.reviewModel.findOne({
@@ -730,7 +756,6 @@ export class ReviewService {
 
     const reviewData = {
       storeId: new Types.ObjectId(storeId),
-      organizationId: new Types.ObjectId(organizationId),
       externalId: wooReview.id,
       productExternalId: wooReview.product_id,
       localProductId: product?._id,
@@ -784,16 +809,19 @@ export class ReviewService {
   // ==================== Response Templates ====================
 
   /**
-   * Get all response templates for user's organizations
+   * Get all response templates for user's stores
    */
-  async getResponseTemplates(userId: string, category?: string): Promise<IResponseTemplate[]> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+  async getResponseTemplates(userId: string, storeId?: string, category?: string): Promise<IResponseTemplate[]> {
+    const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
+
+    if (storeId) {
+      filter.storeId = new Types.ObjectId(storeId);
+    }
 
     if (category) {
       filter.category = category;
@@ -811,18 +839,14 @@ export class ReviewService {
    */
   async createResponseTemplate(
     userId: string,
+    storeId: string,
     dto: CreateResponseTemplateDto,
   ): Promise<IResponseTemplate> {
-    const organizations = await this.getUserOrganizations(userId);
-    if (organizations.length === 0) {
-      throw new ForbiddenException('No organization found');
-    }
-
-    // Use the first organization (primary)
-    const organizationId = organizations[0]._id;
+    // Verify user has access to the store
+    await this.verifyStoreAccess(storeId, userId);
 
     const template = await this.responseTemplateModel.create({
-      organizationId,
+      storeId: new Types.ObjectId(storeId),
       name: dto.name,
       content: dto.content,
       category: dto.category || 'general',
@@ -851,7 +875,7 @@ export class ReviewService {
       throw new NotFoundException('Template not found');
     }
 
-    await this.verifyOrganizationAccess(template.organizationId.toString(), userId);
+    await this.verifyStoreAccess(template.storeId.toString(), userId);
 
     if (dto.name !== undefined) template.name = dto.name;
     if (dto.content !== undefined) template.content = dto.content;
@@ -874,7 +898,7 @@ export class ReviewService {
       throw new NotFoundException('Template not found');
     }
 
-    await this.verifyOrganizationAccess(template.organizationId.toString(), userId);
+    await this.verifyStoreAccess(template.storeId.toString(), userId);
 
     template.isDeleted = true;
     await template.save();
@@ -952,11 +976,10 @@ export class ReviewService {
    * Sync ratings for all products in a store
    */
   async syncAllProductRatings(userId: string, storeId?: string): Promise<{ updated: number }> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const productFilter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
@@ -984,7 +1007,7 @@ export class ReviewService {
     const obj = doc.toObject();
     return {
       _id: obj._id.toString(),
-      organizationId: obj.organizationId.toString(),
+      storeId: obj.storeId.toString(),
       name: obj.name,
       content: obj.content,
       category: obj.category,
@@ -995,42 +1018,12 @@ export class ReviewService {
     };
   }
 
-  // Helper methods
-  private async getUserOrganizations(userId: string): Promise<OrganizationDocument[]> {
-    return this.organizationModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    });
-  }
-
-  private async verifyOrganizationAccess(organizationId: string, userId: string): Promise<void> {
-    const organization = await this.organizationModel.findOne({
-      _id: new Types.ObjectId(organizationId),
-      isDeleted: false,
-    });
-
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
-    }
-
-    const isOwner = organization.ownerId.toString() === userId;
-    const isMember = organization.members.some((m) => m.userId.toString() === userId);
-
-    if (!isOwner && !isMember) {
-      throw new ForbiddenException('You do not have access to this organization');
-    }
-  }
-
   private toInterface(doc: ReviewDocument, product?: ProductDocument | null): IReview {
     const obj = doc.toObject();
     return {
       _id: obj._id.toString(),
       externalId: obj.externalId,
       storeId: obj.storeId.toString(),
-      organizationId: obj.organizationId.toString(),
       productExternalId: obj.productExternalId,
       localProductId: obj.localProductId?.toString(),
       reviewer: obj.reviewer,

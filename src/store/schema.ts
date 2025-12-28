@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { StorePlatform, StoreStatus, SyncStatus } from './enum';
+import { StorePlatform, StoreStatus, SyncStatus, StoreMemberRole } from './enum';
 
 // Sub-schema for sync status per entity type
 @Schema({ _id: false })
@@ -62,10 +62,28 @@ export class StoreCredentials {
 
 export const StoreCredentialsSchema = SchemaFactory.createForClass(StoreCredentials);
 
+// Sub-schema for store members
+@Schema({ _id: false })
+export class StoreMember {
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
+  userId: MongooseSchema.Types.ObjectId;
+
+  @Prop({ type: String, enum: Object.values(StoreMemberRole), required: true })
+  role: StoreMemberRole;
+
+  @Prop({ default: () => new Date() })
+  joinedAt: Date;
+}
+
+export const StoreMemberSchema = SchemaFactory.createForClass(StoreMember);
+
 @Schema({ timestamps: true, versionKey: false, collection: 'stores' })
 export class Store extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
+  ownerId: MongooseSchema.Types.ObjectId;
+
+  @Prop({ type: [StoreMemberSchema], default: [] })
+  members: StoreMember[];
 
   @Prop({ required: true, trim: true })
   name: string;
@@ -125,8 +143,9 @@ export type StoreDocument = Store & Document;
 export const StoreSchema = SchemaFactory.createForClass(Store);
 
 // Indexes
-StoreSchema.index({ organizationId: 1, isDeleted: 1 });
+StoreSchema.index({ ownerId: 1, isDeleted: 1 });
+StoreSchema.index({ 'members.userId': 1 });
 StoreSchema.index({ status: 1 });
 StoreSchema.index({ platform: 1 });
 StoreSchema.index({ createdAt: -1 });
-StoreSchema.index({ url: 1, organizationId: 1 }, { unique: true }); // Prevent duplicate stores
+StoreSchema.index({ url: 1 }, { unique: true }); // Prevent duplicate stores

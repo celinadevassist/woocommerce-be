@@ -8,12 +8,9 @@ export class Review extends Document {
   @Prop({ required: true, index: true })
   externalId: number;
 
-  // Multi-tenant references
+  // Store reference
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
-
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
 
   // Product reference
   @Prop({ required: true, index: true })
@@ -97,6 +94,6 @@ export const ReviewSchema = SchemaFactory.createForClass(Review);
 ReviewSchema.index({ storeId: 1, externalId: 1 }, { unique: true });
 ReviewSchema.index({ storeId: 1, productExternalId: 1 });
 ReviewSchema.index({ storeId: 1, status: 1 });
-ReviewSchema.index({ organizationId: 1, createdAt: -1 });
+ReviewSchema.index({ storeId: 1, createdAt: -1 });
 ReviewSchema.index({ rating: 1 });
 ReviewSchema.index({ reviewerEmail: 1 });

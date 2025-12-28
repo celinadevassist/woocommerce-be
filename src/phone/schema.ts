@@ -24,9 +24,6 @@ export class Phone extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
-
   // Current owner
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Customer', index: true })
   customerId?: MongooseSchema.Types.ObjectId;
@@ -114,5 +111,3 @@ PhoneSchema.index({ storeId: 1, number: 1 }, { unique: true });
 PhoneSchema.index({ customerId: 1 });
 // Find phones for SMS campaigns (active, opted-in, verified)
 PhoneSchema.index({ storeId: 1, status: 1, smsOptIn: 1, isVerified: 1 });
-// Find by organization
-PhoneSchema.index({ organizationId: 1 });

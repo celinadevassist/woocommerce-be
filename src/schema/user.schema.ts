@@ -96,26 +96,6 @@ export class User extends Document {
   @Prop({ default: 0, min: 0 })
   specialistSessionsAttended?: number;
 
-  // CartFlow - Organization fields
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization' })
-  defaultOrganizationId?: MongooseSchema.Types.ObjectId;
-
-  @Prop({
-    type: [
-      {
-        organizationId: { type: MongooseSchema.Types.ObjectId, ref: 'Organization' },
-        role: { type: String },
-        joinedAt: { type: Date, default: Date.now },
-      },
-    ],
-    default: [],
-  })
-  organizations: {
-    organizationId: MongooseSchema.Types.ObjectId;
-    role: string;
-    joinedAt: Date;
-  }[];
-
   @Prop({ default: () => new Date() })
   createdAt: Date;
 

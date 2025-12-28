@@ -7,7 +7,7 @@ import { Invitation, InvitationSchema } from './schema';
 import { InvitationController } from './controller';
 import { InvitationService } from './service';
 import { AuthModule } from '../auth/auth.module';
-import { Organization, OrganizationSchema } from '../organization/schema';
+import { Store, StoreSchema } from '../store/schema';
 import { User, UserSchema } from '../schema/user.schema';
 
 @Module({
@@ -17,7 +17,7 @@ import { User, UserSchema } from '../schema/user.schema';
     PassportModule.register({ defaultStrategy: 'jwt' }),
     MongooseModule.forFeature([
       { name: Invitation.name, schema: InvitationSchema },
-      { name: Organization.name, schema: OrganizationSchema },
+      { name: Store.name, schema: StoreSchema },
       { name: User.name, schema: UserSchema },
     ]),
     HttpModule,

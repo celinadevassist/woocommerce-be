@@ -18,8 +18,8 @@ export const SegmentRuleSchema = SchemaFactory.createForClass(SegmentRule);
 
 @Schema({ timestamps: true, versionKey: false, collection: 'customer_segments' })
 export class CustomerSegment extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true })
   name: string;
@@ -60,5 +60,5 @@ export type CustomerSegmentDocument = CustomerSegment & Document;
 export const CustomerSegmentSchema = SchemaFactory.createForClass(CustomerSegment);
 
 // Indexes
-CustomerSegmentSchema.index({ organizationId: 1, isDeleted: 1 });
-CustomerSegmentSchema.index({ organizationId: 1, name: 1 });
+CustomerSegmentSchema.index({ storeId: 1, isDeleted: 1 });
+CustomerSegmentSchema.index({ storeId: 1, name: 1 });

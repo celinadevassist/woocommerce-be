@@ -19,9 +19,6 @@ export class Email extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
-
   // Current owner
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Customer', index: true })
   customerId?: MongooseSchema.Types.ObjectId;
@@ -126,5 +123,3 @@ EmailSchema.index({ storeId: 1, email: 1 }, { unique: true });
 EmailSchema.index({ customerId: 1 });
 // Find emails for marketing campaigns (active, opted-in, verified)
 EmailSchema.index({ storeId: 1, status: 1, marketingOptIn: 1, isVerified: 1 });
-// Find by organization
-EmailSchema.index({ organizationId: 1 });

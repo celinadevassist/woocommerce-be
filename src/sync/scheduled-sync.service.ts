@@ -175,25 +175,25 @@ export class ScheduledSyncService implements OnModuleInit {
 
     this.logger.log('Processing sync error notifications...');
 
-    // Group errors by organization
-    const errorsByOrg = new Map<string, SyncErrorNotification[]>();
+    // Group errors by store owner
+    const errorsByOwner = new Map<string, SyncErrorNotification[]>();
 
     for (const [storeId, errors] of this.syncErrors) {
       if (errors.length === 0) continue;
 
       const store = await this.storeModel.findById(storeId);
-      if (!store) continue;
+      if (!store || !store.ownerId) continue;
 
-      const orgId = store.organizationId.toString();
-      if (!errorsByOrg.has(orgId)) {
-        errorsByOrg.set(orgId, []);
+      const ownerId = store.ownerId.toString();
+      if (!errorsByOwner.has(ownerId)) {
+        errorsByOwner.set(ownerId, []);
       }
-      errorsByOrg.get(orgId).push(...errors);
+      errorsByOwner.get(ownerId).push(...errors);
     }
 
-    // Send notifications for each organization
-    for (const [orgId, errors] of errorsByOrg) {
-      await this.sendOrgSyncErrorNotification(orgId, errors);
+    // Send notifications for each store owner
+    for (const [ownerId, errors] of errorsByOwner) {
+      await this.sendOwnerSyncErrorNotification(ownerId, errors);
     }
 
     // Clear processed errors
@@ -201,21 +201,18 @@ export class ScheduledSyncService implements OnModuleInit {
   }
 
   /**
-   * Send sync error notification to organization owner
+   * Send sync error notification to store owner
    */
-  private async sendOrgSyncErrorNotification(
-    orgId: string,
+  private async sendOwnerSyncErrorNotification(
+    ownerId: string,
     errors: SyncErrorNotification[],
   ): Promise<void> {
     try {
-      // Get organization with owner
-      const Organization = this.storeModel.db.model('Organization');
-      const org = await Organization.findById(orgId).populate('ownerId');
+      // Get user (store owner)
+      const User = this.storeModel.db.model('User');
+      const owner = await User.findById(ownerId);
 
-      if (!org || !org.ownerId) return;
-
-      const owner = org.ownerId as any;
-      if (!owner.email) return;
+      if (!owner || !owner.email) return;
 
       // Build error summary
       const errorSummary = errors

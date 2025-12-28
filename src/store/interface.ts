@@ -1,4 +1,4 @@
-import { StorePlatform, StoreStatus, SyncStatus } from './enum';
+import { StorePlatform, StoreStatus, SyncStatus, StoreMemberRole } from './enum';
 
 export interface IStoreCredentials {
   consumerKey: string;
@@ -20,9 +20,19 @@ export interface IStoreSettings {
   currency?: string;
 }
 
+export interface IStoreMember {
+  userId: string;
+  role: StoreMemberRole;
+  joinedAt: Date;
+  // Populated fields
+  name?: string;
+  email?: string;
+}
+
 export interface IStore {
   _id: string;
-  organizationId: string;
+  ownerId: string;
+  members: IStoreMember[];
   name: string;
   platform: StorePlatform;
   url: string;

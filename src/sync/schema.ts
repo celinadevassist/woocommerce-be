@@ -7,9 +7,6 @@ export class SyncJob extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
-
   @Prop({ type: String, enum: Object.values(SyncEntityType), required: true })
   entityType: SyncEntityType;
 
@@ -74,5 +71,5 @@ export const SyncJobSchema = SchemaFactory.createForClass(SyncJob);
 
 // Indexes
 SyncJobSchema.index({ storeId: 1, status: 1 });
-SyncJobSchema.index({ organizationId: 1, createdAt: -1 });
+SyncJobSchema.index({ storeId: 1, createdAt: -1 });
 SyncJobSchema.index({ status: 1, entityType: 1 });

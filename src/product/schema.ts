@@ -97,9 +97,6 @@ export class Product extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
-
   @Prop({ required: true, index: true })
   externalId: number;
 
@@ -232,7 +229,7 @@ export const ProductSchema = SchemaFactory.createForClass(Product);
 // Indexes
 ProductSchema.index({ storeId: 1, externalId: 1 }, { unique: true });
 ProductSchema.index({ storeId: 1, sku: 1 });
-ProductSchema.index({ organizationId: 1, isDeleted: 1 });
+ProductSchema.index({ storeId: 1, isDeleted: 1 });
 ProductSchema.index({ name: 'text', sku: 'text', description: 'text' });
 ProductSchema.index({ status: 1, stockStatus: 1 });
 ProductSchema.index({ pendingSync: 1 });

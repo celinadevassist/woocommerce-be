@@ -6,9 +6,6 @@ export class QueryOrderDto {
   @ApiPropertyOptional({ description: 'Store ID to filter by' })
   storeId?: string;
 
-  @ApiPropertyOptional({ description: 'Organization ID to filter by' })
-  organizationId?: string;
-
   @ApiPropertyOptional({ description: 'Filter by order status', enum: OrderStatus })
   status?: OrderStatus;
 
@@ -51,7 +48,6 @@ export class QueryOrderDto {
 
 export const QueryOrderSchema = Joi.object().keys({
   storeId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional(),
-  organizationId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional(),
   status: Joi.string().valid(...Object.values(OrderStatus)).optional(),
   paymentStatus: Joi.string().valid(...Object.values(PaymentStatus)).optional(),
   fulfillmentStatus: Joi.string().valid(...Object.values(FulfillmentStatus)).optional(),

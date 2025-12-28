@@ -10,7 +10,6 @@ import { Tag, TagDocument } from './schema';
 import { CreateTagDto, UpdateTagDto, QueryTagDto } from './dto';
 import { ITag, ITagResponse } from './interface';
 import { Store, StoreDocument } from '../store/schema';
-import { Organization, OrganizationDocument } from '../organization/schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 import { WooTagFull } from '../integrations/woocommerce/woocommerce.types';
 
@@ -21,7 +20,6 @@ export class TagService {
   constructor(
     @InjectModel(Tag.name) private tagModel: Model<TagDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
-    @InjectModel(Organization.name) private organizationModel: Model<OrganizationDocument>,
     private readonly wooCommerceService: WooCommerceService,
   ) {}
 
@@ -50,7 +48,6 @@ export class TagService {
     // Create in local database
     const tag = await this.tagModel.create({
       storeId: store._id,
-      organizationId: store.organizationId,
       externalId: wooTag.id,
       name: wooTag.name,
       slug: wooTag.slug,
@@ -233,7 +230,6 @@ export class TagService {
 
       const tagData = {
         storeId: store._id,
-        organizationId: store.organizationId,
         externalId: wooTag.id,
         name: wooTag.name,
         slug: wooTag.slug,
@@ -289,18 +285,9 @@ export class TagService {
       throw new NotFoundException('Store not found');
     }
 
-    // Verify organization access
-    const organization = await this.organizationModel.findOne({
-      _id: store.organizationId,
-      isDeleted: false,
-    });
-
-    if (!organization) {
-      throw new NotFoundException('Organization not found');
-    }
-
-    const isOwner = organization.ownerId.toString() === userId;
-    const isMember = organization.members.some((m) => m.userId.toString() === userId);
+    // Verify store access - check if user is owner or member
+    const isOwner = store.ownerId?.toString() === userId;
+    const isMember = store.members?.some((m) => m.userId.toString() === userId);
 
     if (!isOwner && !isMember) {
       throw new ForbiddenException('You do not have access to this store');
@@ -314,7 +301,6 @@ export class TagService {
     return {
       _id: obj._id.toString(),
       storeId: obj.storeId.toString(),
-      organizationId: obj.organizationId.toString(),
       externalId: obj.externalId,
       name: obj.name,
       slug: obj.slug,

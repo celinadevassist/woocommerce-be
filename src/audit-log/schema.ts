@@ -2,11 +2,6 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
 
 export enum AuditAction {
-  // Organization actions
-  ORGANIZATION_CREATED = 'organization.created',
-  ORGANIZATION_UPDATED = 'organization.updated',
-  ORGANIZATION_DELETED = 'organization.deleted',
-
   // Member actions
   MEMBER_INVITED = 'member.invited',
   MEMBER_JOINED = 'member.joined',
@@ -80,9 +75,6 @@ export enum AuditSeverity {
 
 @Schema({ timestamps: true, versionKey: false, collection: 'audit_logs' })
 export class AuditLog extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', index: true })
-  organizationId?: MongooseSchema.Types.ObjectId;
-
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', index: true })
   storeId?: MongooseSchema.Types.ObjectId;
 
@@ -93,7 +85,7 @@ export class AuditLog extends Document {
   action: AuditAction;
 
   @Prop({ required: true })
-  resourceType: string; // 'organization', 'store', 'product', 'order', etc.
+  resourceType: string; // 'store', 'product', 'order', 'member', etc.
 
   @Prop({ type: MongooseSchema.Types.ObjectId })
   resourceId?: MongooseSchema.Types.ObjectId;
@@ -131,9 +123,8 @@ export type AuditLogDocument = AuditLog & Document;
 export const AuditLogSchema = SchemaFactory.createForClass(AuditLog);
 
 // Compound indexes for efficient querying
-AuditLogSchema.index({ organizationId: 1, createdAt: -1 });
-AuditLogSchema.index({ organizationId: 1, action: 1, createdAt: -1 });
 AuditLogSchema.index({ storeId: 1, createdAt: -1 });
+AuditLogSchema.index({ storeId: 1, action: 1, createdAt: -1 });
 AuditLogSchema.index({ userId: 1, createdAt: -1 });
 AuditLogSchema.index({ resourceType: 1, resourceId: 1 });
 

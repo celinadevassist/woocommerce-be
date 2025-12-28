@@ -6,7 +6,6 @@ import { OrderModule } from '../order/module';
 import { CustomerModule } from '../customer/module';
 import { ProductModule } from '../product/module';
 import { ReviewModule } from '../review/module';
-import { OrganizationModule } from '../organization/module';
 import { StoreModule } from '../store/module';
 
 @Module({
@@ -16,7 +15,6 @@ import { StoreModule } from '../store/module';
     forwardRef(() => CustomerModule),
     forwardRef(() => ProductModule),
     forwardRef(() => ReviewModule),
-    forwardRef(() => OrganizationModule),
     forwardRef(() => StoreModule),
   ],
   controllers: [AnalyticsController],

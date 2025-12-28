@@ -5,7 +5,6 @@ export interface IInventoryLog {
   productId: string;
   variantId?: string;
   storeId: string;
-  organizationId: string;
   previousQuantity: number;
   newQuantity: number;
   quantityChange: number;
@@ -23,7 +22,6 @@ export interface IStockAlert {
   productId: string;
   variantId?: string;
   storeId: string;
-  organizationId: string;
   alertType: AlertType;
   status: AlertStatus;
   currentQuantity: number;

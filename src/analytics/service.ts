@@ -1,11 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Order, OrderDocument } from '../order/schema';
 import { Customer, CustomerDocument } from '../customer/schema';
 import { Product, ProductDocument } from '../product/schema';
 import { Review, ReviewDocument } from '../review/schema';
-import { Organization, OrganizationDocument } from '../organization/schema';
 import { Store, StoreDocument } from '../store/schema';
 import { QueryAnalyticsDto } from './dto.query';
 import {
@@ -17,7 +16,6 @@ import {
   IOrdersByStatus,
   IRevenueByStore,
 } from './interface';
-import { OrderStatus } from '../order/enum';
 import { ReviewStatus } from '../review/enum';
 
 @Injectable()
@@ -27,7 +25,6 @@ export class AnalyticsService {
     @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     @InjectModel(Review.name) private reviewModel: Model<ReviewDocument>,
-    @InjectModel(Organization.name) private organizationModel: Model<OrganizationDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
   ) {}
 
@@ -35,19 +32,17 @@ export class AnalyticsService {
    * Get dashboard analytics
    */
   async getDashboard(userId: string, query: QueryAnalyticsDto): Promise<IDashboardAnalytics> {
-    const organizations = await this.getUserOrganizations(userId);
-    const orgIds = organizations.map((org) => org._id);
+    const storeIds = await this.getUserStoreIds(userId);
 
     const baseFilter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
 
     if (query.storeId) {
+      // Verify user has access to this specific store
+      await this.getStoreWithAccess(query.storeId, userId);
       baseFilter.storeId = new Types.ObjectId(query.storeId);
-    }
-    if (query.organizationId) {
-      baseFilter.organizationId = new Types.ObjectId(query.organizationId);
     }
 
     // Date range filter
@@ -74,7 +69,7 @@ export class AnalyticsService {
       this.getTopProducts(baseFilter, dateFilter),
       this.getTopCustomers(baseFilter, dateFilter),
       this.getOrdersByStatus(baseFilter, dateFilter),
-      this.getRevenueByStore(orgIds, dateFilter),
+      this.getRevenueByStore(storeIds, dateFilter),
       this.getRecentOrders(baseFilter),
       this.getRecentReviews(baseFilter),
     ]);
@@ -333,11 +328,11 @@ export class AnalyticsService {
    * Get revenue by store
    */
   private async getRevenueByStore(
-    orgIds: Types.ObjectId[],
+    storeIds: Types.ObjectId[],
     dateFilter: any,
   ): Promise<IRevenueByStore[]> {
     const orderFilter: any = {
-      organizationId: { $in: orgIds },
+      storeId: { $in: storeIds },
       isDeleted: false,
     };
     if (Object.keys(dateFilter).length > 0) {
@@ -357,8 +352,8 @@ export class AnalyticsService {
     ]);
 
     // Get store names
-    const storeIds = result.map((r: any) => r._id);
-    const stores = await this.storeModel.find({ _id: { $in: storeIds } });
+    const resultStoreIds = result.map((r: any) => r._id);
+    const stores = await this.storeModel.find({ _id: { $in: resultStoreIds } });
     const storeMap = new Map(stores.map((s) => [s._id.toString(), s]));
 
     return result.map((item: any) => {
@@ -411,13 +406,34 @@ export class AnalyticsService {
   }
 
   // Helper methods
-  private async getUserOrganizations(userId: string): Promise<OrganizationDocument[]> {
-    return this.organizationModel.find({
+  private async getUserStoreIds(userId: string): Promise<Types.ObjectId[]> {
+    const stores = await this.storeModel.find({
       isDeleted: false,
       $or: [
         { ownerId: new Types.ObjectId(userId) },
         { 'members.userId': new Types.ObjectId(userId) },
       ],
     });
+    return stores.map((store) => store._id);
+  }
+
+  private async getStoreWithAccess(storeId: string, userId: string): Promise<StoreDocument> {
+    const store = await this.storeModel.findOne({
+      _id: new Types.ObjectId(storeId),
+      isDeleted: false,
+    });
+
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+
+    const isOwner = store.ownerId?.toString() === userId;
+    const isMember = store.members?.some((m) => m.userId.toString() === userId);
+
+    if (!isOwner && !isMember) {
+      throw new ForbiddenException('You do not have access to this store');
+    }
+
+    return store;
   }
 }

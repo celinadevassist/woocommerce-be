@@ -4,7 +4,6 @@ export interface IReview {
   _id: string;
   externalId: number;
   storeId: string;
-  organizationId: string;
   productExternalId: number;
   localProductId?: string;
   reviewer: string;

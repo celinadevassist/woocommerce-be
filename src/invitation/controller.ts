@@ -22,23 +22,21 @@ export class InvitationController {
   @Post('send')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Send an invitation to join an organization' })
+  @ApiOperation({ summary: 'Send an invitation to join a store' })
   @ApiResponse({ status: 201, description: 'Invitation sent successfully' })
   async sendInvitation(
     @Body() body: {
-      organizationId: string;
+      storeId: string;
       email: string;
       role: string;
-      storeAccess?: string[] | 'all';
     },
     @User() user: UserDocument,
   ) {
     return this.invitationService.sendInvitation(
-      body.organizationId,
+      body.storeId,
       user._id.toString(),
       body.email,
       body.role,
-      body.storeAccess || 'all',
     );
   }
 
@@ -61,17 +59,17 @@ export class InvitationController {
     return this.invitationService.acceptInvitation(token, user._id.toString());
   }
 
-  @Get('organization/:organizationId')
+  @Get('store/:storeId')
   @UseGuards(AuthGuard('jwt'))
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get pending invitations for an organization' })
+  @ApiOperation({ summary: 'Get pending invitations for a store' })
   @ApiResponse({ status: 200, description: 'List of pending invitations' })
-  async getOrganizationInvitations(
-    @Param('organizationId') organizationId: string,
+  async getStoreInvitations(
+    @Param('storeId') storeId: string,
     @User() user: UserDocument,
   ) {
-    return this.invitationService.getOrganizationInvitations(
-      organizationId,
+    return this.invitationService.getStoreInvitations(
+      storeId,
       user._id.toString(),
     );
   }

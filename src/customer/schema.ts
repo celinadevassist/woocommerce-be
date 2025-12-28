@@ -86,12 +86,9 @@ export class Customer extends Document {
   @Prop({ required: true, index: true })
   externalId: number;
 
-  // Multi-tenant references
+  // Store reference
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
-
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Organization', required: true, index: true })
-  organizationId: MongooseSchema.Types.ObjectId;
 
   // Basic info - email is optional (customer can be identified by phone only)
   @Prop({ index: true })
@@ -186,7 +183,7 @@ CustomerSchema.index(
   { storeId: 1, phone: 1 },
   { unique: true, partialFilterExpression: { phone: { $exists: true, $nin: [null, ''] } } }
 );
-CustomerSchema.index({ organizationId: 1, createdAt: -1 });
+CustomerSchema.index({ storeId: 1, createdAt: -1 });
 CustomerSchema.index({ status: 1, tier: 1 });
 CustomerSchema.index({ 'stats.ordersCount': -1 });
 CustomerSchema.index({ 'stats.totalSpent': -1 });
