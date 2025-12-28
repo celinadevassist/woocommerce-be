@@ -15,7 +15,6 @@ import { ReviewModule } from '../review/module';
 import { WooCommerceModule } from '../integrations/woocommerce/woocommerce.module';
 import { LoggerModule } from '../logger/logger.module';
 import { MetadataModule } from '../common_metadata_module/module';
-import { EmailService } from '../services/email.service';
 
 @Module({
   imports: [
@@ -35,7 +34,7 @@ import { EmailService } from '../services/email.service';
     forwardRef(() => MetadataModule),
   ],
   controllers: [SyncController],
-  providers: [SyncService, ScheduledSyncService, EmailService],
+  providers: [SyncService, ScheduledSyncService],
   exports: [SyncService, ScheduledSyncService],
 })
 export class SyncModule {}

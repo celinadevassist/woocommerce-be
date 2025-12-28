@@ -9,18 +9,11 @@ import { InvitationService } from './service';
 import { AuthModule } from '../auth/auth.module';
 import { Organization, OrganizationSchema } from '../organization/schema';
 import { User, UserSchema } from '../schema/user.schema';
-import { EmailService } from '../services/email.service';
-import { MailrelayService } from '../services/mailrelay.service';
-import { MailerService } from '../services/mailer.service';
-import { LoggerModule } from '../logger/logger.module';
-import { MetadataModule } from '../common_metadata_module/module';
 
 @Module({
   imports: [
     ConfigModule,
     forwardRef(() => AuthModule),
-    forwardRef(() => MetadataModule),
-    forwardRef(() => LoggerModule),
     PassportModule.register({ defaultStrategy: 'jwt' }),
     MongooseModule.forFeature([
       { name: Invitation.name, schema: InvitationSchema },
@@ -30,12 +23,7 @@ import { MetadataModule } from '../common_metadata_module/module';
     HttpModule,
   ],
   controllers: [InvitationController],
-  providers: [
-    InvitationService,
-    EmailService,
-    MailrelayService,
-    MailerService,
-  ],
+  providers: [InvitationService],
   exports: [InvitationService],
 })
 export class InvitationModule {}
