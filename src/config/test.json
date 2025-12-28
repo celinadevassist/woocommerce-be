@@ -1,0 +1,12 @@
+{
+  "db": {
+    "uri": "mongodb+srv://church:oGTNcQbNALg5Qm0S@cluster1.yrt1qfc.mongodb.net/church?retryWrites=true&w=majority"
+  },
+  "server": {
+    "port": 3041
+  },
+  "jwt": {
+    "secret": "AAAAB3NzaC1yc2EAAAABJQAAAQEA6BJXtHRswU9WirUK/ECDjO6apHiYvMqechL5WOIVLN64YKVJ3LBj09v0Jomk89IL7TI9yI46gKHBTqRhxnNrwAqECpSEvx0Xw7iTBBzJd15kE8d6M/2poWDxh7q5r9R0+zfIuBseUyEABNwyULsIPqd91tkraeg8exikS7f4BfnYWlDKX7UbFHBp67pLaCQm0zuZMZV0fpOoMV1LkH5VW3meACWmfaqwLFFSqk3ASxZG",
+    "expiration": "14d"
+  }
+}

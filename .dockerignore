@@ -1,0 +1,71 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build outputs (we build inside Docker)
+dist
+build
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+docs
+
+# Testing
+coverage
+.nyc_output
+**/*.spec.ts
+**/*.test.ts
+
+# CI/CD
+.github
+.gitlab-ci.yml
+
+# Docker
+Dockerfile
+.dockerignore
+
+# Logs
+logs
+*.log
+
+# Temporary files
+tmp
+temp
+*.tmp
+*.temp
+
+# Development files
+.eslintrc*
+.prettierrc*
+nodemon.json
+
+# Not needed for production
+nginx/
+scripts/
+secrets/

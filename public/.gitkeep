@@ -1,0 +1,3 @@
+# This file preserves the empty public/ directory in git
+# The public directory is kept empty to prevent serving static content
+# while maintaining Docker build compatibility

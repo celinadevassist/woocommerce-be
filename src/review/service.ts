@@ -1,0 +1,1060 @@
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  Logger,
+} from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { Review, ReviewDocument } from './schema';
+import { ResponseTemplate, ResponseTemplateDocument } from './response-template.schema';
+import { UpdateReviewDto, ReplyReviewDto } from './dto.update';
+import { QueryReviewDto } from './dto.query';
+import { CreateResponseTemplateDto, UpdateResponseTemplateDto, IResponseTemplate } from './response-template.dto';
+import { IReview, IReviewResponse, IReviewStats } from './interface';
+import { ReviewStatus, ReviewSource } from './enum';
+import { Organization, OrganizationDocument } from '../organization/schema';
+import { Product, ProductDocument } from '../product/schema';
+import { Store, StoreDocument } from '../store/schema';
+import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
+import { WooProductReview } from '../integrations/woocommerce/woocommerce.types';
+
+@Injectable()
+export class ReviewService {
+  private readonly logger = new Logger(ReviewService.name);
+
+  constructor(
+    @InjectModel(Review.name) private reviewModel: Model<ReviewDocument>,
+    @InjectModel(Organization.name) private organizationModel: Model<OrganizationDocument>,
+    @InjectModel(Product.name) private productModel: Model<ProductDocument>,
+    @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
+    @InjectModel(ResponseTemplate.name) private responseTemplateModel: Model<ResponseTemplateDocument>,
+    private readonly wooCommerceService: WooCommerceService,
+  ) {}
+
+  /**
+   * Get reviews with filtering and pagination
+   */
+  async findAll(userId: string, query: QueryReviewDto): Promise<IReviewResponse> {
+    const organizations = await this.getUserOrganizations(userId);
+    const orgIds = organizations.map((org) => org._id);
+
+    const filter: any = {
+      organizationId: { $in: orgIds },
+      isDeleted: false,
+    };
+
+    // Apply filters
+    if (query.storeId) {
+      filter.storeId = new Types.ObjectId(query.storeId);
+    }
+    if (query.organizationId) {
+      filter.organizationId = new Types.ObjectId(query.organizationId);
+    }
+    if (query.productId) {
+      filter.localProductId = new Types.ObjectId(query.productId);
+    }
+    if (query.status) {
+      filter.status = query.status;
+    }
+    if (query.minRating !== undefined || query.maxRating !== undefined) {
+      filter.rating = {};
+      if (query.minRating !== undefined) filter.rating.$gte = query.minRating;
+      if (query.maxRating !== undefined) filter.rating.$lte = query.maxRating;
+    }
+    if (query.verified !== undefined) {
+      filter.verified = query.verified;
+    }
+    if (query.hasReply !== undefined) {
+      if (query.hasReply) {
+        filter.$and = [
+          { reply: { $exists: true } },
+          { reply: { $ne: null } },
+          { reply: { $ne: '' } },
+        ];
+      } else {
+        filter.$or = [{ reply: { $exists: false } }, { reply: null }, { reply: '' }];
+      }
+    }
+    if (query.isFlagged !== undefined) {
+      filter.isFlagged = query.isFlagged;
+    }
+    if (query.reviewerEmail) {
+      filter.reviewerEmail = { $regex: query.reviewerEmail, $options: 'i' };
+    }
+    if (query.startDate || query.endDate) {
+      filter.createdAt = {};
+      if (query.startDate) filter.createdAt.$gte = new Date(query.startDate);
+      if (query.endDate) filter.createdAt.$lte = new Date(query.endDate);
+    }
+    if (query.search) {
+      filter.$or = [
+        { reviewer: { $regex: query.search, $options: 'i' } },
+        { review: { $regex: query.search, $options: 'i' } },
+        { reviewerEmail: { $regex: query.search, $options: 'i' } },
+      ];
+    }
+
+    const page = query.page || 1;
+    const size = query.size || 20;
+    const skip = (page - 1) * size;
+
+    const sortField = query.sortBy || 'createdAt';
+    const sortOrder = query.sortOrder === 'asc' ? 1 : -1;
+    const sort: any = { [sortField]: sortOrder };
+
+    const [reviews, total] = await Promise.all([
+      this.reviewModel.find(filter).sort(sort).skip(skip).limit(size),
+      this.reviewModel.countDocuments(filter),
+    ]);
+
+    // Fetch product info for reviews
+    const productIds = [...new Set(reviews.map((r) => r.localProductId?.toString()).filter(Boolean))];
+    const products = productIds.length > 0
+      ? await this.productModel.find({ _id: { $in: productIds } })
+      : [];
+    const productMap = new Map(products.map((p) => [p._id.toString(), p]));
+
+    return {
+      reviews: reviews.map((r) => {
+        const product = r.localProductId ? productMap.get(r.localProductId.toString()) : null;
+        return this.toInterface(r, product);
+      }),
+      pagination: {
+        total,
+        page,
+        size,
+        pages: Math.ceil(total / size),
+      },
+    };
+  }
+
+  /**
+   * Get review by ID
+   */
+  async findById(id: string, userId: string): Promise<IReview> {
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(id),
+      isDeleted: false,
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    await this.verifyOrganizationAccess(review.organizationId.toString(), userId);
+
+    const product = review.localProductId
+      ? await this.productModel.findById(review.localProductId)
+      : null;
+
+    return this.toInterface(review, product);
+  }
+
+  /**
+   * Update review (status, flags, notes)
+   * Optionally syncs status changes back to WooCommerce
+   */
+  async update(id: string, userId: string, dto: UpdateReviewDto): Promise<IReview> {
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(id),
+      isDeleted: false,
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    await this.verifyOrganizationAccess(review.organizationId.toString(), userId);
+
+    const oldStatus = review.status;
+    const statusChanged = dto.status && dto.status !== oldStatus;
+
+    // Update fields
+    if (dto.status) review.status = dto.status;
+    if (dto.tags) review.tags = dto.tags;
+    if (dto.internalNotes !== undefined) review.internalNotes = dto.internalNotes;
+    if (dto.isFlagged !== undefined) review.isFlagged = dto.isFlagged;
+    if (dto.flagReason !== undefined) review.flagReason = dto.flagReason;
+
+    await review.save();
+
+    // Sync status change to WooCommerce if requested (default: true)
+    if (statusChanged && dto.syncToStore !== false && review.externalId) {
+      try {
+        await this.syncReviewStatusToWoo(review);
+        this.logger.log(`Review ${review.externalId} status synced to WooCommerce: ${dto.status}`);
+      } catch (error) {
+        this.logger.error(`Failed to sync review status to WooCommerce: ${error.message}`);
+        // Don't throw - local update succeeded, just log the sync failure
+      }
+    }
+
+    // Sync product rating when review status changes (affects which reviews are counted)
+    if (statusChanged && review.localProductId) {
+      await this.syncProductRating(review.localProductId.toString()).catch((err) => {
+        this.logger.error(`Failed to sync product rating: ${err.message}`);
+      });
+    }
+
+    return this.toInterface(review);
+  }
+
+  /**
+   * Sync review status to WooCommerce
+   */
+  private async syncReviewStatusToWoo(review: ReviewDocument): Promise<void> {
+    const store = await this.storeModel.findById(review.storeId);
+    if (!store) {
+      throw new Error('Store not found');
+    }
+
+    const credentials = {
+      url: store.url,
+      consumerKey: store.credentials.consumerKey,
+      consumerSecret: store.credentials.consumerSecret,
+    };
+
+    await this.wooCommerceService.updateReview(credentials, review.externalId, {
+      status: review.status,
+    });
+  }
+
+  /**
+   * Reply to a review
+   */
+  async reply(id: string, userId: string, dto: ReplyReviewDto): Promise<IReview> {
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(id),
+      isDeleted: false,
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    await this.verifyOrganizationAccess(review.organizationId.toString(), userId);
+
+    review.reply = dto.reply;
+    review.repliedAt = new Date();
+    review.repliedBy = new Types.ObjectId(userId) as any;
+
+    await review.save();
+    return this.toInterface(review);
+  }
+
+  /**
+   * Get new reviews count (reviews from the last 24 hours that are pending)
+   */
+  async getNewReviewsCount(userId: string, storeId?: string): Promise<{ count: number; reviews: IReview[] }> {
+    const organizations = await this.getUserOrganizations(userId);
+    const orgIds = organizations.map((org) => org._id);
+
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const filter: any = {
+      organizationId: { $in: orgIds },
+      isDeleted: false,
+      wooCreatedAt: { $gte: twentyFourHoursAgo },
+    };
+
+    if (storeId) {
+      filter.storeId = new Types.ObjectId(storeId);
+    }
+
+    const reviews = await this.reviewModel
+      .find(filter)
+      .sort({ wooCreatedAt: -1 })
+      .limit(10);
+
+    // Get product info
+    const productIds = [...new Set(reviews.map((r) => r.localProductId?.toString()).filter(Boolean))];
+    const products = productIds.length > 0
+      ? await this.productModel.find({ _id: { $in: productIds } })
+      : [];
+    const productMap = new Map(products.map((p) => [p._id.toString(), p]));
+
+    const count = await this.reviewModel.countDocuments(filter);
+
+    return {
+      count,
+      reviews: reviews.map((r) => {
+        const product = r.localProductId ? productMap.get(r.localProductId.toString()) : null;
+        return this.toInterface(r, product);
+      }),
+    };
+  }
+
+  /**
+   * Get review statistics
+   */
+  async getStats(userId: string, storeId?: string): Promise<IReviewStats> {
+    const organizations = await this.getUserOrganizations(userId);
+    const orgIds = organizations.map((org) => org._id);
+
+    const filter: any = {
+      organizationId: { $in: orgIds },
+      isDeleted: false,
+    };
+
+    if (storeId) {
+      filter.storeId = new Types.ObjectId(storeId);
+    }
+
+    const [
+      totalReviews,
+      pendingReviews,
+      verifiedReviews,
+      repliedReviews,
+      avgRating,
+      ratingDist,
+      recentReviews,
+    ] = await Promise.all([
+      this.reviewModel.countDocuments(filter),
+      this.reviewModel.countDocuments({ ...filter, status: ReviewStatus.HOLD }),
+      this.reviewModel.countDocuments({ ...filter, verified: true }),
+      this.reviewModel.countDocuments({
+        ...filter,
+        reply: { $exists: true },
+        $and: [{ reply: { $ne: null } }, { reply: { $ne: '' } }]
+      }),
+      this.reviewModel.aggregate([
+        { $match: filter },
+        { $group: { _id: null, avgRating: { $avg: '$rating' } } },
+      ]),
+      this.reviewModel.aggregate([
+        { $match: filter },
+        { $group: { _id: '$rating', count: { $sum: 1 } } },
+      ]),
+      this.reviewModel.find(filter).sort({ createdAt: -1 }).limit(5),
+    ]);
+
+    const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    ratingDist.forEach((item: any) => {
+      if (item._id >= 1 && item._id <= 5) {
+        ratingDistribution[item._id as 1 | 2 | 3 | 4 | 5] = item.count;
+      }
+    });
+
+    return {
+      totalReviews,
+      averageRating: Math.round((avgRating[0]?.avgRating || 0) * 10) / 10,
+      ratingDistribution,
+      pendingReviews,
+      verifiedReviews,
+      repliedReviews,
+      recentReviews: recentReviews.map((r) => this.toInterface(r)),
+    };
+  }
+
+  /**
+   * Get reviews for a specific product
+   */
+  async getProductReviews(productId: string, page: number = 1, size: number = 10): Promise<IReviewResponse> {
+    const filter = {
+      localProductId: new Types.ObjectId(productId),
+      status: ReviewStatus.APPROVED,
+      isDeleted: false,
+    };
+
+    const skip = (page - 1) * size;
+
+    const [reviews, total] = await Promise.all([
+      this.reviewModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(size),
+      this.reviewModel.countDocuments(filter),
+    ]);
+
+    return {
+      reviews: reviews.map((r) => this.toInterface(r)),
+      pagination: {
+        total,
+        page,
+        size,
+        pages: Math.ceil(total / size),
+      },
+    };
+  }
+
+  /**
+   * Get review count by store
+   */
+  async getReviewCountByStore(storeId: string): Promise<number> {
+    return this.reviewModel.countDocuments({
+      storeId: new Types.ObjectId(storeId),
+      isDeleted: false,
+    });
+  }
+
+  /**
+   * Get review analytics and trends
+   */
+  async getAnalytics(
+    userId: string,
+    storeId?: string,
+    period: 'week' | 'month' | 'quarter' | 'year' = 'month',
+  ): Promise<{
+    trends: { date: string; count: number; avgRating: number; positiveCount: number; negativeCount: number }[];
+    ratingTrends: { date: string; rating1: number; rating2: number; rating3: number; rating4: number; rating5: number }[];
+    responseMetrics: { totalReviews: number; repliedCount: number; responseRate: number; avgResponseTime: number | null };
+    topProducts: { productId: string; productName: string; reviewCount: number; avgRating: number }[];
+    sentimentBreakdown: { positive: number; neutral: number; negative: number };
+    reviewsByDayOfWeek: { day: string; count: number }[];
+    verificationStats: { verified: number; unverified: number };
+  }> {
+    const organizations = await this.getUserOrganizations(userId);
+    const orgIds = organizations.map((org) => org._id);
+
+    const filter: any = {
+      organizationId: { $in: orgIds },
+      isDeleted: false,
+    };
+
+    if (storeId) {
+      filter.storeId = new Types.ObjectId(storeId);
+    }
+
+    // Calculate date range based on period
+    const now = new Date();
+    let startDate: Date;
+    let groupFormat: string;
+
+    switch (period) {
+      case 'week':
+        startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        groupFormat = '%Y-%m-%d';
+        break;
+      case 'month':
+        startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        groupFormat = '%Y-%m-%d';
+        break;
+      case 'quarter':
+        startDate = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+        groupFormat = '%Y-%U'; // Week of year
+        break;
+      case 'year':
+        startDate = new Date(now.getTime() - 365 * 24 * 60 * 60 * 1000);
+        groupFormat = '%Y-%m'; // Month
+        break;
+    }
+
+    const dateFilter = { ...filter, wooCreatedAt: { $gte: startDate } };
+
+    // 1. Review trends over time
+    const trends = await this.reviewModel.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: { $dateToString: { format: groupFormat, date: '$wooCreatedAt' } },
+          count: { $sum: 1 },
+          avgRating: { $avg: '$rating' },
+          positiveCount: { $sum: { $cond: [{ $gte: ['$rating', 4] }, 1, 0] } },
+          negativeCount: { $sum: { $cond: [{ $lte: ['$rating', 2] }, 1, 0] } },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // 2. Rating distribution trends
+    const ratingTrends = await this.reviewModel.aggregate([
+      { $match: dateFilter },
+      {
+        $group: {
+          _id: { $dateToString: { format: groupFormat, date: '$wooCreatedAt' } },
+          rating1: { $sum: { $cond: [{ $eq: ['$rating', 1] }, 1, 0] } },
+          rating2: { $sum: { $cond: [{ $eq: ['$rating', 2] }, 1, 0] } },
+          rating3: { $sum: { $cond: [{ $eq: ['$rating', 3] }, 1, 0] } },
+          rating4: { $sum: { $cond: [{ $eq: ['$rating', 4] }, 1, 0] } },
+          rating5: { $sum: { $cond: [{ $eq: ['$rating', 5] }, 1, 0] } },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // 3. Response metrics
+    const [totalReviews, repliedCount, avgResponseTimeResult] = await Promise.all([
+      this.reviewModel.countDocuments(filter),
+      this.reviewModel.countDocuments({
+        ...filter,
+        reply: { $exists: true, $nin: [null, ''] },
+      }),
+      this.reviewModel.aggregate([
+        {
+          $match: {
+            ...filter,
+            reply: { $exists: true, $nin: [null, ''] },
+            repliedAt: { $exists: true },
+            wooCreatedAt: { $exists: true },
+          },
+        },
+        {
+          $project: {
+            responseTime: { $subtract: ['$repliedAt', '$wooCreatedAt'] },
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            avgResponseTime: { $avg: '$responseTime' },
+          },
+        },
+      ]),
+    ]);
+
+    const responseMetrics = {
+      totalReviews,
+      repliedCount,
+      responseRate: totalReviews > 0 ? Math.round((repliedCount / totalReviews) * 100) : 0,
+      avgResponseTime: avgResponseTimeResult[0]?.avgResponseTime
+        ? Math.round(avgResponseTimeResult[0].avgResponseTime / (1000 * 60 * 60)) // Hours
+        : null,
+    };
+
+    // 4. Top reviewed products
+    const topProductsAgg = await this.reviewModel.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: '$localProductId',
+          reviewCount: { $sum: 1 },
+          avgRating: { $avg: '$rating' },
+        },
+      },
+      { $sort: { reviewCount: -1 } },
+      { $limit: 10 },
+    ]);
+
+    const productIds = topProductsAgg.map((p) => p._id).filter(Boolean);
+    const products = productIds.length > 0
+      ? await this.productModel.find({ _id: { $in: productIds } })
+      : [];
+    const productMap = new Map(products.map((p) => [p._id.toString(), p.name]));
+
+    const topProducts = topProductsAgg
+      .filter((p) => p._id)
+      .map((p) => ({
+        productId: p._id.toString(),
+        productName: productMap.get(p._id.toString()) || 'Unknown Product',
+        reviewCount: p.reviewCount,
+        avgRating: Math.round(p.avgRating * 10) / 10,
+      }));
+
+    // 5. Sentiment breakdown (based on rating)
+    const sentimentAgg = await this.reviewModel.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: null,
+          positive: { $sum: { $cond: [{ $gte: ['$rating', 4] }, 1, 0] } },
+          neutral: { $sum: { $cond: [{ $eq: ['$rating', 3] }, 1, 0] } },
+          negative: { $sum: { $cond: [{ $lte: ['$rating', 2] }, 1, 0] } },
+        },
+      },
+    ]);
+
+    const sentimentBreakdown = sentimentAgg[0] || { positive: 0, neutral: 0, negative: 0 };
+
+    // 6. Reviews by day of week
+    const dayOfWeekAgg = await this.reviewModel.aggregate([
+      { $match: filter },
+      {
+        $group: {
+          _id: { $dayOfWeek: '$wooCreatedAt' },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const reviewsByDayOfWeek = dayOfWeekAgg.map((d) => ({
+      day: dayNames[d._id - 1] || 'Unknown',
+      count: d.count,
+    }));
+
+    // 7. Verification stats
+    const [verified, unverified] = await Promise.all([
+      this.reviewModel.countDocuments({ ...filter, verified: true }),
+      this.reviewModel.countDocuments({ ...filter, verified: false }),
+    ]);
+
+    return {
+      trends: trends.map((t) => ({
+        date: t._id,
+        count: t.count,
+        avgRating: Math.round(t.avgRating * 10) / 10,
+        positiveCount: t.positiveCount,
+        negativeCount: t.negativeCount,
+      })),
+      ratingTrends: ratingTrends.map((t) => ({
+        date: t._id,
+        rating1: t.rating1,
+        rating2: t.rating2,
+        rating3: t.rating3,
+        rating4: t.rating4,
+        rating5: t.rating5,
+      })),
+      responseMetrics,
+      topProducts,
+      sentimentBreakdown,
+      reviewsByDayOfWeek,
+      verificationStats: { verified, unverified },
+    };
+  }
+
+  /**
+   * Export reviews to CSV
+   */
+  async exportToCsv(userId: string, query: QueryReviewDto): Promise<string> {
+    const organizations = await this.getUserOrganizations(userId);
+    const orgIds = organizations.map((org) => org._id);
+
+    const filter: any = {
+      organizationId: { $in: orgIds },
+      isDeleted: false,
+    };
+
+    // Apply filters
+    if (query.storeId) {
+      filter.storeId = new Types.ObjectId(query.storeId);
+    }
+    if (query.status) {
+      filter.status = query.status;
+    }
+    if (query.minRating !== undefined) {
+      filter.rating = { ...filter.rating, $gte: query.minRating };
+    }
+    if (query.maxRating !== undefined) {
+      filter.rating = { ...filter.rating, $lte: query.maxRating };
+    }
+    if (query.verified !== undefined) {
+      filter.verified = query.verified;
+    }
+    if (query.search) {
+      filter.$or = [
+        { reviewer: { $regex: query.search, $options: 'i' } },
+        { review: { $regex: query.search, $options: 'i' } },
+      ];
+    }
+
+    const reviews = await this.reviewModel
+      .find(filter)
+      .sort({ wooCreatedAt: -1 })
+      .limit(10000); // Max 10k reviews
+
+    // Get product names
+    const productIds = [...new Set(reviews.map((r) => r.localProductId?.toString()).filter(Boolean))];
+    const products = productIds.length > 0
+      ? await this.productModel.find({ _id: { $in: productIds } })
+      : [];
+    const productMap = new Map(products.map((p) => [p._id.toString(), p.name]));
+
+    // CSV Header
+    const headers = [
+      'Reviewer',
+      'Email',
+      'Product',
+      'Rating',
+      'Review',
+      'Status',
+      'Verified',
+      'Reply',
+      'Date',
+      'Tags',
+    ];
+
+    // CSV Rows
+    const rows = reviews.map((review) => {
+      const productName = review.localProductId
+        ? productMap.get(review.localProductId.toString()) || ''
+        : '';
+      return [
+        review.reviewer || '',
+        review.reviewerEmail || '',
+        productName,
+        review.rating,
+        review.review || '',
+        review.status || '',
+        review.verified ? 'Yes' : 'No',
+        review.reply || '',
+        review.wooCreatedAt
+          ? new Date(review.wooCreatedAt).toISOString().split('T')[0]
+          : '',
+        (review.tags || []).join('; '),
+      ];
+    });
+
+    // Escape CSV values
+    const escapeValue = (val: any): string => {
+      const str = String(val ?? '');
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    // Build CSV with UTF-8 BOM for Arabic text support
+    const BOM = '\uFEFF';
+    const csvContent = BOM + [
+      headers.map(escapeValue).join(','),
+      ...rows.map((row) => row.map(escapeValue).join(',')),
+    ].join('\n');
+
+    return csvContent;
+  }
+
+  /**
+   * Upsert review from WooCommerce data
+   */
+  async upsertFromWoo(
+    storeId: string,
+    organizationId: string,
+    wooReview: WooProductReview,
+  ): Promise<ReviewDocument> {
+    const existingReview = await this.reviewModel.findOne({
+      storeId: new Types.ObjectId(storeId),
+      externalId: wooReview.id,
+    });
+
+    // Find local product by external ID
+    const product = await this.productModel.findOne({
+      storeId: new Types.ObjectId(storeId),
+      externalId: wooReview.product_id,
+    });
+
+    const statusMap: Record<string, ReviewStatus> = {
+      approved: ReviewStatus.APPROVED,
+      hold: ReviewStatus.HOLD,
+      spam: ReviewStatus.SPAM,
+      trash: ReviewStatus.TRASH,
+    };
+
+    const reviewData = {
+      storeId: new Types.ObjectId(storeId),
+      organizationId: new Types.ObjectId(organizationId),
+      externalId: wooReview.id,
+      productExternalId: wooReview.product_id,
+      localProductId: product?._id,
+      reviewer: wooReview.reviewer,
+      reviewerEmail: wooReview.reviewer_email.toLowerCase(),
+      review: wooReview.review,
+      rating: wooReview.rating,
+      verified: wooReview.verified,
+      status: statusMap[wooReview.status] || ReviewStatus.APPROVED,
+      source: ReviewSource.WOOCOMMERCE,
+      wooCreatedAt: new Date(wooReview.date_created),
+      lastSyncedAt: new Date(),
+      isDeleted: false,
+    };
+
+    if (existingReview) {
+      // Preserve internal fields
+      reviewData['reply'] = existingReview.reply;
+      reviewData['repliedAt'] = existingReview.repliedAt;
+      reviewData['repliedBy'] = existingReview.repliedBy;
+      reviewData['tags'] = existingReview.tags;
+      reviewData['internalNotes'] = existingReview.internalNotes;
+      reviewData['isFlagged'] = existingReview.isFlagged;
+      reviewData['flagReason'] = existingReview.flagReason;
+
+      Object.assign(existingReview, reviewData);
+      await existingReview.save();
+
+      // Sync rating to product after review update
+      if (product) {
+        await this.syncProductRating(product._id.toString()).catch((err) => {
+          this.logger.error(`Failed to sync product rating: ${err.message}`);
+        });
+      }
+
+      return existingReview;
+    }
+
+    const newReview = await this.reviewModel.create(reviewData);
+
+    // Sync rating to product after new review
+    if (product) {
+      await this.syncProductRating(product._id.toString()).catch((err) => {
+        this.logger.error(`Failed to sync product rating: ${err.message}`);
+      });
+    }
+
+    return newReview;
+  }
+
+  // ==================== Response Templates ====================
+
+  /**
+   * Get all response templates for user's organizations
+   */
+  async getResponseTemplates(userId: string, category?: string): Promise<IResponseTemplate[]> {
+    const organizations = await this.getUserOrganizations(userId);
+    const orgIds = organizations.map((org) => org._id);
+
+    const filter: any = {
+      organizationId: { $in: orgIds },
+      isDeleted: false,
+    };
+
+    if (category) {
+      filter.category = category;
+    }
+
+    const templates = await this.responseTemplateModel
+      .find(filter)
+      .sort({ usageCount: -1, name: 1 });
+
+    return templates.map((t) => this.templateToInterface(t));
+  }
+
+  /**
+   * Create a response template
+   */
+  async createResponseTemplate(
+    userId: string,
+    dto: CreateResponseTemplateDto,
+  ): Promise<IResponseTemplate> {
+    const organizations = await this.getUserOrganizations(userId);
+    if (organizations.length === 0) {
+      throw new ForbiddenException('No organization found');
+    }
+
+    // Use the first organization (primary)
+    const organizationId = organizations[0]._id;
+
+    const template = await this.responseTemplateModel.create({
+      organizationId,
+      name: dto.name,
+      content: dto.content,
+      category: dto.category || 'general',
+      createdBy: new Types.ObjectId(userId),
+      usageCount: 0,
+      isDeleted: false,
+    });
+
+    return this.templateToInterface(template);
+  }
+
+  /**
+   * Update a response template
+   */
+  async updateResponseTemplate(
+    id: string,
+    userId: string,
+    dto: UpdateResponseTemplateDto,
+  ): Promise<IResponseTemplate> {
+    const template = await this.responseTemplateModel.findOne({
+      _id: new Types.ObjectId(id),
+      isDeleted: false,
+    });
+
+    if (!template) {
+      throw new NotFoundException('Template not found');
+    }
+
+    await this.verifyOrganizationAccess(template.organizationId.toString(), userId);
+
+    if (dto.name !== undefined) template.name = dto.name;
+    if (dto.content !== undefined) template.content = dto.content;
+    if (dto.category !== undefined) template.category = dto.category;
+
+    await template.save();
+    return this.templateToInterface(template);
+  }
+
+  /**
+   * Delete a response template
+   */
+  async deleteResponseTemplate(id: string, userId: string): Promise<void> {
+    const template = await this.responseTemplateModel.findOne({
+      _id: new Types.ObjectId(id),
+      isDeleted: false,
+    });
+
+    if (!template) {
+      throw new NotFoundException('Template not found');
+    }
+
+    await this.verifyOrganizationAccess(template.organizationId.toString(), userId);
+
+    template.isDeleted = true;
+    await template.save();
+  }
+
+  /**
+   * Increment template usage count
+   */
+  async incrementTemplateUsage(id: string): Promise<void> {
+    await this.responseTemplateModel.updateOne(
+      { _id: new Types.ObjectId(id) },
+      { $inc: { usageCount: 1 } },
+    );
+  }
+
+  // ==================== Rating Sync to Products ====================
+
+  /**
+   * Sync average rating from reviews to a specific product
+   */
+  async syncProductRating(productId: string): Promise<{ averageRating: number; ratingCount: number }> {
+    const product = await this.productModel.findById(productId);
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // Calculate rating stats from approved reviews only
+    const ratingStats = await this.reviewModel.aggregate([
+      {
+        $match: {
+          localProductId: new Types.ObjectId(productId),
+          status: ReviewStatus.APPROVED,
+          isDeleted: false,
+        },
+      },
+      {
+        $group: {
+          _id: null,
+          averageRating: { $avg: '$rating' },
+          ratingCount: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const stats = ratingStats[0] || { averageRating: 0, ratingCount: 0 };
+    const averageRating = Math.round((stats.averageRating || 0) * 10) / 10;
+    const ratingCount = stats.ratingCount || 0;
+
+    // Update product
+    await this.productModel.updateOne(
+      { _id: productId },
+      { averageRating, ratingCount },
+    );
+
+    this.logger.log(`Product ${productId} rating synced: ${averageRating} (${ratingCount} reviews)`);
+
+    return { averageRating, ratingCount };
+  }
+
+  /**
+   * Sync average rating by product external ID (used during WooCommerce sync)
+   */
+  async syncProductRatingByExternalId(storeId: string, productExternalId: number): Promise<void> {
+    const product = await this.productModel.findOne({
+      storeId: new Types.ObjectId(storeId),
+      externalId: productExternalId,
+    });
+
+    if (product) {
+      await this.syncProductRating(product._id.toString());
+    }
+  }
+
+  /**
+   * Sync ratings for all products in a store
+   */
+  async syncAllProductRatings(userId: string, storeId?: string): Promise<{ updated: number }> {
+    const organizations = await this.getUserOrganizations(userId);
+    const orgIds = organizations.map((org) => org._id);
+
+    const productFilter: any = {
+      organizationId: { $in: orgIds },
+      isDeleted: false,
+    };
+
+    if (storeId) {
+      productFilter.storeId = new Types.ObjectId(storeId);
+    }
+
+    const products = await this.productModel.find(productFilter, '_id');
+
+    let updated = 0;
+    for (const product of products) {
+      try {
+        await this.syncProductRating(product._id.toString());
+        updated++;
+      } catch (error) {
+        this.logger.error(`Failed to sync rating for product ${product._id}: ${error.message}`);
+      }
+    }
+
+    this.logger.log(`Synced ratings for ${updated} products`);
+    return { updated };
+  }
+
+  private templateToInterface(doc: ResponseTemplateDocument): IResponseTemplate {
+    const obj = doc.toObject();
+    return {
+      _id: obj._id.toString(),
+      organizationId: obj.organizationId.toString(),
+      name: obj.name,
+      content: obj.content,
+      category: obj.category,
+      usageCount: obj.usageCount,
+      createdBy: obj.createdBy?.toString(),
+      createdAt: obj.createdAt,
+      updatedAt: obj.updatedAt,
+    };
+  }
+
+  // Helper methods
+  private async getUserOrganizations(userId: string): Promise<OrganizationDocument[]> {
+    return this.organizationModel.find({
+      isDeleted: false,
+      $or: [
+        { ownerId: new Types.ObjectId(userId) },
+        { 'members.userId': new Types.ObjectId(userId) },
+      ],
+    });
+  }
+
+  private async verifyOrganizationAccess(organizationId: string, userId: string): Promise<void> {
+    const organization = await this.organizationModel.findOne({
+      _id: new Types.ObjectId(organizationId),
+      isDeleted: false,
+    });
+
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    const isOwner = organization.ownerId.toString() === userId;
+    const isMember = organization.members.some((m) => m.userId.toString() === userId);
+
+    if (!isOwner && !isMember) {
+      throw new ForbiddenException('You do not have access to this organization');
+    }
+  }
+
+  private toInterface(doc: ReviewDocument, product?: ProductDocument | null): IReview {
+    const obj = doc.toObject();
+    return {
+      _id: obj._id.toString(),
+      externalId: obj.externalId,
+      storeId: obj.storeId.toString(),
+      organizationId: obj.organizationId.toString(),
+      productExternalId: obj.productExternalId,
+      localProductId: obj.localProductId?.toString(),
+      reviewer: obj.reviewer,
+      reviewerEmail: obj.reviewerEmail,
+      reviewerAvatarUrl: obj.reviewerAvatarUrl,
+      review: obj.review,
+      rating: obj.rating,
+      verified: obj.verified,
+      status: obj.status,
+      source: obj.source,
+      reply: obj.reply,
+      repliedAt: obj.repliedAt,
+      repliedBy: obj.repliedBy?.toString(),
+      tags: obj.tags || [],
+      internalNotes: obj.internalNotes,
+      isFlagged: obj.isFlagged,
+      flagReason: obj.flagReason,
+      isDeleted: obj.isDeleted,
+      wooCreatedAt: obj.wooCreatedAt,
+      lastSyncedAt: obj.lastSyncedAt,
+      createdAt: obj.createdAt,
+      updatedAt: obj.updatedAt,
+      productName: product?.name,
+      productImage: product?.images?.[0]?.src,
+    };
+  }
+}

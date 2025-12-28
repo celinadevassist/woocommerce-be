@@ -1,0 +1,410 @@
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+} from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
+import { InventoryLog, InventoryLogDocument, StockAlert, StockAlertDocument } from './schema';
+import { InventoryChangeType, AlertType, AlertStatus } from './enum';
+import {
+  IInventoryLog,
+  IStockAlert,
+  IInventoryOverview,
+  IInventoryLogsResponse,
+  IStockAlertsResponse,
+} from './interface';
+import { Product, ProductDocument } from '../product/schema';
+import { ProductVariant, ProductVariantDocument } from '../product/variant.schema';
+import { Organization, OrganizationDocument } from '../organization/schema';
+import { Store, StoreDocument } from '../store/schema';
+import { StockStatus } from '../product/enum';
+
+@Injectable()
+export class InventoryService {
+  constructor(
+    @InjectModel(InventoryLog.name) private inventoryLogModel: Model<InventoryLogDocument>,
+    @InjectModel(StockAlert.name) private stockAlertModel: Model<StockAlertDocument>,
+    @InjectModel(Product.name) private productModel: Model<ProductDocument>,
+    @InjectModel(ProductVariant.name) private variantModel: Model<ProductVariantDocument>,
+    @InjectModel(Organization.name) private organizationModel: Model<OrganizationDocument>,
+    @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
+  ) {}
+
+  /**
+   * Log a stock change
+   */
+  async logStockChange(
+    productId: string,
+    previousQuantity: number,
+    newQuantity: number,
+    changeType: InventoryChangeType,
+    options: {
+      variantId?: string;
+      reason?: string;
+      reference?: string;
+      changedBy?: string;
+    } = {},
+  ): Promise<IInventoryLog> {
+    const product = await this.productModel.findById(productId);
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    const log = await this.inventoryLogModel.create({
+      productId: new Types.ObjectId(productId),
+      variantId: options.variantId ? new Types.ObjectId(options.variantId) : undefined,
+      storeId: product.storeId,
+      organizationId: product.organizationId,
+      previousQuantity,
+      newQuantity,
+      quantityChange: newQuantity - previousQuantity,
+      changeType,
+      reason: options.reason,
+      reference: options.reference,
+      changedBy: options.changedBy ? new Types.ObjectId(options.changedBy) : undefined,
+      sku: product.sku,
+      productName: product.name,
+    });
+
+    // Check and create/update alerts
+    await this.checkAndUpdateAlerts(product, newQuantity);
+
+    return this.toLogInterface(log);
+  }
+
+  /**
+   * Get inventory logs for a product or store
+   */
+  async getLogs(
+    userId: string,
+    options: {
+      productId?: string;
+      storeId?: string;
+      organizationId?: string;
+      changeType?: InventoryChangeType;
+      startDate?: Date;
+      endDate?: Date;
+      page?: number;
+      size?: number;
+    } = {},
+  ): Promise<IInventoryLogsResponse> {
+    // Verify user access
+    const organizations = await this.getUserOrganizations(userId);
+    const orgIds = organizations.map((org) => org._id);
+
+    const filter: any = {
+      organizationId: { $in: orgIds },
+    };
+
+    if (options.productId) {
+      filter.productId = new Types.ObjectId(options.productId);
+    }
+    if (options.storeId) {
+      filter.storeId = new Types.ObjectId(options.storeId);
+    }
+    if (options.organizationId) {
+      filter.organizationId = new Types.ObjectId(options.organizationId);
+    }
+    if (options.changeType) {
+      filter.changeType = options.changeType;
+    }
+    if (options.startDate || options.endDate) {
+      filter.createdAt = {};
+      if (options.startDate) filter.createdAt.$gte = options.startDate;
+      if (options.endDate) filter.createdAt.$lte = options.endDate;
+    }
+
+    const page = options.page || 1;
+    const size = options.size || 20;
+    const skip = (page - 1) * size;
+
+    const [logs, total] = await Promise.all([
+      this.inventoryLogModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(size),
+      this.inventoryLogModel.countDocuments(filter),
+    ]);
+
+    return {
+      logs: logs.map((log) => this.toLogInterface(log)),
+      pagination: {
+        total,
+        page,
+        size,
+        pages: Math.ceil(total / size),
+      },
+    };
+  }
+
+  /**
+   * Get stock alerts
+   */
+  async getAlerts(
+    userId: string,
+    options: {
+      storeId?: string;
+      organizationId?: string;
+      status?: AlertStatus;
+      alertType?: AlertType;
+      page?: number;
+      size?: number;
+    } = {},
+  ): Promise<IStockAlertsResponse> {
+    const organizations = await this.getUserOrganizations(userId);
+    const orgIds = organizations.map((org) => org._id);
+
+    const filter: any = {
+      organizationId: { $in: orgIds },
+    };
+
+    if (options.storeId) {
+      filter.storeId = new Types.ObjectId(options.storeId);
+    }
+    if (options.organizationId) {
+      filter.organizationId = new Types.ObjectId(options.organizationId);
+    }
+    if (options.status) {
+      filter.status = options.status;
+    } else {
+      filter.status = AlertStatus.ACTIVE; // Default to active alerts
+    }
+    if (options.alertType) {
+      filter.alertType = options.alertType;
+    }
+
+    const page = options.page || 1;
+    const size = options.size || 20;
+    const skip = (page - 1) * size;
+
+    const [alerts, total] = await Promise.all([
+      this.stockAlertModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(size),
+      this.stockAlertModel.countDocuments(filter),
+    ]);
+
+    return {
+      alerts: alerts.map((alert) => this.toAlertInterface(alert)),
+      pagination: {
+        total,
+        page,
+        size,
+        pages: Math.ceil(total / size),
+      },
+    };
+  }
+
+  /**
+   * Get inventory overview for a store or organization
+   */
+  async getOverview(userId: string, storeId?: string): Promise<IInventoryOverview> {
+    const organizations = await this.getUserOrganizations(userId);
+    const orgIds = organizations.map((org) => org._id);
+
+    const filter: any = {
+      organizationId: { $in: orgIds },
+      isDeleted: false,
+    };
+
+    if (storeId) {
+      filter.storeId = new Types.ObjectId(storeId);
+    }
+
+    const [totalProducts, inStockCount, outOfStockCount, lowStockCount] = await Promise.all([
+      this.productModel.countDocuments(filter),
+      this.productModel.countDocuments({ ...filter, stockStatus: StockStatus.IN_STOCK }),
+      this.productModel.countDocuments({ ...filter, stockStatus: StockStatus.OUT_OF_STOCK }),
+      this.productModel.countDocuments({
+        ...filter,
+        manageStock: true,
+        stockQuantity: { $ne: null },
+        $expr: { $lte: ['$stockQuantity', { $ifNull: ['$lowStockAmount', 10] }] },
+      }),
+    ]);
+
+    return {
+      totalProducts,
+      totalInStock: inStockCount,
+      totalOutOfStock: outOfStockCount,
+      totalLowStock: lowStockCount,
+    };
+  }
+
+  /**
+   * Dismiss an alert
+   */
+  async dismissAlert(alertId: string, userId: string): Promise<IStockAlert> {
+    const alert = await this.stockAlertModel.findById(alertId);
+    if (!alert) {
+      throw new NotFoundException('Alert not found');
+    }
+
+    // Verify user has access
+    await this.verifyOrganizationAccess(alert.organizationId.toString(), userId);
+
+    alert.status = AlertStatus.DISMISSED;
+    (alert as any).dismissedBy = new Types.ObjectId(userId);
+    await alert.save();
+
+    return this.toAlertInterface(alert);
+  }
+
+  /**
+   * Get alert count for dashboard
+   */
+  async getAlertCount(userId: string, storeId?: string): Promise<{ lowStock: number; outOfStock: number }> {
+    const organizations = await this.getUserOrganizations(userId);
+    const orgIds = organizations.map((org) => org._id);
+
+    const filter: any = {
+      organizationId: { $in: orgIds },
+      status: AlertStatus.ACTIVE,
+    };
+
+    if (storeId) {
+      filter.storeId = new Types.ObjectId(storeId);
+    }
+
+    const [lowStockCount, outOfStockCount] = await Promise.all([
+      this.stockAlertModel.countDocuments({ ...filter, alertType: AlertType.LOW_STOCK }),
+      this.stockAlertModel.countDocuments({ ...filter, alertType: AlertType.OUT_OF_STOCK }),
+    ]);
+
+    return {
+      lowStock: lowStockCount,
+      outOfStock: outOfStockCount,
+    };
+  }
+
+  // Private helper methods
+  private async checkAndUpdateAlerts(product: ProductDocument, quantity: number): Promise<void> {
+    const threshold = product.lowStockAmount || 10;
+    const store = await this.storeModel.findById(product.storeId);
+    const storeThreshold = store?.settings?.lowStockThreshold || threshold;
+    const effectiveThreshold = product.lowStockAmount || storeThreshold;
+
+    // Determine alert type based on quantity
+    let alertType: AlertType | null = null;
+
+    if (quantity === 0) {
+      alertType = AlertType.OUT_OF_STOCK;
+    } else if (quantity <= effectiveThreshold) {
+      alertType = AlertType.LOW_STOCK;
+    }
+
+    // Find existing active alert
+    const existingAlert = await this.stockAlertModel.findOne({
+      productId: product._id,
+      status: AlertStatus.ACTIVE,
+    });
+
+    if (alertType) {
+      // Create or update alert
+      if (existingAlert) {
+        existingAlert.alertType = alertType;
+        existingAlert.currentQuantity = quantity;
+        existingAlert.threshold = effectiveThreshold;
+        await existingAlert.save();
+      } else {
+        await this.stockAlertModel.create({
+          productId: product._id,
+          storeId: product.storeId,
+          organizationId: product.organizationId,
+          alertType,
+          status: AlertStatus.ACTIVE,
+          currentQuantity: quantity,
+          threshold: effectiveThreshold,
+          sku: product.sku,
+          productName: product.name,
+        });
+      }
+    } else if (existingAlert) {
+      // Resolve the alert - stock is back to healthy levels
+      existingAlert.status = AlertStatus.RESOLVED;
+      existingAlert.resolvedAt = new Date();
+      await existingAlert.save();
+
+      // Create a "back in stock" notification if it was out of stock
+      if (existingAlert.alertType === AlertType.OUT_OF_STOCK) {
+        await this.stockAlertModel.create({
+          productId: product._id,
+          storeId: product.storeId,
+          organizationId: product.organizationId,
+          alertType: AlertType.BACK_IN_STOCK,
+          status: AlertStatus.RESOLVED, // Auto-resolve back-in-stock alerts
+          currentQuantity: quantity,
+          sku: product.sku,
+          productName: product.name,
+          resolvedAt: new Date(),
+        });
+      }
+    }
+  }
+
+  private async getUserOrganizations(userId: string): Promise<OrganizationDocument[]> {
+    return this.organizationModel.find({
+      isDeleted: false,
+      $or: [
+        { ownerId: new Types.ObjectId(userId) },
+        { 'members.userId': new Types.ObjectId(userId) },
+      ],
+    });
+  }
+
+  private async verifyOrganizationAccess(organizationId: string, userId: string): Promise<void> {
+    const organization = await this.organizationModel.findOne({
+      _id: new Types.ObjectId(organizationId),
+      isDeleted: false,
+    });
+
+    if (!organization) {
+      throw new NotFoundException('Organization not found');
+    }
+
+    const isOwner = organization.ownerId.toString() === userId;
+    const isMember = organization.members.some((m) => m.userId.toString() === userId);
+
+    if (!isOwner && !isMember) {
+      throw new ForbiddenException('You do not have access to this organization');
+    }
+  }
+
+  private toLogInterface(doc: InventoryLogDocument): IInventoryLog {
+    const obj = doc.toObject();
+    return {
+      _id: obj._id.toString(),
+      productId: obj.productId.toString(),
+      variantId: obj.variantId?.toString(),
+      storeId: obj.storeId.toString(),
+      organizationId: obj.organizationId.toString(),
+      previousQuantity: obj.previousQuantity,
+      newQuantity: obj.newQuantity,
+      quantityChange: obj.quantityChange,
+      changeType: obj.changeType,
+      reason: obj.reason,
+      reference: obj.reference,
+      changedBy: obj.changedBy?.toString(),
+      sku: obj.sku,
+      productName: obj.productName,
+      createdAt: obj.createdAt,
+    };
+  }
+
+  private toAlertInterface(doc: StockAlertDocument): IStockAlert {
+    const obj = doc.toObject();
+    return {
+      _id: obj._id.toString(),
+      productId: obj.productId.toString(),
+      variantId: obj.variantId?.toString(),
+      storeId: obj.storeId.toString(),
+      organizationId: obj.organizationId.toString(),
+      alertType: obj.alertType,
+      status: obj.status,
+      currentQuantity: obj.currentQuantity,
+      threshold: obj.threshold,
+      sku: obj.sku,
+      productName: obj.productName,
+      resolvedAt: obj.resolvedAt,
+      dismissedBy: obj.dismissedBy?.toString(),
+      createdAt: obj.createdAt,
+      updatedAt: obj.updatedAt,
+    };
+  }
+}

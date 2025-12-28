@@ -1,0 +1,45 @@
+export enum BusinessErrorCode {
+  // Credit related errors (1000-1099)
+  INSUFFICIENT_CREDITS = 1001,
+  CREDITS_EXPIRED = 1002,
+  INVALID_CREDIT_AMOUNT = 1003,
+
+  // Subscription related errors (1100-1199)
+  NO_ACTIVE_SUBSCRIPTION = 1101,
+  SUBSCRIPTION_EXPIRED = 1102,
+  SUBSCRIPTION_SUSPENDED = 1103,
+  SUBSCRIPTION_LIMIT_REACHED = 1104,
+  PLAN_NOT_AVAILABLE = 1105,
+
+  // Payment related errors (1200-1299)
+  PAYMENT_FAILED = 1201,
+  PAYMENT_METHOD_REQUIRED = 1202,
+  INVALID_PAYMENT_METHOD = 1203,
+  REFUND_FAILED = 1204,
+
+  // Project/Resource limits (1300-1399)
+  PROJECT_LIMIT_REACHED = 1301,
+  BRAND_MESSAGE_LIMIT_REACHED = 1302,
+  PRODUCT_VERSION_LIMIT_REACHED = 1303,
+  TEAM_MEMBER_LIMIT_REACHED = 1304,
+
+  // Authentication/Authorization (1400-1499)
+  UNAUTHORIZED_ACCESS = 1401,
+  FORBIDDEN_RESOURCE = 1403,
+  TOKEN_EXPIRED = 1404,
+
+  // General business logic errors (1500-1599)
+  RESOURCE_NOT_FOUND = 1501,
+  DUPLICATE_RESOURCE = 1502,
+  INVALID_OPERATION = 1503,
+  OPERATION_NOT_ALLOWED = 1504,
+}
+
+export interface BusinessErrorResponse {
+  statusCode: number;
+  errorCode: BusinessErrorCode;
+  message: string;
+  details?: any;
+  timestamp: string;
+  path: string;
+}

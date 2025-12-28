@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  app:
+    image: ghcr.io/smartlabtech/idea-keep-be:latest
+    container_name: idea-keep-be
+    ports:
+      - '${PORT:-3055}:${PORT:-3055}'
+    environment:
+      # ===========================================
+      # Application
+      # ===========================================
+      NODE_ENV: production
+      PORT: '${PORT:-3055}'
+      APP_NAME: '${APP_NAME}'
+      APP_URL: '${APP_URL}'
+      FRONTEND_URL: '${FRONTEND_URL}'
+      BACKEND_URL: '${BACKEND_URL}'
+      MAX_REQUEST_SIZE: '${MAX_REQUEST_SIZE:-50mb}'
+
+      # ===========================================
+      # Database
+      # ===========================================
+      DB_URI: '${DB_URI}'
+
+      # ===========================================
+      # JWT Authentication
+      # ===========================================
+      JWT_SECRET: '${JWT_SECRET}'
+      JWT_EXPIRATION: '${JWT_EXPIRATION:-14d}'
+
+      # ===========================================
+      # Email Configuration
+      # ===========================================
+      EMAIL_PROVIDER: '${EMAIL_PROVIDER:-smtp}'
+      SUPPORT_EMAIL: '${SUPPORT_EMAIL}'
+
+      # SMTP (MXrouting)
+      SMTP_HOST: '${SMTP_HOST}'
+      SMTP_PORT: '${SMTP_PORT:-465}'
+      SMTP_SECURE: '${SMTP_SECURE:-true}'
+      SMTP_USER: '${SMTP_USER}'
+      SMTP_PASSWORD: '${SMTP_PASSWORD}'
+      EMAIL_FROM: '${EMAIL_FROM}'
+      EMAIL_FROM_NAME: '${EMAIL_FROM_NAME}'
+      EMAIL_VERIFICATION_URL: '${EMAIL_VERIFICATION_URL}'
+      PASSWORD_RESET_URL: '${PASSWORD_RESET_URL}'
+
+      # Mailrelay (Alternative)
+      MAILRELAY_API_URL: '${MAILRELAY_API_URL}'
+      MAILRELAY_AUTH_TOKEN: '${MAILRELAY_AUTH_TOKEN}'
+
+      # ===========================================
+      # OpenAI
+      # ===========================================
+      OPENAI_API_KEY: '${OPENAI_API_KEY}'
+
+      # ===========================================
+      # Zoom Integration
+      # ===========================================
+      ZOOM_ACCOUNT_ID: '${ZOOM_ACCOUNT_ID}'
+      ZOOM_CLIENT_ID: '${ZOOM_CLIENT_ID}'
+      ZOOM_CLIENT_SECRET: '${ZOOM_CLIENT_SECRET}'
+
+      # ===========================================
+      # AWS S3
+      # ===========================================
+      AWS_ACCESS_KEY_ID: '${AWS_ACCESS_KEY_ID}'
+      AWS_SECRET_ACCESS_KEY: '${AWS_SECRET_ACCESS_KEY}'
+      AWS_S3_BUCKET: '${AWS_S3_BUCKET}'
+      AWS_REGION: '${AWS_REGION:-us-east-2}'
+
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://localhost:${PORT:-3055}/api'
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - proxy-network
+    volumes:
+      - 'idea_keep_app_data:/app/data'
+      - 'idea_keep_app_logs:/app/logs'
+      - 'idea_keep_app_uploads:/app/uploads'
+
+networks:
+  proxy-network:
+    external: true
+
+volumes:
+  idea_keep_app_data:
+    driver: local
+  idea_keep_app_logs:
+    driver: local
+  idea_keep_app_uploads:
+    driver: local
