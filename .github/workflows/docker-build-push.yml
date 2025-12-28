@@ -9,7 +9,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: smartlabtech/cartflow-be
+  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   build-and-push:
@@ -60,4 +60,4 @@ jobs:
     - name: Image digest
       run: |
         echo "### Docker Image Built" >> $GITHUB_STEP_SUMMARY
-        echo "Image: ghcr.io/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY
+        echo "Image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest" >> $GITHUB_STEP_SUMMARY

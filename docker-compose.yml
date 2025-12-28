@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   app:
-    image: ghcr.io/smartlabtech/cartflow-be:latest
+    image: ghcr.io/smartlabtech/woocommerce-be:latest
     container_name: cartflow-be
     ports:
       - '${PORT:-3062}:${PORT:-3062}'
