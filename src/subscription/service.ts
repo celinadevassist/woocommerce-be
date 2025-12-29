@@ -331,6 +331,7 @@ export class SubscriptionService {
       throw new NotFoundException('Invoice not found');
     }
 
+    // Check if already paid
     if (invoice.status === InvoiceStatus.PAID) {
       return { invoice, updated: false, paymentStatus: 'already_paid' };
     }
@@ -344,8 +345,8 @@ export class SubscriptionService {
 
       this.logger.log(`Invoice ${invoice.invoiceNumber} payment status: ${paymentIntent.status}`);
 
-      // If payment completed but invoice not marked as paid, update it
-      if (paymentIntent.status === 'completed' && invoice.status !== InvoiceStatus.PAID) {
+      // If payment completed, update the invoice
+      if (paymentIntent.status === 'completed') {
         invoice.status = InvoiceStatus.PAID;
         invoice.paidAt = new Date();
         invoice.paymentMethod = 'ziina';
