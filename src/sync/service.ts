@@ -68,8 +68,10 @@ export class SyncService {
     let modifiedAfter: Date | undefined;
     if (syncMode === SyncMode.DELTA) {
       const lastSync = store.syncStatus?.products?.lastSync;
+      this.logger.log(`Delta sync requested. Last sync date: ${lastSync ? lastSync.toISOString() : 'none'}`);
       if (lastSync) {
-        modifiedAfter = lastSync;
+        modifiedAfter = new Date(lastSync); // Ensure it's a Date object
+        this.logger.log(`Will fetch products modified after: ${modifiedAfter.toISOString()}`);
       } else {
         // No previous sync - fall back to full sync
         syncMode = SyncMode.FULL;
@@ -433,8 +435,10 @@ export class SyncService {
     let modifiedAfter: Date | undefined;
     if (syncMode === SyncMode.DELTA) {
       const lastSync = store.syncStatus?.orders?.lastSync;
+      this.logger.log(`Delta sync requested. Last sync date: ${lastSync ? new Date(lastSync).toISOString() : 'none'}`);
       if (lastSync) {
-        modifiedAfter = lastSync;
+        modifiedAfter = new Date(lastSync); // Ensure it's a Date object
+        this.logger.log(`Will fetch orders modified after: ${modifiedAfter.toISOString()}`);
       } else {
         // No previous sync - fall back to full sync
         syncMode = SyncMode.FULL;

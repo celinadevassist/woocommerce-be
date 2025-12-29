@@ -353,7 +353,9 @@ export class StoreService {
       updatedAt: new Date(),
     };
 
-    if (status === SyncStatus.SYNCING) {
+    // Set lastSync when sync COMPLETES successfully, not when it starts
+    // This ensures delta sync uses the correct timestamp for modified_after
+    if (status === SyncStatus.SYNCED) {
       updateData[`syncStatus.${entityType}.lastSync`] = new Date();
     }
     if (itemCount !== undefined) {
