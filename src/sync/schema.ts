@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { SyncJobType, SyncJobStatus, SyncEntityType } from './enum';
+import { SyncJobType, SyncJobStatus, SyncEntityType, SyncMode } from './enum';
 
 @Schema({ timestamps: true, versionKey: false, collection: 'sync_jobs' })
 export class SyncJob extends Document {
@@ -15,6 +15,12 @@ export class SyncJob extends Document {
 
   @Prop({ type: String, enum: Object.values(SyncJobStatus), default: SyncJobStatus.PENDING })
   status: SyncJobStatus;
+
+  @Prop({ type: String, enum: Object.values(SyncMode), default: SyncMode.FULL })
+  syncMode: SyncMode;
+
+  @Prop()
+  modifiedAfter?: Date; // For delta sync - only fetch records modified after this date
 
   @Prop({ default: 0 })
   totalItems: number;

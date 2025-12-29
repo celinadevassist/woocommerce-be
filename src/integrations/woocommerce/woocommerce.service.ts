@@ -96,16 +96,25 @@ export class WooCommerceService implements IPlatformAdapter {
 
   /**
    * Get products with pagination
+   * @param modifiedAfter - ISO8601 date string to fetch only products modified after this date (delta sync)
    */
   async getProducts(
     credentials: WooCommerceCredentials,
     page: number = 1,
     perPage: number = 100,
+    modifiedAfter?: string,
   ): Promise<IPaginatedResult<WooProduct>> {
-    const response = await this.requestWithHeaders<WooProduct[]>(credentials, 'GET', 'products', {
+    const params: Record<string, any> = {
       page,
       per_page: perPage,
-    });
+    };
+
+    // Add modified_after for delta sync
+    if (modifiedAfter) {
+      params.modified_after = modifiedAfter;
+    }
+
+    const response = await this.requestWithHeaders<WooProduct[]>(credentials, 'GET', 'products', params);
 
     return {
       data: response.data,
@@ -227,15 +236,22 @@ export class WooCommerceService implements IPlatformAdapter {
 
   /**
    * Get orders with pagination
+   * @param modifiedAfter - ISO8601 date string to fetch only orders modified after this date (delta sync)
    */
   async getOrders(
     credentials: WooCommerceCredentials,
     page: number = 1,
     perPage: number = 100,
     status?: string,
+    modifiedAfter?: string,
   ): Promise<IPaginatedResult<WooOrder>> {
     const params: any = { page, per_page: perPage };
     if (status) params.status = status;
+
+    // Add modified_after for delta sync
+    if (modifiedAfter) {
+      params.modified_after = modifiedAfter;
+    }
 
     const response = await this.requestWithHeaders<WooOrder[]>(
       credentials,

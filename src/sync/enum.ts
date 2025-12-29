@@ -20,3 +20,8 @@ export enum SyncEntityType {
   CUSTOMERS = 'customers',
   REVIEWS = 'reviews',
 }
+
+export enum SyncMode {
+  FULL = 'full',       // Sync all records from WooCommerce
+  DELTA = 'delta',     // Sync only records modified since last sync
+}

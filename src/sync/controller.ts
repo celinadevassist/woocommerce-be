@@ -13,7 +13,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { SyncService } from './service';
 import { ScheduledSyncService } from './scheduled-sync.service';
-import { SyncJobType, SyncEntityType } from './enum';
+import { SyncJobType, SyncEntityType, SyncMode } from './enum';
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
 import { User } from '../decorators/user.decorator';
 import { UserDocument } from '../schema/user.schema';
@@ -33,6 +33,12 @@ export class SyncController {
   @ApiOperation({ summary: 'Start product sync for a store' })
   @ApiResponse({ status: 200, description: 'Sync started successfully' })
   @ApiResponse({ status: 400, description: 'Sync already in progress' })
+  @ApiQuery({
+    name: 'mode',
+    required: false,
+    enum: SyncMode,
+    description: 'Sync mode: "full" for all products, "delta" for only modified since last sync',
+  })
   @UsePipes(
     new JoiValidationPipe({
       param: { lang: LanguageSchema },
@@ -42,14 +48,22 @@ export class SyncController {
     @Param('storeId') storeId: string,
     @User() user: UserDocument,
     @Param('lang') lang: string,
+    @Query('mode') mode?: SyncMode,
   ) {
-    return await this.syncService.startProductSync(storeId, user._id.toString(), SyncJobType.MANUAL);
+    const syncMode = mode === SyncMode.DELTA ? SyncMode.DELTA : SyncMode.FULL;
+    return await this.syncService.startProductSync(storeId, user._id.toString(), SyncJobType.MANUAL, syncMode);
   }
 
   @Post('store/:storeId/orders')
   @ApiOperation({ summary: 'Start order sync for a store' })
   @ApiResponse({ status: 200, description: 'Sync started successfully' })
   @ApiResponse({ status: 400, description: 'Sync already in progress' })
+  @ApiQuery({
+    name: 'mode',
+    required: false,
+    enum: SyncMode,
+    description: 'Sync mode: "full" for all orders, "delta" for only modified since last sync',
+  })
   @UsePipes(
     new JoiValidationPipe({
       param: { lang: LanguageSchema },
@@ -59,8 +73,10 @@ export class SyncController {
     @Param('storeId') storeId: string,
     @User() user: UserDocument,
     @Param('lang') lang: string,
+    @Query('mode') mode?: SyncMode,
   ) {
-    return await this.syncService.startOrderSync(storeId, user._id.toString(), SyncJobType.MANUAL);
+    const syncMode = mode === SyncMode.DELTA ? SyncMode.DELTA : SyncMode.FULL;
+    return await this.syncService.startOrderSync(storeId, user._id.toString(), SyncJobType.MANUAL, syncMode);
   }
 
   @Post('store/:storeId/customers')
@@ -98,8 +114,14 @@ export class SyncController {
   }
 
   @Post('store/:storeId/full')
-  @ApiOperation({ summary: 'Start full sync for all entity types' })
+  @ApiOperation({ summary: 'Start sync for all entity types' })
   @ApiResponse({ status: 200, description: 'Sync started successfully' })
+  @ApiQuery({
+    name: 'mode',
+    required: false,
+    enum: SyncMode,
+    description: 'Sync mode: "full" for all records, "delta" for only modified since last sync (products & orders only)',
+  })
   @UsePipes(
     new JoiValidationPipe({
       param: { lang: LanguageSchema },
@@ -109,8 +131,10 @@ export class SyncController {
     @Param('storeId') storeId: string,
     @User() user: UserDocument,
     @Param('lang') lang: string,
+    @Query('mode') mode?: SyncMode,
   ) {
-    return await this.syncService.startFullSync(storeId, user._id.toString());
+    const syncMode = mode === SyncMode.DELTA ? SyncMode.DELTA : SyncMode.FULL;
+    return await this.syncService.startFullSync(storeId, user._id.toString(), syncMode);
   }
 
   @Post('job/:jobId/pause')

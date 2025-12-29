@@ -1,4 +1,4 @@
-import { SyncJobType, SyncJobStatus, SyncEntityType } from './enum';
+import { SyncJobType, SyncJobStatus, SyncEntityType, SyncMode } from './enum';
 
 export interface ISyncJob {
   _id: string;
@@ -6,6 +6,8 @@ export interface ISyncJob {
   entityType: SyncEntityType;
   type: SyncJobType;
   status: SyncJobStatus;
+  syncMode: SyncMode;
+  modifiedAfter?: Date;
   totalItems: number;
   processedItems: number;
   createdItems: number;

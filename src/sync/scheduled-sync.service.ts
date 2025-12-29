@@ -6,7 +6,7 @@ import { SyncService } from './service';
 import { StoreService } from '../store/service';
 import { Store, StoreDocument } from '../store/schema';
 import { SyncJob, SyncJobDocument } from './schema';
-import { SyncJobType, SyncJobStatus, SyncEntityType } from './enum';
+import { SyncJobType, SyncJobStatus, SyncEntityType, SyncMode } from './enum';
 import { StoreStatus, SyncStatus } from '../store/enum';
 import { EmailService } from '../services/email.service';
 
@@ -100,26 +100,50 @@ export class ScheduledSyncService implements OnModuleInit {
   }
 
   /**
-   * Run full sync for all entity types
+   * Run scheduled sync for all entity types
+   * Uses DELTA sync by default to only fetch changed records since last sync
    */
   private async runFullSync(store: StoreDocument): Promise<void> {
     const storeId = store._id.toString();
     // Use a system user ID for scheduled syncs
     const systemUserId = 'scheduled-sync';
 
-    const entityTypes = [
+    // Scheduled syncs use DELTA mode by default (only fetch changes since last sync)
+    // This significantly reduces API calls and bandwidth
+    const syncMode = SyncMode.DELTA;
+
+    this.logger.log(`Starting scheduled ${syncMode} sync for store: ${store.name}`);
+
+    // Products and Orders support delta sync
+    const deltaSyncEntities = [
       { type: SyncEntityType.PRODUCTS, method: 'startProductSync' },
       { type: SyncEntityType.ORDERS, method: 'startOrderSync' },
+    ];
+
+    // Customers and Reviews don't support delta sync in WooCommerce API
+    const fullSyncEntities = [
       { type: SyncEntityType.CUSTOMERS, method: 'startCustomerSync' },
       { type: SyncEntityType.REVIEWS, method: 'startReviewSync' },
     ];
 
-    for (const entity of entityTypes) {
+    // Run delta sync for products and orders
+    for (const entity of deltaSyncEntities) {
       try {
-        // Check if sync method exists and call it
+        if (typeof this.syncService[entity.method] === 'function') {
+          await this.syncService[entity.method](storeId, systemUserId, SyncJobType.SCHEDULED, syncMode);
+          await this.delay(2000);
+        }
+      } catch (error) {
+        this.logger.error(`Scheduled ${entity.type} sync failed for ${store.name}: ${error.message}`);
+        await this.recordSyncError(store, entity.type, error.message);
+      }
+    }
+
+    // Run full sync for customers and reviews (no delta support)
+    for (const entity of fullSyncEntities) {
+      try {
         if (typeof this.syncService[entity.method] === 'function') {
           await this.syncService[entity.method](storeId, systemUserId, SyncJobType.SCHEDULED);
-          // Small delay between entity syncs to avoid overwhelming the API
           await this.delay(2000);
         }
       } catch (error) {

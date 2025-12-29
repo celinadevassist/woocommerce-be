@@ -2,7 +2,7 @@ import { Injectable, Logger, NotFoundException, BadRequestException, Inject, for
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { SyncJob, SyncJobDocument } from './schema';
-import { SyncJobType, SyncJobStatus, SyncEntityType } from './enum';
+import { SyncJobType, SyncJobStatus, SyncEntityType, SyncMode } from './enum';
 import { ISyncJob, ISyncProgress, ISyncResult, ISyncJobsResponse } from './interface';
 import { StoreService } from '../store/service';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
@@ -39,12 +39,14 @@ export class SyncService {
   ) {}
 
   /**
-   * Start initial product sync for a store
+   * Start product sync for a store
+   * @param syncMode - 'full' for all products, 'delta' for only modified since last sync
    */
   async startProductSync(
     storeId: string,
     userId: string,
     type: SyncJobType = SyncJobType.MANUAL,
+    syncMode: SyncMode = SyncMode.FULL,
   ): Promise<ISyncResult> {
     const store = await this.storeService.getStoreWithCredentials(storeId);
     if (!store) {
@@ -62,12 +64,27 @@ export class SyncService {
       throw new BadRequestException('A product sync is already in progress for this store');
     }
 
+    // For delta sync, get the last successful sync date
+    let modifiedAfter: Date | undefined;
+    if (syncMode === SyncMode.DELTA) {
+      const lastSync = store.syncStatus?.products?.lastSync;
+      if (lastSync) {
+        modifiedAfter = lastSync;
+      } else {
+        // No previous sync - fall back to full sync
+        syncMode = SyncMode.FULL;
+        this.logger.log(`No previous sync found for products, falling back to full sync`);
+      }
+    }
+
     // Create sync job
     const job = await this.syncJobModel.create({
       storeId: new Types.ObjectId(storeId),
       entityType: SyncEntityType.PRODUCTS,
       type,
       status: SyncJobStatus.PENDING,
+      syncMode,
+      modifiedAfter,
       ...(this.isValidObjectId(userId) && { triggeredBy: new Types.ObjectId(userId) }),
     });
 
@@ -81,7 +98,7 @@ export class SyncService {
 
     return {
       success: true,
-      message: 'Product sync started',
+      message: `Product ${syncMode} sync started`,
       job: this.toInterface(job),
     };
   }
@@ -257,11 +274,27 @@ export class SyncService {
         consumerSecret: store.credentials.consumerSecret,
       };
 
+      // Convert modifiedAfter to ISO string for WooCommerce API (delta sync)
+      const modifiedAfterISO = job.modifiedAfter
+        ? job.modifiedAfter.toISOString()
+        : undefined;
+
+      if (modifiedAfterISO) {
+        this.logger.log(`Delta sync: fetching products modified after ${modifiedAfterISO}`);
+      }
+
       // Get first page to determine total
-      const firstPage = await this.wooCommerceService.getProducts(credentials, 1, this.BATCH_SIZE);
+      const firstPage = await this.wooCommerceService.getProducts(
+        credentials,
+        1,
+        this.BATCH_SIZE,
+        modifiedAfterISO,
+      );
       job.totalItems = firstPage.totalItems;
       job.totalPages = firstPage.totalPages;
       await job.save();
+
+      this.logger.log(`Product sync: ${firstPage.totalItems} products to sync (${job.syncMode} mode)`);
 
       // Process from current page (supports resume)
       for (let page = job.currentPage; page <= job.totalPages; page++) {
@@ -273,7 +306,9 @@ export class SyncService {
         }
 
         // Fetch products for this page
-        const productsPage = page === 1 ? firstPage : await this.wooCommerceService.getProducts(credentials, page, this.BATCH_SIZE);
+        const productsPage = page === 1
+          ? firstPage
+          : await this.wooCommerceService.getProducts(credentials, page, this.BATCH_SIZE, modifiedAfterISO);
 
         // Process each product
         for (const wooProduct of productsPage.data) {
@@ -371,11 +406,13 @@ export class SyncService {
 
   /**
    * Start order sync for a store
+   * @param syncMode - 'full' for all orders, 'delta' for only modified since last sync
    */
   async startOrderSync(
     storeId: string,
     userId: string,
     type: SyncJobType = SyncJobType.MANUAL,
+    syncMode: SyncMode = SyncMode.FULL,
   ): Promise<ISyncResult> {
     const store = await this.storeService.getStoreWithCredentials(storeId);
     if (!store) {
@@ -392,11 +429,26 @@ export class SyncService {
       throw new BadRequestException('An order sync is already in progress for this store');
     }
 
+    // For delta sync, get the last successful sync date
+    let modifiedAfter: Date | undefined;
+    if (syncMode === SyncMode.DELTA) {
+      const lastSync = store.syncStatus?.orders?.lastSync;
+      if (lastSync) {
+        modifiedAfter = lastSync;
+      } else {
+        // No previous sync - fall back to full sync
+        syncMode = SyncMode.FULL;
+        this.logger.log(`No previous sync found for orders, falling back to full sync`);
+      }
+    }
+
     const job = await this.syncJobModel.create({
       storeId: new Types.ObjectId(storeId),
       entityType: SyncEntityType.ORDERS,
       type,
       status: SyncJobStatus.PENDING,
+      syncMode,
+      modifiedAfter,
       ...(this.isValidObjectId(userId) && { triggeredBy: new Types.ObjectId(userId) }),
     });
 
@@ -408,7 +460,7 @@ export class SyncService {
 
     return {
       success: true,
-      message: 'Order sync started',
+      message: `Order ${syncMode} sync started`,
       job: this.toInterface(job),
     };
   }
@@ -431,10 +483,27 @@ export class SyncService {
         consumerSecret: store.credentials.consumerSecret,
       };
 
-      const firstPage = await this.wooCommerceService.getOrders(credentials, 1, this.BATCH_SIZE);
+      // Convert modifiedAfter to ISO string for WooCommerce API (delta sync)
+      const modifiedAfterISO = job.modifiedAfter
+        ? job.modifiedAfter.toISOString()
+        : undefined;
+
+      if (modifiedAfterISO) {
+        this.logger.log(`Delta sync: fetching orders modified after ${modifiedAfterISO}`);
+      }
+
+      const firstPage = await this.wooCommerceService.getOrders(
+        credentials,
+        1,
+        this.BATCH_SIZE,
+        undefined, // status
+        modifiedAfterISO,
+      );
       job.totalItems = firstPage.totalItems;
       job.totalPages = firstPage.totalPages;
       await job.save();
+
+      this.logger.log(`Order sync: ${firstPage.totalItems} orders to sync (${job.syncMode} mode)`);
 
       for (let page = job.currentPage; page <= job.totalPages; page++) {
         const currentJob = await this.syncJobModel.findById(jobId);
@@ -443,7 +512,9 @@ export class SyncService {
           return;
         }
 
-        const ordersPage = page === 1 ? firstPage : await this.wooCommerceService.getOrders(credentials, page, this.BATCH_SIZE);
+        const ordersPage = page === 1
+          ? firstPage
+          : await this.wooCommerceService.getOrders(credentials, page, this.BATCH_SIZE, undefined, modifiedAfterISO);
 
         for (const wooOrder of ordersPage.data) {
           try {
@@ -772,30 +843,38 @@ export class SyncService {
   }
 
   /**
-   * Start full sync for all entity types
+   * Start sync for all entity types
+   * @param syncMode - 'full' for all records, 'delta' for only modified since last sync
    */
-  async startFullSync(storeId: string, userId: string): Promise<{ jobs: ISyncResult[] }> {
+  async startFullSync(
+    storeId: string,
+    userId: string,
+    syncMode: SyncMode = SyncMode.FULL,
+  ): Promise<{ jobs: ISyncResult[] }> {
     const results: ISyncResult[] = [];
 
     try {
-      results.push(await this.startProductSync(storeId, userId, SyncJobType.MANUAL));
+      // Products and Orders support delta sync
+      results.push(await this.startProductSync(storeId, userId, SyncJobType.MANUAL, syncMode));
     } catch (error) {
       results.push({ success: false, message: `Products: ${error.message}` });
     }
 
     try {
-      results.push(await this.startOrderSync(storeId, userId, SyncJobType.MANUAL));
+      results.push(await this.startOrderSync(storeId, userId, SyncJobType.MANUAL, syncMode));
     } catch (error) {
       results.push({ success: false, message: `Orders: ${error.message}` });
     }
 
     try {
+      // Customers don't support delta sync in WooCommerce API - always full sync
       results.push(await this.startCustomerSync(storeId, userId, SyncJobType.MANUAL));
     } catch (error) {
       results.push({ success: false, message: `Customers: ${error.message}` });
     }
 
     try {
+      // Reviews don't support delta sync in WooCommerce API - always full sync
       results.push(await this.startReviewSync(storeId, userId, SyncJobType.MANUAL));
     } catch (error) {
       results.push({ success: false, message: `Reviews: ${error.message}` });
@@ -816,6 +895,8 @@ export class SyncService {
       entityType: obj.entityType,
       type: obj.type,
       status: obj.status,
+      syncMode: obj.syncMode || SyncMode.FULL,
+      modifiedAfter: obj.modifiedAfter,
       totalItems: obj.totalItems,
       processedItems: obj.processedItems,
       createdItems: obj.createdItems,
