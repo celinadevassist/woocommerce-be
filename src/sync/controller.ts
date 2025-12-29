@@ -131,7 +131,7 @@ export class SyncController {
     @Param('storeId') storeId: string,
     @User() user: UserDocument,
     @Param('lang') lang: string,
-    @Query('mode') mode?: SyncMode,
+    @Query('mode') mode?: string,
   ) {
     const syncMode = mode === SyncMode.DELTA ? SyncMode.DELTA : SyncMode.FULL;
     return await this.syncService.startFullSync(storeId, user._id.toString(), syncMode);

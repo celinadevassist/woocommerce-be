@@ -47,6 +47,7 @@ export interface ISyncResult {
   success: boolean;
   message: string;
   job?: ISyncJob;
+  fellBackToFull?: boolean; // True when delta sync fell back to full due to no previous lastSync
 }
 
 export interface ISyncJobsResponse {

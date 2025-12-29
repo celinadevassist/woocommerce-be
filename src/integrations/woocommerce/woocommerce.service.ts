@@ -112,7 +112,12 @@ export class WooCommerceService implements IPlatformAdapter {
     // Add modified_after for delta sync
     if (modifiedAfter) {
       params.modified_after = modifiedAfter;
+      this.logger.log(`[WooCommerce] DELTA SYNC - Fetching products modified after: ${modifiedAfter}`);
+    } else {
+      this.logger.log(`[WooCommerce] FULL SYNC - Fetching all products`);
     }
+
+    this.logger.log(`[WooCommerce] GET products API params: ${JSON.stringify(params)}`);
 
     const response = await this.requestWithHeaders<WooProduct[]>(credentials, 'GET', 'products', params);
 
@@ -251,7 +256,12 @@ export class WooCommerceService implements IPlatformAdapter {
     // Add modified_after for delta sync
     if (modifiedAfter) {
       params.modified_after = modifiedAfter;
+      this.logger.log(`[WooCommerce] DELTA SYNC - Fetching orders modified after: ${modifiedAfter}`);
+    } else {
+      this.logger.log(`[WooCommerce] FULL SYNC - Fetching all orders`);
     }
+
+    this.logger.log(`[WooCommerce] GET orders API params: ${JSON.stringify(params)}`);
 
     const response = await this.requestWithHeaders<WooOrder[]>(
       credentials,

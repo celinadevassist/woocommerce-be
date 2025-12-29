@@ -66,15 +66,17 @@ export class SyncService {
 
     // For delta sync, get the last successful sync date
     let modifiedAfter: Date | undefined;
+    let fellBackToFull = false;
     if (syncMode === SyncMode.DELTA) {
       const lastSync = store.syncStatus?.products?.lastSync;
-      this.logger.log(`Delta sync requested. Last sync date: ${lastSync ? lastSync.toISOString() : 'none'}`);
+      this.logger.log(`Delta sync requested. Last sync date: ${lastSync ? new Date(lastSync).toISOString() : 'none'}`);
       if (lastSync) {
         modifiedAfter = new Date(lastSync); // Ensure it's a Date object
         this.logger.log(`Will fetch products modified after: ${modifiedAfter.toISOString()}`);
       } else {
         // No previous sync - fall back to full sync
         syncMode = SyncMode.FULL;
+        fellBackToFull = true;
         this.logger.log(`No previous sync found for products, falling back to full sync`);
       }
     }
@@ -98,10 +100,16 @@ export class SyncService {
       this.logger.error(`Product sync failed for job ${job._id}: ${error.message}`);
     });
 
+    let message = `Product ${syncMode} sync started`;
+    if (fellBackToFull) {
+      message = `Product sync started (no previous sync found, running full sync instead of delta)`;
+    }
+
     return {
       success: true,
-      message: `Product ${syncMode} sync started`,
+      message,
       job: this.toInterface(job),
+      fellBackToFull,
     };
   }
 
@@ -270,6 +278,8 @@ export class SyncService {
       job.startedAt = job.startedAt || new Date();
       await job.save();
 
+      this.logger.log(`Executing product sync - Mode: ${job.syncMode}, ModifiedAfter: ${job.modifiedAfter}`);
+
       const credentials = {
         url: store.url,
         consumerKey: store.credentials.consumerKey,
@@ -277,12 +287,15 @@ export class SyncService {
       };
 
       // Convert modifiedAfter to ISO string for WooCommerce API (delta sync)
-      const modifiedAfterISO = job.modifiedAfter
-        ? job.modifiedAfter.toISOString()
-        : undefined;
-
-      if (modifiedAfterISO) {
+      // WooCommerce expects format: YYYY-MM-DDTHH:MM:SS (without milliseconds and Z)
+      let modifiedAfterISO: string | undefined;
+      if (job.modifiedAfter) {
+        const date = new Date(job.modifiedAfter);
+        // Format: 2024-01-15T10:30:00 (WooCommerce compatible format)
+        modifiedAfterISO = date.toISOString().replace(/\.\d{3}Z$/, '');
         this.logger.log(`Delta sync: fetching products modified after ${modifiedAfterISO}`);
+      } else {
+        this.logger.log(`Full sync: fetching all products (no modifiedAfter in job)`);
       }
 
       // Get first page to determine total
@@ -433,6 +446,7 @@ export class SyncService {
 
     // For delta sync, get the last successful sync date
     let modifiedAfter: Date | undefined;
+    let fellBackToFull = false;
     if (syncMode === SyncMode.DELTA) {
       const lastSync = store.syncStatus?.orders?.lastSync;
       this.logger.log(`Delta sync requested. Last sync date: ${lastSync ? new Date(lastSync).toISOString() : 'none'}`);
@@ -442,6 +456,7 @@ export class SyncService {
       } else {
         // No previous sync - fall back to full sync
         syncMode = SyncMode.FULL;
+        fellBackToFull = true;
         this.logger.log(`No previous sync found for orders, falling back to full sync`);
       }
     }
@@ -462,10 +477,16 @@ export class SyncService {
       this.logger.error(`Order sync failed for job ${job._id}: ${error.message}`);
     });
 
+    let message = `Order ${syncMode} sync started`;
+    if (fellBackToFull) {
+      message = `Order sync started (no previous sync found, running full sync instead of delta)`;
+    }
+
     return {
       success: true,
-      message: `Order ${syncMode} sync started`,
+      message,
       job: this.toInterface(job),
+      fellBackToFull,
     };
   }
 
@@ -488,12 +509,14 @@ export class SyncService {
       };
 
       // Convert modifiedAfter to ISO string for WooCommerce API (delta sync)
-      const modifiedAfterISO = job.modifiedAfter
-        ? job.modifiedAfter.toISOString()
-        : undefined;
-
-      if (modifiedAfterISO) {
+      // WooCommerce expects format: YYYY-MM-DDTHH:MM:SS (without milliseconds and Z)
+      let modifiedAfterISO: string | undefined;
+      if (job.modifiedAfter) {
+        const date = new Date(job.modifiedAfter);
+        modifiedAfterISO = date.toISOString().replace(/\.\d{3}Z$/, '');
         this.logger.log(`Delta sync: fetching orders modified after ${modifiedAfterISO}`);
+      } else {
+        this.logger.log(`Full sync: fetching all orders (no modifiedAfter in job)`);
       }
 
       const firstPage = await this.wooCommerceService.getOrders(
