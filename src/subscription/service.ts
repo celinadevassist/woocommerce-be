@@ -373,8 +373,8 @@ export class SubscriptionService {
       throw new BadRequestException('Invoice has been cancelled');
     }
 
-    // Get frontend URL for callbacks
-    const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:5173');
+    // Get frontend URL for callbacks (remove trailing slash if present)
+    const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:5173').replace(/\/+$/, '');
     const isTest = this.configService.get('NODE_ENV') !== 'production';
 
     // Create payment intent with Ziina

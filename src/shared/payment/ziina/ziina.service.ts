@@ -199,7 +199,8 @@ export class ZiinaService {
     cancelUrl?: string
   ): Promise<IPaymentLink> {
     try {
-      const baseUrl = this.configService.get('APP_URL', 'http://localhost:3000');
+      // Remove trailing slash from base URL
+      const baseUrl = this.configService.get('APP_URL', 'http://localhost:3000').replace(/\/+$/, '');
 
       const response = await this.axiosInstance.post('/payment_links', {
         amount: Math.round(amount * 100), // Convert to cents
