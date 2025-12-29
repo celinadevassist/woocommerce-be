@@ -174,6 +174,26 @@ export class InvoiceController {
     const status = await this.subscriptionService.checkPaymentStatus(invoiceId);
     return status;
   }
+
+  /**
+   * Verify and update payment status for an invoice
+   * Manually triggers a check with Ziina and updates invoice if paid
+   */
+  @Post(':invoiceId/verify-payment')
+  @SkipSubscriptionCheck()
+  @ApiOperation({ summary: 'Verify payment status with payment provider and update invoice' })
+  async verifyPayment(@Param('invoiceId') invoiceId: string) {
+    const result = await this.subscriptionService.verifySingleInvoicePayment(invoiceId);
+    return {
+      success: true,
+      updated: result.updated,
+      paymentStatus: result.paymentStatus,
+      invoiceStatus: result.invoice.status,
+      message: result.updated
+        ? 'Payment verified and invoice marked as paid'
+        : `Payment status: ${result.paymentStatus}`,
+    };
+  }
 }
 
 /**

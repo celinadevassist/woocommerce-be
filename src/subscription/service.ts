@@ -292,6 +292,89 @@ export class SubscriptionService {
   }
 
   /**
+   * Cron job: Check payment status for pending invoices with payment intents
+   * Runs every minute to catch payments where webhook failed
+   */
+  @Cron('*/1 * * * *') // Every minute
+  async checkPendingPayments(): Promise<void> {
+    this.logger.log('Checking pending payments...');
+
+    // Find pending/overdue invoices that have a payment intent ID
+    const pendingInvoices = await this.invoiceModel.find({
+      status: { $in: [InvoiceStatus.PENDING, InvoiceStatus.OVERDUE] },
+      paymentIntentId: { $exists: true, $ne: null },
+      isDeleted: false,
+    });
+
+    this.logger.log(`Found ${pendingInvoices.length} invoices with payment intents to check`);
+
+    for (const invoice of pendingInvoices) {
+      try {
+        await this.verifySingleInvoicePayment(invoice._id.toString());
+      } catch (error) {
+        this.logger.error(`Failed to check payment for invoice ${invoice.invoiceNumber}: ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * Verify payment status for a single invoice
+   * Can be called manually or by cron job
+   */
+  async verifySingleInvoicePayment(invoiceId: string): Promise<{
+    invoice: InvoiceDocument;
+    updated: boolean;
+    paymentStatus?: string;
+  }> {
+    const invoice = await this.invoiceModel.findById(invoiceId);
+    if (!invoice) {
+      throw new NotFoundException('Invoice not found');
+    }
+
+    if (invoice.status === InvoiceStatus.PAID) {
+      return { invoice, updated: false, paymentStatus: 'already_paid' };
+    }
+
+    if (!invoice.paymentIntentId) {
+      return { invoice, updated: false, paymentStatus: 'no_payment_intent' };
+    }
+
+    try {
+      const paymentIntent = await this.ziinaService.getPaymentIntent(invoice.paymentIntentId);
+
+      this.logger.log(`Invoice ${invoice.invoiceNumber} payment status: ${paymentIntent.status}`);
+
+      // If payment completed but invoice not marked as paid, update it
+      if (paymentIntent.status === 'completed' && invoice.status !== InvoiceStatus.PAID) {
+        invoice.status = InvoiceStatus.PAID;
+        invoice.paidAt = new Date();
+        invoice.paymentMethod = 'ziina';
+        invoice.paymentReference = invoice.paymentIntentId;
+        await invoice.save();
+
+        // Ensure subscription status is active
+        if (invoice.subscriptionId) {
+          const subscription = await this.subscriptionModel.findById(invoice.subscriptionId);
+          if (subscription && subscription.status !== SubscriptionStatus.ACTIVE) {
+            subscription.status = SubscriptionStatus.ACTIVE;
+            subscription.suspendedAt = undefined;
+            subscription.suspensionReason = undefined;
+            await subscription.save();
+          }
+        }
+
+        this.logger.log(`Invoice ${invoice.invoiceNumber} marked as paid via status check`);
+        return { invoice, updated: true, paymentStatus: 'completed' };
+      }
+
+      return { invoice, updated: false, paymentStatus: paymentIntent.status };
+    } catch (error) {
+      this.logger.error(`Failed to verify payment for invoice ${invoice.invoiceNumber}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
    * Cancel subscription
    */
   async cancelSubscription(storeId: string): Promise<SubscriptionDocument> {
