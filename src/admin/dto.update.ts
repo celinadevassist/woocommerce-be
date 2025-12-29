@@ -22,13 +22,23 @@ export const AdminSuspendStoreSchema = Joi.object({
 
 export class AdminUpdateSubscriptionDTO {
   status?: string;
+  plan?: string;
+  pricePerMonth?: number;
+  currency?: string;
+  billingCycle?: string;
+  discount?: number;
   trialEndsAt?: Date;
   notes?: string;
 }
 
 export const AdminUpdateSubscriptionSchema = Joi.object({
   status: Joi.string().valid('active', 'suspended', 'cancelled', 'trial').optional(),
-  trialEndsAt: Joi.date().iso().optional(),
+  plan: Joi.string().optional().allow(''),
+  pricePerMonth: Joi.number().min(0).optional(),
+  currency: Joi.string().optional(),
+  billingCycle: Joi.string().valid('monthly', 'quarterly', 'yearly').optional(),
+  discount: Joi.number().min(0).max(100).optional(),
+  trialEndsAt: Joi.date().iso().optional().allow(null),
   notes: Joi.string().optional().allow(''),
 });
 

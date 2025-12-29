@@ -26,11 +26,24 @@ export class Subscription extends Document {
   @Prop({ type: String, enum: Object.values(SubscriptionStatus), default: SubscriptionStatus.ACTIVE })
   status: SubscriptionStatus;
 
+  // Plan info - customizable per store deal
+  @Prop({ default: 'standard' })
+  plan: string; // e.g., 'basic', 'standard', 'premium', 'enterprise', or custom name
+
   @Prop({ required: true, default: 19 })
-  pricePerMonth: number; // $19 per store
+  pricePerMonth: number; // Base price, can be customized per deal
 
   @Prop({ default: 'USD' })
   currency: string;
+
+  @Prop({ default: 'monthly', enum: ['monthly', 'quarterly', 'yearly'] })
+  billingCycle: string; // monthly = 30 days, quarterly = 90 days, yearly = 365 days
+
+  @Prop()
+  discount?: number; // Percentage discount for special deals (e.g., 20 for 20% off)
+
+  @Prop()
+  notes?: string; // Admin notes about the deal
 
   // Billing cycle
   @Prop({ required: true })

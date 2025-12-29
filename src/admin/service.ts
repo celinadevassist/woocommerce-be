@@ -534,8 +534,15 @@ export class AdminService {
       throw new NotFoundException('Subscription not found');
     }
 
+    // Update all provided fields
     if (data.status) subscription.status = data.status as SubscriptionStatus;
-    if (data.trialEndsAt) subscription.trialEndsAt = data.trialEndsAt;
+    if (data.plan !== undefined) subscription.plan = data.plan;
+    if (data.pricePerMonth !== undefined) subscription.pricePerMonth = data.pricePerMonth;
+    if (data.currency) subscription.currency = data.currency;
+    if (data.billingCycle) subscription.billingCycle = data.billingCycle;
+    if (data.discount !== undefined) subscription.discount = data.discount;
+    if (data.trialEndsAt !== undefined) subscription.trialEndsAt = data.trialEndsAt;
+    if (data.notes !== undefined) subscription.notes = data.notes;
 
     await subscription.save();
 
