@@ -884,18 +884,26 @@ export class AdminService {
     const invoiceCount = await this.invoiceModel.countDocuments();
     const invoiceNumber = `INV-${String(invoiceCount + 1).padStart(6, '0')}`;
 
-    const invoice = await this.invoiceModel.create({
+    const invoiceData: any = {
       storeId: store._id,
-      subscriptionId: subscription?._id,
       invoiceNumber,
       amount: data.amount,
       currency: subscription?.currency || 'USD',
       status: InvoiceStatus.PENDING,
       description: data.description || `Invoice for ${store.name}`,
       dueDate,
-      billingPeriodStart: now,
-      billingPeriodEnd: dueDate,
-    });
+      periodStart: now,
+      periodEnd: dueDate,
+      storeName: store.name,
+      storeUrl: store.url,
+    };
+
+    // Only add subscriptionId if subscription exists
+    if (subscription?._id) {
+      invoiceData.subscriptionId = subscription._id;
+    }
+
+    const invoice = await this.invoiceModel.create(invoiceData);
 
     this.logger.log(`Admin ${adminId} generated invoice ${invoiceNumber} for store ${storeId}`);
 

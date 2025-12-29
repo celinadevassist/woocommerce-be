@@ -93,8 +93,8 @@ export class Invoice extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Subscription', required: true })
-  subscriptionId: MongooseSchema.Types.ObjectId;
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Subscription' })
+  subscriptionId?: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: String, enum: Object.values(InvoiceStatus), default: InvoiceStatus.PENDING })
   status: InvoiceStatus;
