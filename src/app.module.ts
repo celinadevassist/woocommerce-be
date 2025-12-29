@@ -35,6 +35,7 @@ import { AuditLogModule } from './audit-log/module';
 import { PhoneModule } from './phone/module';
 import { EmailModule } from './email/module';
 import { SubscriptionModule } from './subscription/module';
+import { AdminModule } from './admin/module';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { SubscriptionModule } from './subscription/module';
     PhoneModule,
     EmailModule,
     SubscriptionModule,
+    AdminModule,
   ],
   controllers: [HealthController],
   providers: [ValidationPipe],
