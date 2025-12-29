@@ -230,6 +230,55 @@ export class SubscriptionService {
   }
 
   /**
+   * Get invoices for multiple stores (for user's all stores view)
+   */
+  async getInvoicesByStoreIds(
+    storeIds: string[],
+    status?: InvoiceStatus,
+    page: number = 1,
+    limit: number = 50,
+  ): Promise<{ invoices: InvoiceDocument[]; total: number; pagination: any }> {
+    const filter: any = {
+      storeId: { $in: storeIds.map(id => new Types.ObjectId(id)) },
+      isDeleted: false,
+    };
+
+    if (status) {
+      filter.status = status;
+    }
+
+    const [invoices, total] = await Promise.all([
+      this.invoiceModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit),
+      this.invoiceModel.countDocuments(filter),
+    ]);
+
+    return {
+      invoices,
+      total,
+      pagination: {
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Get pending invoices for multiple stores
+   */
+  async getPendingInvoicesByStoreIds(storeIds: string[]): Promise<InvoiceDocument[]> {
+    return this.invoiceModel.find({
+      storeId: { $in: storeIds.map(id => new Types.ObjectId(id)) },
+      status: { $in: [InvoiceStatus.PENDING, InvoiceStatus.OVERDUE] },
+      isDeleted: false,
+    }).sort({ dueDate: 1 });
+  }
+
+  /**
    * Cron job: Generate invoices for subscriptions due today
    * Runs daily at midnight
    */

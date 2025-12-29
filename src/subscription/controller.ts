@@ -15,10 +15,13 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model, Types } from 'mongoose';
 import { Request, Response } from 'express';
 import { SubscriptionService } from './service';
 import { SkipSubscriptionCheck } from './guard';
 import { InvoiceStatus } from './schema';
+import { Store, StoreDocument } from '../store/schema';
 import { User } from '../decorators/user.decorator';
 import { UserDocument } from '../schema/user.schema';
 
@@ -79,31 +82,85 @@ export class SubscriptionController {
 @Controller(':lang/invoices')
 @UseGuards(AuthGuard('jwt'))
 export class InvoiceController {
-  constructor(private readonly subscriptionService: SubscriptionService) {}
+  constructor(
+    private readonly subscriptionService: SubscriptionService,
+    @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
+  ) {}
 
   /**
-   * Get all invoices for a store
+   * Get all invoices for a store or all user's stores
    */
   @Get()
   @SkipSubscriptionCheck()
-  @ApiOperation({ summary: 'Get all invoices for a store' })
-  @ApiQuery({ name: 'storeId', required: true })
+  @ApiOperation({ summary: 'Get all invoices for a store or all user stores' })
+  @ApiQuery({ name: 'storeId', required: false, description: 'Optional: filter by store ID. If not provided, returns invoices for all user stores' })
   @ApiQuery({ name: 'status', required: false, enum: InvoiceStatus })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
   async getInvoices(
-    @Query('storeId') storeId: string,
+    @User() user: UserDocument,
+    @Query('storeId') storeId?: string,
     @Query('status') status?: InvoiceStatus,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const result = await this.subscriptionService.getInvoicesByStore(
-      storeId,
+    // If storeId provided, get invoices for that store
+    if (storeId) {
+      const result = await this.subscriptionService.getInvoicesByStore(
+        storeId,
+        status,
+        parseInt(page) || 1,
+        parseInt(limit) || 20,
+      );
+      return result;
+    }
+
+    // Otherwise, get invoices for all user's stores
+    const userStores = await this.storeModel.find({
+      $or: [
+        { ownerId: user._id },
+        { 'members.userId': user._id },
+      ],
+      isDeleted: false,
+    }).select('_id');
+
+    const storeIds = userStores.map(s => s._id.toString());
+
+    if (storeIds.length === 0) {
+      return { invoices: [], total: 0, pagination: { page: 1, limit: 50, totalPages: 0 } };
+    }
+
+    return this.subscriptionService.getInvoicesByStoreIds(
+      storeIds,
       status,
       parseInt(page) || 1,
-      parseInt(limit) || 20,
+      parseInt(limit) || 50,
     );
-    return result;
+  }
+
+  /**
+   * Get all pending invoices for user's stores
+   */
+  @Get('user/pending')
+  @SkipSubscriptionCheck()
+  @ApiOperation({ summary: 'Get all pending invoices for user stores' })
+  async getAllPendingInvoices(@User() user: UserDocument) {
+    const userStores = await this.storeModel.find({
+      $or: [
+        { ownerId: user._id },
+        { 'members.userId': user._id },
+      ],
+      isDeleted: false,
+    }).select('_id');
+
+    const storeIds = userStores.map(s => s._id.toString());
+
+    if (storeIds.length === 0) {
+      return { invoices: [] };
+    }
+
+    const invoices = await this.subscriptionService.getPendingInvoicesByStoreIds(storeIds);
+    return { invoices };
   }
 
   /**
