@@ -666,6 +666,8 @@ export class AdminService {
     const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
 
     const [
+      totalCount,
+      paidCount,
       totalRevenue,
       thisMonthRevenue,
       lastMonthRevenue,
@@ -673,6 +675,8 @@ export class AdminService {
       overdueStats,
       revenueByMonth,
     ] = await Promise.all([
+      this.invoiceModel.countDocuments({ isDeleted: { $ne: true } }),
+      this.invoiceModel.countDocuments({ status: InvoiceStatus.PAID, isDeleted: { $ne: true } }),
       this.invoiceModel.aggregate([
         { $match: { status: InvoiceStatus.PAID, isDeleted: { $ne: true } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
@@ -724,7 +728,9 @@ export class AdminService {
     ]);
 
     return {
-      totalRevenue: totalRevenue[0]?.total || 0,
+      total: totalCount,
+      paid: paidCount,
+      totalPaid: totalRevenue[0]?.total || 0,
       thisMonth: thisMonthRevenue[0]?.total || 0,
       lastMonth: lastMonthRevenue[0]?.total || 0,
       pending: {
