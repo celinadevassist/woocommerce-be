@@ -38,6 +38,8 @@ export class AuthService {
 
   async signup(userDTO: any, lang) {
     const user = userDTO;
+    // Normalize email to lowercase
+    user.email = user.email?.toLowerCase()?.trim();
     let exist = await this.userModel.findOne({ email: user.email });
 
     if (exist) {
@@ -142,7 +144,9 @@ export class AuthService {
   async signin(userDTO, lang): Promise<{ token: string, user: any }> {
     const user = userDTO;
     let exist: any = {}
-    exist = await this.userModel.findOne({ email: user.email }).select('+password +hashKey')
+    // Normalize email to lowercase for case-insensitive matching
+    const normalizedEmail = user.email?.toLowerCase()?.trim();
+    exist = await this.userModel.findOne({ email: normalizedEmail }).select('+password +hashKey')
 
 
     if (!exist) {
@@ -492,7 +496,8 @@ export class AuthService {
   }
 
   async findUserByEmail(email: string): Promise<UserDocument> {
-    return await this.userModel.findOne({ email })
+    const normalizedEmail = email?.toLowerCase()?.trim();
+    return await this.userModel.findOne({ email: normalizedEmail })
   }
 
   async encryptPassword(password: string, key: string): Promise<string> {
