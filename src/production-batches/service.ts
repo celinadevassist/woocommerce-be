@@ -6,6 +6,7 @@ import { Material } from '../inventory-materials/schema';
 import { SKU } from '../inventory-skus/schema';
 import { Store } from '../store/schema';
 import { InventoryMaterialsService } from '../inventory-materials/service';
+import { ProductStockService } from '../product-stock/service';
 import { ProductionBatchStatus, ProductionBatchType } from './enum';
 import { IProductionBatch, IProductionBatchResponse, IProductionBatchCostSummary } from './interface';
 import {
@@ -27,6 +28,7 @@ export class ProductionBatchesService {
     @InjectModel(SKU.name) private skuModel: Model<SKU>,
     @InjectModel(Store.name) private storeModel: Model<Store>,
     private readonly materialsService: InventoryMaterialsService,
+    private readonly productStockService: ProductStockService,
   ) {}
 
   /**
@@ -482,6 +484,24 @@ export class ProductionBatchesService {
     }
 
     await batch.save();
+
+    // Add completed products to Product Stock
+    if (dto.completedQuantity > 0) {
+      const sku = await this.skuModel.findById(batch.skuId);
+      if (sku) {
+        await this.productStockService.addStockFromProduction(
+          batch.storeId.toString(),
+          userId,
+          batch.skuId.toString(),
+          sku.sku,
+          sku.title,
+          dto.completedQuantity,
+          batch.costPerUnit,
+          batch.batchNumber,
+        );
+        this.logger.log(`Added ${dto.completedQuantity} units to product stock for SKU: ${sku.sku}`);
+      }
+    }
 
     this.logger.log(`Production completed: ${batch.batchNumber}, ${dto.completedQuantity} units at ${batch.costPerUnit}/unit`);
     return this.findById(userId, batchId);

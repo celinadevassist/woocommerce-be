@@ -601,4 +601,106 @@ export class ProductStockService {
 
     return locations;
   }
+
+  /**
+   * Add stock from production - finds or creates stock entry for SKU
+   * Used when production batches are completed
+   */
+  async addStockFromProduction(
+    storeId: string,
+    userId: string,
+    skuId: string,
+    skuCode: string,
+    productName: string,
+    quantity: number,
+    unitCost: number,
+    batchNumber: string,
+  ): Promise<IProductStock> {
+    await this.getStoreWithAccess(storeId, userId);
+
+    const storeObjectId = new Types.ObjectId(storeId);
+    const skuObjectId = new Types.ObjectId(skuId);
+
+    // Find existing stock entry for this SKU
+    let stock = await this.stockModel.findOne({
+      storeId: storeObjectId,
+      skuId: skuObjectId,
+      isDeleted: false,
+    });
+
+    if (stock) {
+      // Add to existing stock using weighted average cost
+      const previousStock = stock.currentStock;
+      const newStock = previousStock + quantity;
+
+      // Weighted average cost calculation
+      if (unitCost > 0) {
+        const totalValue = previousStock * stock.unitCost + quantity * unitCost;
+        stock.unitCost = newStock > 0 ? Math.round((totalValue / newStock) * 100) / 100 : unitCost;
+      }
+
+      stock.currentStock = newStock;
+      stock.lastRestockedAt = new Date();
+      await this.updateCalculatedFields(stock);
+      await stock.save();
+
+      // Create transaction record
+      await this.transactionModel.create({
+        storeId: storeObjectId,
+        stockId: stock._id,
+        type: StockTransactionType.PRODUCTION,
+        quantity: quantity,
+        previousStock,
+        newStock,
+        unitCost,
+        totalCost: quantity * unitCost,
+        reference: batchNumber,
+        referenceType: 'production',
+        notes: `Production batch: ${batchNumber}`,
+        performedBy: new Types.ObjectId(userId),
+      });
+
+      this.logger.log(`Stock added from production to ${skuCode}: +${quantity} (Batch: ${batchNumber})`);
+      return this.toInterface(stock);
+    } else {
+      // Create new stock entry
+      stock = await this.stockModel.create({
+        storeId: storeObjectId,
+        skuId: skuObjectId,
+        sku: skuCode,
+        productName,
+        variantName: '',
+        currentStock: quantity,
+        reservedStock: 0,
+        availableStock: quantity,
+        minStockLevel: 0,
+        reorderPoint: 0,
+        reorderQuantity: 0,
+        unitCost,
+        totalValue: quantity * unitCost,
+        status: this.calculateStatus(quantity, 0),
+        location: '',
+        lastRestockedAt: new Date(),
+      });
+
+      // Create initial transaction
+      await this.transactionModel.create({
+        storeId: storeObjectId,
+        stockId: stock._id,
+        type: StockTransactionType.PRODUCTION,
+        quantity,
+        previousStock: 0,
+        newStock: quantity,
+        unitCost,
+        totalCost: quantity * unitCost,
+        reference: batchNumber,
+        referenceType: 'production',
+        notes: `Initial stock from production batch: ${batchNumber}`,
+        performedBy: new Types.ObjectId(userId),
+      });
+
+      this.logger.log(`Stock created from production for ${skuCode}: ${quantity} units (Batch: ${batchNumber})`);
+      return this.toInterface(stock);
+    }
+  }
 }
