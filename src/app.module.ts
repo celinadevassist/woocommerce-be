@@ -39,6 +39,7 @@ import { AdminModule } from './admin/module';
 import { InventoryMaterialsModule } from './inventory-materials/module';
 import { InventorySKUsModule } from './inventory-skus/module';
 import { ProductionBatchesModule } from './production-batches/module';
+import { ProductStockModule } from './product-stock/module';
 
 @Module({
   imports: [
@@ -82,6 +83,7 @@ import { ProductionBatchesModule } from './production-batches/module';
     InventoryMaterialsModule,
     InventorySKUsModule,
     ProductionBatchesModule,
+    ProductStockModule,
   ],
   controllers: [HealthController],
   providers: [ValidationPipe],
