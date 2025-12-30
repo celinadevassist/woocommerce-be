@@ -37,6 +37,7 @@ import { EmailModule } from './email/module';
 import { SubscriptionModule } from './subscription/module';
 import { AdminModule } from './admin/module';
 import { InventoryMaterialsModule } from './inventory-materials/module';
+import { InventorySKUsModule } from './inventory-skus/module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { InventoryMaterialsModule } from './inventory-materials/module';
     SubscriptionModule,
     AdminModule,
     InventoryMaterialsModule,
+    InventorySKUsModule,
   ],
   controllers: [HealthController],
   providers: [ValidationPipe],
