@@ -40,6 +40,7 @@ import { InventoryMaterialsModule } from './inventory-materials/module';
 import { InventorySKUsModule } from './inventory-skus/module';
 import { ProductionBatchesModule } from './production-batches/module';
 import { ProductStockModule } from './product-stock/module';
+import { RunningCostsModule } from './running-costs/module';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { ProductStockModule } from './product-stock/module';
     InventorySKUsModule,
     ProductionBatchesModule,
     ProductStockModule,
+    RunningCostsModule,
   ],
   controllers: [HealthController],
   providers: [ValidationPipe],
