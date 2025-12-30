@@ -38,6 +38,7 @@ import { SubscriptionModule } from './subscription/module';
 import { AdminModule } from './admin/module';
 import { InventoryMaterialsModule } from './inventory-materials/module';
 import { InventorySKUsModule } from './inventory-skus/module';
+import { ProductionBatchesModule } from './production-batches/module';
 
 @Module({
   imports: [
@@ -80,6 +81,7 @@ import { InventorySKUsModule } from './inventory-skus/module';
     AdminModule,
     InventoryMaterialsModule,
     InventorySKUsModule,
+    ProductionBatchesModule,
   ],
   controllers: [HealthController],
   providers: [ValidationPipe],
