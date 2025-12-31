@@ -22,7 +22,7 @@ const BOMMaterialSchema = Joi.object({
   quantity: Joi.number().greater(0).required(),
   unit: Joi.string().required(),
   notes: Joi.string().optional().allow(''),
-});
+}).options({ stripUnknown: true });
 
 // Create SKU DTO
 export class CreateSKUDto {

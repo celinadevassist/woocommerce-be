@@ -56,6 +56,8 @@ export class ProductUnit extends Document {
   isDeleted: boolean;
 }
 
+export type ProductUnitDocument = ProductUnit & Document;
+
 export const ProductUnitSchema = SchemaFactory.createForClass(ProductUnit);
 
 // Compound index for inventory queries (available units per SKU)

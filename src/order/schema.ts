@@ -88,6 +88,13 @@ export class OrderLineItem {
 
   @Prop({ type: Object })
   metaData?: Record<string, any>;
+
+  // Unit tracking for fulfillment
+  @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'ProductUnit' }], default: [] })
+  fulfilledUnits: MongooseSchema.Types.ObjectId[];
+
+  @Prop({ default: 0 })
+  fulfilledQuantity: number;
 }
 
 export const OrderLineItemSchema = SchemaFactory.createForClass(OrderLineItem);

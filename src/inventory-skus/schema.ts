@@ -88,7 +88,12 @@ export type SKUDocument = SKU & Document;
 export const SKUSchema = SchemaFactory.createForClass(SKU);
 
 // Indexes
-SKUSchema.index({ storeId: 1, sku: 1 }, { unique: true });
+// Partial unique index - only enforces uniqueness on non-deleted SKUs
+SKUSchema.index(
+  { storeId: 1, sku: 1 },
+  { unique: true, partialFilterExpression: { isDeleted: false } }
+);
 SKUSchema.index({ storeId: 1, status: 1 });
 SKUSchema.index({ storeId: 1, category: 1 });
 SKUSchema.index({ storeId: 1, title: 'text', sku: 'text' });
+SKUSchema.index({ storeId: 1, isDeleted: 1 });

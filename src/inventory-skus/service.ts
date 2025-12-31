@@ -11,6 +11,7 @@ import { Model, Types } from 'mongoose';
 import { SKU, SKUDocument } from './schema';
 import { CreateSKUDto, UpdateSKUDto, QuerySKUDto } from './dto';
 import { ISKU, ISKUResponse, ISKUCostBreakdown, IBOMMaterial } from './interface';
+import { SKUStatus } from './enum';
 import { Material, MaterialDocument } from '../inventory-materials/schema';
 import { Store, StoreDocument } from '../store/schema';
 
@@ -30,7 +31,7 @@ export class InventorySKUsService {
   async create(userId: string, storeId: string, dto: CreateSKUDto): Promise<ISKU> {
     await this.getStoreWithAccess(storeId, userId);
 
-    // Check for duplicate SKU
+    // Check for duplicate SKU (active)
     const existingSKU = await this.skuModel.findOne({
       storeId: new Types.ObjectId(storeId),
       sku: dto.sku,
@@ -41,41 +42,74 @@ export class InventorySKUsService {
       throw new ConflictException(`SKU "${dto.sku}" already exists`);
     }
 
+    // Check for soft-deleted SKU with same code - restore it
+    const deletedSKU = await this.skuModel.findOne({
+      storeId: new Types.ObjectId(storeId),
+      sku: dto.sku,
+      isDeleted: true,
+    });
+
     // Validate materials exist
     if (dto.materials && dto.materials.length > 0) {
       await this.validateMaterials(storeId, dto.materials);
     }
 
-    // Create SKU
-    const sku = await this.skuModel.create({
-      storeId: new Types.ObjectId(storeId),
-      sku: dto.sku,
-      title: dto.title,
-      description: dto.description || '',
-      specs: dto.specs || {},
-      category: dto.category || '',
-      status: dto.status || 'draft',
-      materials: dto.materials?.map((m) => ({
+    let sku: SKUDocument;
+
+    if (deletedSKU) {
+      // Restore and update the deleted SKU
+      deletedSKU.title = dto.title;
+      deletedSKU.description = dto.description || '';
+      deletedSKU.specs = dto.specs || {};
+      deletedSKU.category = dto.category || '';
+      deletedSKU.status = dto.status || SKUStatus.DRAFT;
+      deletedSKU.materials = dto.materials?.map((m) => ({
         materialId: new Types.ObjectId(m.materialId),
         quantity: m.quantity,
         unit: m.unit,
         notes: m.notes || '',
-      })) || [],
-      laborCost: dto.laborCost || 0,
-      overheadCost: dto.overheadCost || 0,
-      fixedCost: dto.fixedCost || false,
-      cost: dto.cost || 0,
-      calculatedCost: 0,
-      sellingPrice: dto.sellingPrice || 0,
-      images: dto.images || [],
-    });
+      })) as any || [];
+      deletedSKU.laborCost = dto.laborCost || 0;
+      deletedSKU.overheadCost = dto.overheadCost || 0;
+      deletedSKU.fixedCost = dto.fixedCost || false;
+      deletedSKU.cost = dto.cost || 0;
+      deletedSKU.sellingPrice = dto.sellingPrice || 0;
+      deletedSKU.images = dto.images || [];
+      deletedSKU.isDeleted = false;
+      sku = deletedSKU;
+      this.logger.log(`SKU restored: ${sku.sku} in store ${storeId}`);
+    } else {
+      // Create new SKU
+      sku = await this.skuModel.create({
+        storeId: new Types.ObjectId(storeId),
+        sku: dto.sku,
+        title: dto.title,
+        description: dto.description || '',
+        specs: dto.specs || {},
+        category: dto.category || '',
+        status: dto.status || 'draft',
+        materials: dto.materials?.map((m) => ({
+          materialId: new Types.ObjectId(m.materialId),
+          quantity: m.quantity,
+          unit: m.unit,
+          notes: m.notes || '',
+        })) || [],
+        laborCost: dto.laborCost || 0,
+        overheadCost: dto.overheadCost || 0,
+        fixedCost: dto.fixedCost || false,
+        cost: dto.cost || 0,
+        calculatedCost: 0,
+        sellingPrice: dto.sellingPrice || 0,
+        images: dto.images || [],
+      });
+      this.logger.log(`SKU created: ${sku.sku} in store ${storeId}`);
+    }
 
     // Calculate cost
     const calculatedCost = await this.calculateCost(sku);
     sku.calculatedCost = calculatedCost;
     await sku.save();
 
-    this.logger.log(`SKU created: ${sku.sku} in store ${storeId}`);
     return this.toInterface(sku);
   }
 
