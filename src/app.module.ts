@@ -40,6 +40,7 @@ import { InventoryMaterialsModule } from './inventory-materials/module';
 import { InventorySKUsModule } from './inventory-skus/module';
 import { ProductionBatchesModule } from './production-batches/module';
 import { ProductStockModule } from './product-stock/module';
+import { ProductUnitModule } from './product-unit/module';
 import { RunningCostsModule } from './running-costs/module';
 import { FixedAssetsModule } from './fixed-assets/module';
 
@@ -86,6 +87,7 @@ import { FixedAssetsModule } from './fixed-assets/module';
     InventorySKUsModule,
     ProductionBatchesModule,
     ProductStockModule,
+    ProductUnitModule,
     RunningCostsModule,
     FixedAssetsModule,
   ],

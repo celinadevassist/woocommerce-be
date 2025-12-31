@@ -80,6 +80,7 @@ export class CompleteProductionDto {
     actualQuantity: number;
   }[];
   notes?: string;
+  rfidCodes?: string[];  // Optional manual RFID codes (must match completedQuantity)
 }
 
 export const CompleteProductionSchema = Joi.object({
@@ -92,6 +93,7 @@ export const CompleteProductionSchema = Joi.object({
     })
   ).optional(),
   notes: Joi.string().allow('').optional(),
+  rfidCodes: Joi.array().items(Joi.string()).optional(),
 });
 
 // Cancel Production DTO

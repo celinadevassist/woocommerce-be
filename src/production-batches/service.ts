@@ -7,6 +7,7 @@ import { SKU } from '../inventory-skus/schema';
 import { Store } from '../store/schema';
 import { InventoryMaterialsService } from '../inventory-materials/service';
 import { ProductStockService } from '../product-stock/service';
+import { ProductUnitService } from '../product-unit/service';
 import { ProductionBatchStatus, ProductionBatchType } from './enum';
 import { IProductionBatch, IProductionBatchResponse, IProductionBatchCostSummary } from './interface';
 import {
@@ -29,6 +30,7 @@ export class ProductionBatchesService {
     @InjectModel(Store.name) private storeModel: Model<Store>,
     private readonly materialsService: InventoryMaterialsService,
     private readonly productStockService: ProductStockService,
+    private readonly productUnitService: ProductUnitService,
   ) {}
 
   /**
@@ -500,6 +502,20 @@ export class ProductionBatchesService {
           batch.batchNumber,
         );
         this.logger.log(`Added ${dto.completedQuantity} units to product stock for SKU: ${sku.sku}`);
+
+        // Create individual ProductUnit records for RFID tracking
+        const unitResult = await this.productUnitService.createUnitsFromBatch({
+          storeId: batch.storeId.toString(),
+          skuId: batch.skuId.toString(),
+          sku: sku.sku,
+          productName: sku.title,
+          batchId: batch._id.toString(),
+          batchNumber: batch.batchNumber,
+          quantity: dto.completedQuantity,
+          unitCost: batch.costPerUnit,
+          rfidCodes: dto.rfidCodes,
+        });
+        this.logger.log(`Created ${unitResult.created} product units with RFID codes for batch ${batch.batchNumber}`);
       }
     }
 
