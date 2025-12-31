@@ -50,6 +50,8 @@ export class ProductStockService {
       status: doc.status,
       location: doc.location,
       lastRestockedAt: doc.lastRestockedAt,
+      hasUnitTracking: doc.hasUnitTracking || false,
+      unitCount: doc.unitCount || 0,
       isDeleted: doc.isDeleted,
       createdAt: (doc as any).createdAt,
       updatedAt: (doc as any).updatedAt,
@@ -641,6 +643,8 @@ export class ProductStockService {
 
       stock.currentStock = newStock;
       stock.lastRestockedAt = new Date();
+      stock.hasUnitTracking = true;
+      stock.unitCount = (stock.unitCount || 0) + quantity;
       await this.updateCalculatedFields(stock);
       await stock.save();
 
@@ -681,6 +685,8 @@ export class ProductStockService {
         status: this.calculateStatus(quantity, 0),
         location: '',
         lastRestockedAt: new Date(),
+        hasUnitTracking: true,
+        unitCount: quantity,
       });
 
       // Create initial transaction

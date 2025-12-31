@@ -60,6 +60,12 @@ export class ProductStock extends Document {
   lastRestockedAt: Date;
 
   @Prop({ type: Boolean, default: false })
+  hasUnitTracking: boolean;
+
+  @Prop({ type: Number, default: 0 })
+  unitCount: number;
+
+  @Prop({ type: Boolean, default: false })
   isDeleted: boolean;
 }
 

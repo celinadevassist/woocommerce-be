@@ -22,6 +22,8 @@ export interface IProductStock {
   status: StockStatus;
   location?: string;                // Warehouse/location
   lastRestockedAt?: Date;
+  hasUnitTracking: boolean;         // True when unit-level tracking is enabled
+  unitCount: number;                // Count of in_stock + reserved units
   isDeleted: boolean;
   createdAt: Date;
   updatedAt: Date;
