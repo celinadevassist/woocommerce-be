@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Put,
+  Patch,
   Post,
   Delete,
   Param,
@@ -256,7 +257,7 @@ export class CustomerController {
     return this.customerService.createSegment(userId, dto);
   }
 
-  @Put('segments/:segmentId')
+  @Patch('segments/:segmentId')
   @ApiOperation({ summary: 'Update a customer segment' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'segmentId', description: 'Segment ID' })
