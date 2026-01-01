@@ -547,6 +547,11 @@ export class OrderItemService {
       totals.itemsTotal += item.total;
     }
 
+    // Get order to include shipping in total calculation
+    const order = await this.orderModel.findById(orderId);
+    const shippingTotal = parseFloat(order?.shippingTotal || '0');
+    const orderTotal = totals.itemsTotal + shippingTotal;
+
     // Update order with calculated totals
     await this.orderModel.updateOne(
       { _id: new Types.ObjectId(orderId) },
@@ -555,6 +560,7 @@ export class OrderItemService {
           itemsCount: totals.itemsCount,
           itemsQuantity: totals.itemsQuantity,
           itemsSubtotal: totals.itemsSubtotal,
+          total: String(orderTotal),
         },
       },
     );
