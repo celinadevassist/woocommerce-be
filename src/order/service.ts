@@ -918,6 +918,7 @@ export class OrderService {
 
     const internalOrderNumber = await this.generateInternalOrderNumber(storeId);
 
+    const now = new Date();
     const order = new this.orderModel({
       storeId: new Types.ObjectId(storeId),
       orderNumber: internalOrderNumber,
@@ -941,6 +942,8 @@ export class OrderService {
       itemsQuantity: 0,
       itemsSubtotal: 0,
       isDeleted: false,
+      // Set dateCreatedWoo for consistent sorting with WooCommerce orders
+      dateCreatedWoo: now,
     });
 
     // Link to customer if provided
