@@ -9,6 +9,7 @@ import { WooCommerceModule } from '../integrations/woocommerce/woocommerce.modul
 import { CustomerModule } from '../customer/module';
 import { PhoneModule } from '../phone/module';
 import { EmailModule } from '../email/module';
+import { OrderItemModule } from '../order-item/module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { EmailModule } from '../email/module';
     forwardRef(() => CustomerModule),
     forwardRef(() => PhoneModule),
     forwardRef(() => EmailModule),
+    forwardRef(() => OrderItemModule),
     WooCommerceModule,
   ],
   controllers: [OrderController],

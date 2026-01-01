@@ -1,4 +1,4 @@
-import { OrderStatus, PaymentStatus, FulfillmentStatus } from './enum';
+import { OrderStatus, PaymentStatus, FulfillmentStatus, OrderSource } from './enum';
 
 export interface IOrderAddress {
   firstName: string;
@@ -72,22 +72,29 @@ export interface IOrderNote {
 export interface IOrder {
   _id: string;
   storeId: string;
-  externalId: number;
+  externalId?: number;
   orderNumber: string;
+  internalOrderNumber?: string;
   orderKey?: string;
+  source?: OrderSource;
+  useSeparateItems?: boolean;
   status: OrderStatus;
   paymentStatus: PaymentStatus;
   fulfillmentStatus: FulfillmentStatus;
   currency: string;
   currencySymbol?: string;
-  pricesIncludeTax: boolean;
-  discountTotal: string;
-  discountTax: string;
-  shippingTotal: string;
-  shippingTax: string;
-  cartTax: string;
+  pricesIncludeTax?: boolean;
+  discountTotal?: string;
+  discountTax?: string;
+  shippingTotal?: string;
+  shippingTax?: string;
+  cartTax?: string;
   total: string;
-  totalTax: string;
+  totalTax?: string;
+  // Calculated totals from OrderItems
+  itemsCount?: number;
+  itemsQuantity?: number;
+  itemsSubtotal?: number;
   customerId?: number;
   localCustomerId?: string;
   customerNote?: string;
@@ -98,6 +105,11 @@ export interface IOrder {
   transactionId?: string;
   datePaid?: Date;
   dateCompleted?: Date;
+  // Manual order workflow timestamps
+  confirmedAt?: Date;
+  shippedAt?: Date;
+  deliveredAt?: Date;
+  createdByUserId?: string;
   lineItems: IOrderLineItem[];
   shippingLines: IShippingLine[];
   feeLines: IFeeLine[];
@@ -133,4 +145,15 @@ export interface IOrderStats {
   averageOrderValue: number;
   ordersByStatus: Record<OrderStatus, number>;
   recentOrders: IOrder[];
+}
+
+export interface ICreateManualOrderDto {
+  currency?: string;
+  billing?: Partial<IOrderAddress>;
+  shipping?: Partial<IOrderAddress>;
+  shippingTotal?: string;
+  customerId?: string;
+  customerNote?: string;
+  internalNotes?: string;
+  paymentStatus?: PaymentStatus;
 }

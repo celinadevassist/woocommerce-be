@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { OrderStatus, PaymentStatus, FulfillmentStatus } from './enum';
+import { OrderStatus, PaymentStatus, FulfillmentStatus, OrderSource } from './enum';
 
 // Sub-schema for address
 @Schema({ _id: false })
@@ -200,11 +200,28 @@ export class Order extends Document {
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ required: true, index: true })
-  externalId: number;
+  // For WooCommerce orders - required for synced orders
+  @Prop({ index: true })
+  externalId?: number;
 
   @Prop({ required: true })
   orderNumber: string;
+
+  // Internal order number for manual orders (CF-{storePrefix}-{seq})
+  @Prop()
+  internalOrderNumber?: string;
+
+  // Order source - woocommerce, manual, api
+  @Prop({
+    type: String,
+    enum: Object.values(OrderSource),
+    default: OrderSource.WOOCOMMERCE,
+  })
+  source: OrderSource;
+
+  // Use separate OrderItems collection (true for new orders)
+  @Prop({ default: false })
+  useSeparateItems: boolean;
 
   @Prop()
   orderKey?: string;
@@ -296,6 +313,30 @@ export class Order extends Document {
   @Prop({ type: [OrderRefundSchema], default: [] })
   refunds: OrderRefund[];
 
+  // Calculated totals from OrderItems (when useSeparateItems = true)
+  @Prop({ default: 0 })
+  itemsCount: number;
+
+  @Prop({ default: 0 })
+  itemsQuantity: number;
+
+  @Prop({ default: 0 })
+  itemsSubtotal: number;
+
+  // Manual order workflow timestamps
+  @Prop()
+  confirmedAt?: Date;
+
+  @Prop()
+  shippedAt?: Date;
+
+  @Prop()
+  deliveredAt?: Date;
+
+  // Who created the manual order
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+  createdByUserId?: MongooseSchema.Types.ObjectId;
+
   // WooCommerce metadata
   @Prop()
   createdVia?: string;
@@ -343,9 +384,15 @@ export type OrderDocument = Order & Document;
 export const OrderSchema = SchemaFactory.createForClass(Order);
 
 // Indexes
-OrderSchema.index({ storeId: 1, externalId: 1 }, { unique: true });
-OrderSchema.index({ storeId: 1, orderNumber: 1 });
+// Unique constraint only for WooCommerce orders (where externalId exists)
+OrderSchema.index(
+  { storeId: 1, externalId: 1 },
+  { unique: true, partialFilterExpression: { externalId: { $exists: true } } }
+);
+OrderSchema.index({ storeId: 1, orderNumber: 1 }, { unique: true });
+OrderSchema.index({ storeId: 1, internalOrderNumber: 1 });
 OrderSchema.index({ storeId: 1, status: 1 });
+OrderSchema.index({ storeId: 1, source: 1 });
 OrderSchema.index({ customerId: 1 });
 OrderSchema.index({ localCustomerId: 1 });
 OrderSchema.index({ status: 1, createdAt: -1 });

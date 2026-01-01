@@ -190,4 +190,65 @@ export class OrderController {
   ) {
     return this.orderService.getRefunds(id, userId);
   }
+
+  // ========================
+  // Manual Order Endpoints
+  // ========================
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new manual order (draft)' })
+  @ApiResponse({ status: 201, description: 'Manual order created' })
+  async createManualOrder(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+    @Body() dto: any,
+  ): Promise<IOrder> {
+    return this.orderService.createManualOrder(storeId, userId, dto);
+  }
+
+  @Post(':id/confirm')
+  @ApiOperation({ summary: 'Confirm a draft order (deducts stock)' })
+  @ApiResponse({ status: 200, description: 'Order confirmed' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  async confirmOrder(
+    @Param('id') id: string,
+    @User('_id') userId: string,
+  ): Promise<IOrder> {
+    return this.orderService.confirmOrder(id, userId);
+  }
+
+  @Post(':id/cancel')
+  @ApiOperation({ summary: 'Cancel an order (restores stock if confirmed)' })
+  @ApiResponse({ status: 200, description: 'Order cancelled' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  async cancelOrder(
+    @Param('id') id: string,
+    @User('_id') userId: string,
+    @Body('reason') reason?: string,
+  ): Promise<IOrder> {
+    return this.orderService.cancelOrder(id, userId, reason);
+  }
+
+  @Post(':id/transition')
+  @ApiOperation({ summary: 'Transition order to a new status' })
+  @ApiResponse({ status: 200, description: 'Order status updated' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  async transitionStatus(
+    @Param('id') id: string,
+    @User('_id') userId: string,
+    @Body('status') status: string,
+  ): Promise<IOrder> {
+    return this.orderService.transitionStatus(id, userId, status as any);
+  }
+
+  @Post(':id/clone')
+  @ApiOperation({ summary: 'Clone an order (for reordering)' })
+  @ApiResponse({ status: 201, description: 'Order cloned' })
+  @ApiResponse({ status: 404, description: 'Order not found' })
+  async cloneOrder(
+    @Param('id') id: string,
+    @User('_id') userId: string,
+  ): Promise<IOrder> {
+    return this.orderService.cloneOrder(id, userId);
+  }
 }

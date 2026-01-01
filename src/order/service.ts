@@ -11,8 +11,9 @@ import { Model, Types } from 'mongoose';
 import { Order, OrderDocument } from './schema';
 import { UpdateOrderDto, AddTrackingDto, AddOrderNoteDto } from './dto.update';
 import { QueryOrderDto } from './dto.query';
-import { IOrder, IOrderResponse, IOrderStats } from './interface';
-import { OrderStatus, PaymentStatus, FulfillmentStatus } from './enum';
+import { IOrder, IOrderResponse, IOrderStats, ICreateManualOrderDto } from './interface';
+import { OrderStatus, PaymentStatus, FulfillmentStatus, OrderSource } from './enum';
+import { OrderItemService } from '../order-item/service';
 import { Store, StoreDocument } from '../store/schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 import { WooOrder } from '../integrations/woocommerce/woocommerce.types';
@@ -34,6 +35,8 @@ export class OrderService {
     private readonly phoneService: PhoneService,
     @Inject(forwardRef(() => EmailService))
     private readonly emailService: EmailService,
+    @Inject(forwardRef(() => OrderItemService))
+    private readonly orderItemService: OrderItemService,
   ) {}
 
   /**
@@ -877,6 +880,316 @@ export class OrderService {
     return order.refunds || [];
   }
 
+  // ========================
+  // Manual Order Methods
+  // ========================
+
+  /**
+   * Generate internal order number for manual orders
+   * Format: CF-{storePrefix}-{timestamp}-{sequence}
+   */
+  private async generateInternalOrderNumber(storeId: string): Promise<string> {
+    const storePrefix = storeId.substring(0, 4).toUpperCase();
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+
+    // Get count of manual orders for this store today
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const count = await this.orderModel.countDocuments({
+      storeId: new Types.ObjectId(storeId),
+      source: OrderSource.MANUAL,
+      createdAt: { $gte: startOfDay },
+    });
+
+    const sequence = (count + 1).toString().padStart(4, '0');
+    return `CF-${storePrefix}-${dateStr}-${sequence}`;
+  }
+
+  /**
+   * Create a manual order (draft status)
+   */
+  async createManualOrder(
+    storeId: string,
+    userId: string,
+    dto: ICreateManualOrderDto,
+  ): Promise<IOrder> {
+    await this.verifyStoreAccess(storeId, userId);
+
+    const internalOrderNumber = await this.generateInternalOrderNumber(storeId);
+
+    const order = new this.orderModel({
+      storeId: new Types.ObjectId(storeId),
+      orderNumber: internalOrderNumber,
+      internalOrderNumber,
+      source: OrderSource.MANUAL,
+      useSeparateItems: true,
+      status: OrderStatus.DRAFT,
+      paymentStatus: dto.paymentStatus || PaymentStatus.PENDING,
+      fulfillmentStatus: FulfillmentStatus.UNFULFILLED,
+      currency: dto.currency || 'EGP',
+      total: '0',
+      discountTotal: '0',
+      shippingTotal: dto.shippingTotal || '0',
+      billing: dto.billing || {},
+      shipping: dto.shipping || dto.billing || {},
+      customerNote: dto.customerNote,
+      internalNotes: dto.internalNotes,
+      createdByUserId: new Types.ObjectId(userId),
+      createdVia: 'cartflow',
+      itemsCount: 0,
+      itemsQuantity: 0,
+      itemsSubtotal: 0,
+      isDeleted: false,
+    });
+
+    // Link to customer if provided
+    if (dto.customerId) {
+      (order as any).localCustomerId = new Types.ObjectId(dto.customerId);
+    }
+
+    await order.save();
+
+    this.logger.log(`Manual order ${internalOrderNumber} created by user ${userId}`);
+    return this.toInterface(order);
+  }
+
+  /**
+   * Confirm a manual order - deducts stock
+   */
+  async confirmOrder(orderId: string, userId: string): Promise<IOrder> {
+    const order = await this.orderModel.findOne({
+      _id: new Types.ObjectId(orderId),
+      isDeleted: false,
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    await this.verifyStoreAccess(order.storeId.toString(), userId);
+
+    if (order.source !== OrderSource.MANUAL) {
+      throw new ForbiddenException('Only manual orders can be confirmed');
+    }
+
+    if (order.status !== OrderStatus.DRAFT) {
+      throw new ForbiddenException('Only draft orders can be confirmed');
+    }
+
+    // Fulfill order items (deduct stock)
+    const fulfillResult = await this.orderItemService.fulfillOrderItems(
+      orderId,
+      order.orderNumber,
+    );
+
+    // Update order status
+    order.status = OrderStatus.CONFIRMED;
+    order.confirmedAt = new Date();
+
+    // Update fulfillment status based on result
+    if (fulfillResult.warnings.length === 0) {
+      order.fulfillmentStatus = FulfillmentStatus.FULFILLED;
+    } else {
+      order.fulfillmentStatus = FulfillmentStatus.PARTIALLY_FULFILLED;
+    }
+
+    // Recalculate totals
+    const totals = await this.orderItemService.getOrderTotals(orderId);
+    order.itemsCount = totals.itemsCount;
+    order.itemsQuantity = totals.itemsQuantity;
+    order.itemsSubtotal = totals.itemsSubtotal;
+    order.total = (totals.itemsTotal + parseFloat(order.shippingTotal || '0')).toString();
+
+    await order.save();
+
+    this.logger.log(
+      `Order ${order.orderNumber} confirmed: ${fulfillResult.fulfilledItems} items, ${fulfillResult.totalUnitsAssigned} units`,
+    );
+
+    return this.toInterface(order);
+  }
+
+  /**
+   * Cancel an order - restores stock if confirmed
+   */
+  async cancelOrder(orderId: string, userId: string, reason?: string): Promise<IOrder> {
+    const order = await this.orderModel.findOne({
+      _id: new Types.ObjectId(orderId),
+      isDeleted: false,
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    await this.verifyStoreAccess(order.storeId.toString(), userId);
+
+    // Only manual orders can be cancelled this way
+    if (order.source !== OrderSource.MANUAL) {
+      throw new ForbiddenException('Use status update for WooCommerce orders');
+    }
+
+    const wasConfirmed = order.status === OrderStatus.CONFIRMED ||
+      order.status === OrderStatus.PROCESSING ||
+      order.status === OrderStatus.SHIPPED;
+
+    // Release stock if order was confirmed
+    if (wasConfirmed && order.useSeparateItems) {
+      const releasedUnits = await this.orderItemService.releaseOrderUnits(orderId);
+      this.logger.log(`Released ${releasedUnits} units for cancelled order ${order.orderNumber}`);
+    }
+
+    // Cancel pending items
+    if (order.useSeparateItems) {
+      await this.orderItemService.cancelOrderItems(orderId);
+    }
+
+    // Update order status
+    order.status = OrderStatus.CANCELLED;
+
+    if (reason) {
+      order.internalNotes = order.internalNotes
+        ? `${order.internalNotes}\nCancellation reason: ${reason}`
+        : `Cancellation reason: ${reason}`;
+    }
+
+    await order.save();
+
+    this.logger.log(`Order ${order.orderNumber} cancelled by user ${userId}`);
+    return this.toInterface(order);
+  }
+
+  /**
+   * Transition order status with validation
+   */
+  async transitionStatus(
+    orderId: string,
+    userId: string,
+    newStatus: OrderStatus,
+  ): Promise<IOrder> {
+    const order = await this.orderModel.findOne({
+      _id: new Types.ObjectId(orderId),
+      isDeleted: false,
+    });
+
+    if (!order) {
+      throw new NotFoundException('Order not found');
+    }
+
+    await this.verifyStoreAccess(order.storeId.toString(), userId);
+
+    const currentStatus = order.status;
+
+    // Define valid transitions
+    const validTransitions: Record<OrderStatus, OrderStatus[]> = {
+      [OrderStatus.DRAFT]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
+      [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.ON_HOLD, OrderStatus.CANCELLED],
+      [OrderStatus.CONFIRMED]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
+      [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.ON_HOLD, OrderStatus.CANCELLED],
+      [OrderStatus.ON_HOLD]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
+      [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED, OrderStatus.COMPLETED],
+      [OrderStatus.DELIVERED]: [OrderStatus.COMPLETED, OrderStatus.REFUNDED],
+      [OrderStatus.COMPLETED]: [OrderStatus.REFUNDED],
+      [OrderStatus.CANCELLED]: [],
+      [OrderStatus.REFUNDED]: [],
+      [OrderStatus.FAILED]: [OrderStatus.PENDING],
+      [OrderStatus.TRASH]: [],
+    };
+
+    const allowedTransitions = validTransitions[currentStatus] || [];
+    if (!allowedTransitions.includes(newStatus)) {
+      throw new ForbiddenException(
+        `Cannot transition from ${currentStatus} to ${newStatus}. Allowed: ${allowedTransitions.join(', ') || 'none'}`,
+      );
+    }
+
+    // Update timestamps based on status
+    order.status = newStatus;
+
+    if (newStatus === OrderStatus.SHIPPED) {
+      order.shippedAt = new Date();
+      order.fulfillmentStatus = FulfillmentStatus.SHIPPED;
+    } else if (newStatus === OrderStatus.DELIVERED) {
+      order.deliveredAt = new Date();
+      order.fulfillmentStatus = FulfillmentStatus.DELIVERED;
+    } else if (newStatus === OrderStatus.COMPLETED) {
+      order.dateCompleted = new Date();
+      order.fulfillmentStatus = FulfillmentStatus.DELIVERED;
+    }
+
+    await order.save();
+
+    // Sync to WooCommerce if not a manual order
+    if (order.source === OrderSource.WOOCOMMERCE && order.externalId) {
+      try {
+        await this.syncOrderStatusToWoo(order);
+      } catch (error) {
+        this.logger.error(`Failed to sync status to WooCommerce: ${error.message}`);
+      }
+    }
+
+    this.logger.log(`Order ${order.orderNumber} transitioned from ${currentStatus} to ${newStatus}`);
+    return this.toInterface(order);
+  }
+
+  /**
+   * Clone an order (for reordering)
+   */
+  async cloneOrder(orderId: string, userId: string): Promise<IOrder> {
+    const originalOrder = await this.orderModel.findOne({
+      _id: new Types.ObjectId(orderId),
+      isDeleted: false,
+    });
+
+    if (!originalOrder) {
+      throw new NotFoundException('Order not found');
+    }
+
+    await this.verifyStoreAccess(originalOrder.storeId.toString(), userId);
+
+    // Create new order as draft
+    const newOrder = await this.createManualOrder(
+      originalOrder.storeId.toString(),
+      userId,
+      {
+        currency: originalOrder.currency,
+        billing: originalOrder.billing,
+        shipping: originalOrder.shipping,
+        shippingTotal: originalOrder.shippingTotal,
+        customerId: originalOrder.localCustomerId?.toString(),
+        customerNote: originalOrder.customerNote,
+      },
+    );
+
+    // Clone order items if using separate items
+    if (originalOrder.useSeparateItems) {
+      const originalItems = await this.orderItemService.getOrderItems(orderId);
+
+      if (originalItems.length > 0) {
+        await this.orderItemService.addItemsBulk({
+          storeId: originalOrder.storeId.toString(),
+          orderId: newOrder._id,
+          items: originalItems.map((item) => ({
+            productId: item.productId?.toString(),
+            variantId: item.variantId?.toString(),
+            skuId: item.skuId?.toString(),
+            sku: item.sku,
+            name: item.name,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discountAmount: item.discountAmount,
+            taxAmount: item.taxAmount,
+            attributes: item.attributes,
+          })),
+        });
+      }
+    }
+
+    this.logger.log(`Order ${originalOrder.orderNumber} cloned to ${newOrder.orderNumber}`);
+    return this.findById(newOrder._id, userId);
+  }
+
   private toInterface(doc: OrderDocument): IOrder {
     const obj = doc.toObject();
     return {
@@ -884,7 +1197,10 @@ export class OrderService {
       storeId: obj.storeId.toString(),
       externalId: obj.externalId,
       orderNumber: obj.orderNumber,
+      internalOrderNumber: obj.internalOrderNumber,
       orderKey: obj.orderKey,
+      source: obj.source,
+      useSeparateItems: obj.useSeparateItems,
       status: obj.status,
       paymentStatus: obj.paymentStatus,
       fulfillmentStatus: obj.fulfillmentStatus,
@@ -898,6 +1214,9 @@ export class OrderService {
       cartTax: obj.cartTax,
       total: obj.total,
       totalTax: obj.totalTax,
+      itemsCount: obj.itemsCount,
+      itemsQuantity: obj.itemsQuantity,
+      itemsSubtotal: obj.itemsSubtotal,
       customerId: obj.customerId,
       localCustomerId: obj.localCustomerId?.toString(),
       customerNote: obj.customerNote,
@@ -908,6 +1227,10 @@ export class OrderService {
       transactionId: obj.transactionId,
       datePaid: obj.datePaid,
       dateCompleted: obj.dateCompleted,
+      confirmedAt: obj.confirmedAt,
+      shippedAt: obj.shippedAt,
+      deliveredAt: obj.deliveredAt,
+      createdByUserId: obj.createdByUserId?.toString(),
       lineItems: obj.lineItems,
       shippingLines: obj.shippingLines,
       feeLines: obj.feeLines,

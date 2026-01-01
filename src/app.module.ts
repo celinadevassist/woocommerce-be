@@ -42,6 +42,7 @@ import { ProductionBatchesModule } from './production-batches/module';
 import { ProductStockModule } from './product-stock/module';
 import { ProductUnitModule } from './product-unit/module';
 import { OrderFulfillmentModule } from './order-fulfillment/module';
+import { OrderItemModule } from './order-item/module';
 import { RunningCostsModule } from './running-costs/module';
 import { FixedAssetsModule } from './fixed-assets/module';
 
@@ -90,6 +91,7 @@ import { FixedAssetsModule } from './fixed-assets/module';
     ProductStockModule,
     ProductUnitModule,
     OrderFulfillmentModule,
+    OrderItemModule,
     RunningCostsModule,
     FixedAssetsModule,
   ],
