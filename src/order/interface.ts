@@ -1,4 +1,5 @@
 import { OrderStatus, PaymentStatus, FulfillmentStatus, OrderSource } from './enum';
+import { OrderItemStockStatus } from '../order-item/enum';
 
 export interface IOrderAddress {
   firstName: string;
@@ -69,6 +70,31 @@ export interface IOrderNote {
   createdAt: Date;
 }
 
+// Serialized order item for API responses
+export interface IOrderItemSerialized {
+  _id: string;
+  storeId: string;
+  orderId: string;
+  productId?: string;
+  variantId?: string;
+  skuId?: string;
+  sku?: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+  discountAmount: number;
+  taxAmount: number;
+  subtotal: number;
+  total: number;
+  stockStatus: OrderItemStockStatus;
+  fulfilledQuantity: number;
+  returnedQuantity: number;
+  attributes?: Record<string, any>;
+  notes?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
 export interface IOrder {
   _id: string;
   storeId: string;
@@ -111,6 +137,7 @@ export interface IOrder {
   deliveredAt?: Date;
   createdByUserId?: string;
   lineItems: IOrderLineItem[];
+  orderItems?: IOrderItemSerialized[]; // For manual orders with useSeparateItems
   shippingLines: IShippingLine[];
   feeLines: IFeeLine[];
   couponLines: ICouponLine[];

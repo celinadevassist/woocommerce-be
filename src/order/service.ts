@@ -166,7 +166,37 @@ export class OrderService {
 
     await this.verifyStoreAccess(order.storeId.toString(), userId);
 
-    return this.toInterface(order);
+    const result = this.toInterface(order);
+
+    // For manual orders, fetch order items from separate collection
+    if (order.useSeparateItems) {
+      const orderItems = await this.orderItemService.getOrderItems(id);
+      result.orderItems = orderItems.map((item) => ({
+        _id: item._id?.toString() || '',
+        storeId: item.storeId?.toString() || '',
+        orderId: item.orderId?.toString() || '',
+        productId: item.productId?.toString(),
+        variantId: item.variantId?.toString(),
+        skuId: item.skuId?.toString(),
+        sku: item.sku,
+        name: item.name,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        discountAmount: item.discountAmount,
+        taxAmount: item.taxAmount,
+        subtotal: item.subtotal,
+        total: item.total,
+        stockStatus: item.stockStatus,
+        fulfilledQuantity: item.fulfilledQuantity,
+        returnedQuantity: item.returnedQuantity,
+        attributes: item.attributes,
+        notes: item.notes,
+        createdAt: item.createdAt,
+        updatedAt: item.updatedAt,
+      }));
+    }
+
+    return result;
   }
 
   /**
