@@ -709,4 +709,52 @@ export class ProductStockService {
       return this.toInterface(stock);
     }
   }
+
+  /**
+   * Sync stock from Product Unit counts
+   * Called when unit status changes (sold, damaged)
+   * Only used for SKUs with unit tracking enabled
+   */
+  async syncFromUnits(storeId: string, skuId: string, inStockCount: number): Promise<void> {
+    const stock = await this.stockModel.findOne({
+      storeId: new Types.ObjectId(storeId),
+      skuId: new Types.ObjectId(skuId),
+      isDeleted: false,
+    });
+
+    if (!stock) {
+      this.logger.warn(`Cannot sync stock - no stock entry found for SKU ${skuId}`);
+      return;
+    }
+
+    // Only sync if unit tracking is enabled
+    if (!stock.hasUnitTracking) {
+      this.logger.warn(`SKU ${skuId} does not have unit tracking enabled, skipping sync`);
+      return;
+    }
+
+    const previousStock = stock.currentStock;
+    stock.currentStock = inStockCount;
+    stock.reservedStock = 0; // No reservation with simplified model
+    await this.updateCalculatedFields(stock);
+    await stock.save();
+
+    // Create transaction record if stock changed
+    if (previousStock !== inStockCount) {
+      const difference = inStockCount - previousStock;
+      await this.transactionModel.create({
+        storeId: new Types.ObjectId(storeId),
+        stockId: stock._id,
+        type: difference < 0 ? StockTransactionType.SALE : StockTransactionType.ADJUSTMENT,
+        quantity: difference,
+        previousStock,
+        newStock: inStockCount,
+        totalCost: Math.abs(difference) * stock.unitCost,
+        notes: 'Auto-synced from unit status change',
+        referenceType: 'unit_sync',
+      });
+
+      this.logger.log(`Stock synced from units for ${stock.sku}: ${previousStock} → ${inStockCount}`);
+    }
+  }
 }

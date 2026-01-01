@@ -20,14 +20,6 @@ import {
   CreateProductStockSchema,
   UpdateProductStockDto,
   UpdateProductStockSchema,
-  AddStockDto,
-  AddStockSchema,
-  DeductStockDto,
-  DeductStockSchema,
-  AdjustStockDto,
-  AdjustStockSchema,
-  ReserveStockDto,
-  ReserveStockSchema,
   QueryProductStockDto,
   QueryProductStockSchema,
   QueryTransactionsDto,
@@ -159,71 +151,8 @@ export class ProductStockController {
     return { message: 'Stock entry deleted successfully' };
   }
 
-  // ========================
-  // Stock Operations
-  // ========================
-
-  @Post(':id/add')
-  @ApiOperation({ summary: 'Add stock (from production, purchase, return)' })
-  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
-  @ApiParam({ name: 'id', description: 'Stock entry ID' })
-  @UsePipes(new JoiValidationPipe({ body: AddStockSchema }))
-  async addStock(
-    @User('_id') userId: string,
-    @Param('id') id: string,
-    @Body() dto: AddStockDto,
-  ) {
-    return this.stockService.addStock(userId, id, dto);
-  }
-
-  @Post(':id/deduct')
-  @ApiOperation({ summary: 'Deduct stock (for sales, damage, transfer)' })
-  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
-  @ApiParam({ name: 'id', description: 'Stock entry ID' })
-  @UsePipes(new JoiValidationPipe({ body: DeductStockSchema }))
-  async deductStock(
-    @User('_id') userId: string,
-    @Param('id') id: string,
-    @Body() dto: DeductStockDto,
-  ) {
-    return this.stockService.deductStock(userId, id, dto);
-  }
-
-  @Post(':id/adjust')
-  @ApiOperation({ summary: 'Adjust stock to specific value' })
-  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
-  @ApiParam({ name: 'id', description: 'Stock entry ID' })
-  @UsePipes(new JoiValidationPipe({ body: AdjustStockSchema }))
-  async adjustStock(
-    @User('_id') userId: string,
-    @Param('id') id: string,
-    @Body() dto: AdjustStockDto,
-  ) {
-    return this.stockService.adjustStock(userId, id, dto);
-  }
-
-  @Post(':id/reserve')
-  @ApiOperation({ summary: 'Reserve stock for pending orders' })
-  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
-  @ApiParam({ name: 'id', description: 'Stock entry ID' })
-  @UsePipes(new JoiValidationPipe({ body: ReserveStockSchema }))
-  async reserveStock(
-    @User('_id') userId: string,
-    @Param('id') id: string,
-    @Body() dto: ReserveStockDto,
-  ) {
-    return this.stockService.reserveStock(userId, id, dto);
-  }
-
-  @Post(':id/release')
-  @ApiOperation({ summary: 'Release reserved stock' })
-  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
-  @ApiParam({ name: 'id', description: 'Stock entry ID' })
-  async releaseReservedStock(
-    @User('_id') userId: string,
-    @Param('id') id: string,
-    @Body('quantity') quantity: number,
-  ) {
-    return this.stockService.releaseReservedStock(userId, id, quantity);
-  }
+  // NOTE: Manual stock operations (add/deduct/adjust/reserve) have been removed.
+  // Stock is now automatically managed through:
+  // 1. Production Batches → creates Product Units → adds to stock
+  // 2. Product Unit status changes (sold/damaged) → syncs to stock
 }

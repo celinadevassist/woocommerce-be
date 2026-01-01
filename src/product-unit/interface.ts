@@ -15,7 +15,6 @@ export interface IProductUnit {
   location?: string;
   orderId?: Types.ObjectId;
   orderNumber?: string;
-  reservedAt?: Date;
   soldAt?: Date;
   productionDate: Date;
   notes?: string;
@@ -44,11 +43,8 @@ export interface IProductUnitResponse extends IProductUnit {
 
 export interface IProductUnitCountsByStatus {
   in_stock: number;
-  reserved: number;
   sold: number;
   damaged: number;
-  returned: number;
-  transferred: number;
   total: number;
 }
 

@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException, Inject, forwardRef } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ProductUnit } from './schema';
@@ -10,6 +10,7 @@ import {
   UpdateUnitStatusDto,
   CreateUnitsFromBatchDto,
 } from './dto';
+import { ProductStockService } from '../product-stock/service';
 
 @Injectable()
 export class ProductUnitService {
@@ -18,6 +19,8 @@ export class ProductUnitService {
   constructor(
     @InjectModel(ProductUnit.name) private unitModel: Model<ProductUnit>,
     @InjectModel(Store.name) private storeModel: Model<Store>,
+    @Inject(forwardRef(() => ProductStockService))
+    private readonly productStockService: ProductStockService,
   ) {}
 
   /**
@@ -38,7 +41,6 @@ export class ProductUnitService {
       location: doc.location,
       orderId: doc.orderId as any,
       orderNumber: doc.orderNumber,
-      reservedAt: doc.reservedAt,
       soldAt: doc.soldAt,
       productionDate: doc.productionDate,
       notes: doc.notes,
@@ -248,49 +250,16 @@ export class ProductUnitService {
   }
 
   /**
-   * Reserve units for an order
-   */
-  async reserveUnits(userId: string, unitIds: string[], orderId: string): Promise<IProductUnit[]> {
-    const objectIds = unitIds.map((id) => new Types.ObjectId(id));
-
-    // Verify all units are available
-    const units = await this.unitModel.find({
-      _id: { $in: objectIds },
-      status: ProductUnitStatus.IN_STOCK,
-      isDeleted: false,
-    });
-
-    if (units.length !== unitIds.length) {
-      throw new BadRequestException('Some units are not available for reservation');
-    }
-
-    // Reserve all units
-    await this.unitModel.updateMany(
-      { _id: { $in: objectIds } },
-      {
-        $set: {
-          status: ProductUnitStatus.RESERVED,
-          orderId: new Types.ObjectId(orderId),
-          reservedAt: new Date(),
-        },
-      },
-    );
-
-    // Fetch updated units
-    const updatedUnits = await this.unitModel.find({ _id: { $in: objectIds } });
-    return updatedUnits.map((u) => this.toInterface(u));
-  }
-
-  /**
-   * Mark units as sold
+   * Mark units as sold (direct sale from in_stock)
+   * Automatically syncs Product Stock for affected SKUs
    */
   async markAsSold(userId: string, unitIds: string[], orderId: string, orderNumber: string): Promise<IProductUnit[]> {
     const objectIds = unitIds.map((id) => new Types.ObjectId(id));
 
-    // Verify all units are reserved for this order (or in_stock for direct sale)
+    // Verify all units are in_stock
     const units = await this.unitModel.find({
       _id: { $in: objectIds },
-      status: { $in: [ProductUnitStatus.RESERVED, ProductUnitStatus.IN_STOCK] },
+      status: ProductUnitStatus.IN_STOCK,
       isDeleted: false,
     });
 
@@ -311,40 +280,24 @@ export class ProductUnitService {
       },
     );
 
+    // Sync stock for each affected SKU
+    const affectedSkus = new Set(units.map((u) => ({
+      storeId: u.storeId.toString(),
+      skuId: u.skuId.toString(),
+    })));
+
+    for (const { storeId, skuId } of affectedSkus) {
+      await this.syncStockFromUnits(storeId, skuId);
+    }
+
     // Fetch updated units
     const updatedUnits = await this.unitModel.find({ _id: { $in: objectIds } });
     return updatedUnits.map((u) => this.toInterface(u));
   }
 
   /**
-   * Release reserved units (order cancelled)
-   */
-  async releaseReservedUnits(userId: string, unitIds: string[]): Promise<IProductUnit[]> {
-    const objectIds = unitIds.map((id) => new Types.ObjectId(id));
-
-    await this.unitModel.updateMany(
-      {
-        _id: { $in: objectIds },
-        status: ProductUnitStatus.RESERVED,
-      },
-      {
-        $set: {
-          status: ProductUnitStatus.IN_STOCK,
-        },
-        $unset: {
-          orderId: 1,
-          orderNumber: 1,
-          reservedAt: 1,
-        },
-      },
-    );
-
-    const updatedUnits = await this.unitModel.find({ _id: { $in: objectIds } });
-    return updatedUnits.map((u) => this.toInterface(u));
-  }
-
-  /**
-   * Update unit status (damaged, returned, etc.)
+   * Update unit status (sold, damaged)
+   * Automatically syncs Product Stock when status changes
    */
   async updateUnitStatus(userId: string, unitId: string, dto: UpdateUnitStatusDto): Promise<IProductUnit> {
     const unit = await this.unitModel.findOne({
@@ -356,6 +309,7 @@ export class ProductUnitService {
       throw new NotFoundException('Product unit not found');
     }
 
+    const previousStatus = unit.status;
     unit.status = dto.status;
     if (dto.notes) {
       unit.notes = dto.notes;
@@ -364,8 +318,34 @@ export class ProductUnitService {
       unit.location = dto.location;
     }
 
+    // Set soldAt timestamp when marking as sold
+    if (dto.status === ProductUnitStatus.SOLD && previousStatus !== ProductUnitStatus.SOLD) {
+      unit.soldAt = new Date();
+    }
+
     await unit.save();
+
+    // Sync to Product Stock if status actually changed
+    if (previousStatus !== dto.status) {
+      await this.syncStockFromUnits(unit.storeId.toString(), unit.skuId.toString());
+    }
+
     return this.toInterface(unit);
+  }
+
+  /**
+   * Sync Product Stock from unit counts
+   * Called whenever unit status changes
+   */
+  private async syncStockFromUnits(storeId: string, skuId: string): Promise<void> {
+    try {
+      const counts = await this.getUnitCountsByStatus(storeId, skuId);
+      await this.productStockService.syncFromUnits(storeId, skuId, counts.in_stock);
+      this.logger.log(`Stock synced for SKU ${skuId}: ${counts.in_stock} in_stock`);
+    } catch (error) {
+      this.logger.error(`Failed to sync stock for SKU ${skuId}: ${error.message}`);
+      // Don't throw - unit update succeeded, just log sync failure
+    }
   }
 
   /**
@@ -414,11 +394,8 @@ export class ProductUnitService {
 
     const counts: IProductUnitCountsByStatus = {
       in_stock: 0,
-      reserved: 0,
       sold: 0,
       damaged: 0,
-      returned: 0,
-      transferred: 0,
       total: 0,
     };
 

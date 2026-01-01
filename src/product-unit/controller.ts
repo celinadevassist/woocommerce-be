@@ -24,12 +24,8 @@ import {
   BulkLookupSchema,
   GenerateRfidDto,
   GenerateRfidSchema,
-  ReserveUnitsDto,
-  ReserveUnitsSchema,
   MarkUnitsSoldDto,
   MarkUnitsSoldSchema,
-  ReleaseUnitsDto,
-  ReleaseUnitsSchema,
 } from './dto';
 
 @ApiTags('Product Units')
@@ -157,14 +153,6 @@ export class ProductUnitController {
   // Order Operations
   // ========================
 
-  @Post('reserve')
-  @ApiOperation({ summary: 'Reserve units for an order' })
-  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
-  @UsePipes(new JoiValidationPipe({ body: ReserveUnitsSchema }))
-  async reserveUnits(@User('_id') userId: string, @Body() dto: ReserveUnitsDto) {
-    return this.unitService.reserveUnits(userId, dto.unitIds, dto.orderId);
-  }
-
   @Post('mark-sold')
   @ApiOperation({ summary: 'Mark units as sold' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
@@ -173,13 +161,8 @@ export class ProductUnitController {
     return this.unitService.markAsSold(userId, dto.unitIds, dto.orderId, dto.orderNumber);
   }
 
-  @Post('release')
-  @ApiOperation({ summary: 'Release reserved units' })
-  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
-  @UsePipes(new JoiValidationPipe({ body: ReleaseUnitsSchema }))
-  async releaseUnits(@User('_id') userId: string, @Body() dto: ReleaseUnitsDto) {
-    return this.unitService.releaseReservedUnits(userId, dto.unitIds);
-  }
+  // NOTE: Reserve/Release endpoints have been removed.
+  // Units go directly from in_stock to sold via order fulfillment.
 
   // ========================
   // Delete

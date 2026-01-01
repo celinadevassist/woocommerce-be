@@ -146,15 +146,15 @@ export class OrderFulfillmentService {
       }
     }
 
-    // Reserve units
+    // Mark units as sold immediately (no intermediate reservation state)
     await this.productUnitModel.updateMany(
       { _id: { $in: units.map((u) => u._id) } },
       {
         $set: {
-          status: ProductUnitStatus.RESERVED,
+          status: ProductUnitStatus.SOLD,
           orderId: order._id,
           orderNumber: order.orderNumber,
-          reservedAt: new Date(),
+          soldAt: new Date(),
         },
       },
     );
@@ -284,7 +284,7 @@ export class OrderFulfillmentService {
 
     const lineItem = order.lineItems[foundLineItemIndex];
 
-    // Release the unit
+    // Return the unit to stock (reverse the sale)
     await this.productUnitModel.updateOne(
       { _id: new Types.ObjectId(unitId) },
       {
@@ -294,7 +294,7 @@ export class OrderFulfillmentService {
         $unset: {
           orderId: 1,
           orderNumber: 1,
-          reservedAt: 1,
+          soldAt: 1,
         },
       },
     );

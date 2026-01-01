@@ -41,9 +41,6 @@ export class ProductUnit extends Document {
   orderNumber: string;
 
   @Prop({ type: Date })
-  reservedAt: Date;
-
-  @Prop({ type: Date })
   soldAt: Date;
 
   @Prop({ type: Date, required: true })
