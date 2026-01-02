@@ -413,24 +413,40 @@ export class OrderService {
   async getStats(userId: string, storeId?: string, startDate?: Date, endDate?: Date): Promise<IOrderStats> {
     const storeIds = await this.getUserStoreIds(userId);
 
-    const filter: any = {
+    const baseFilter: any = {
       storeId: { $in: storeIds },
       isDeleted: false,
     };
 
     if (storeId) {
-      filter.storeId = new Types.ObjectId(storeId);
+      baseFilter.storeId = new Types.ObjectId(storeId);
     }
     if (startDate || endDate) {
-      filter.dateCreatedWoo = {};
-      if (startDate) filter.dateCreatedWoo.$gte = startDate;
-      if (endDate) filter.dateCreatedWoo.$lte = endDate;
+      baseFilter.dateCreatedWoo = {};
+      if (startDate) baseFilter.dateCreatedWoo.$gte = startDate;
+      if (endDate) baseFilter.dateCreatedWoo.$lte = endDate;
     }
 
-    const [totalOrders, revenueResult, statusCounts, recentOrders] = await Promise.all([
-      this.orderModel.countDocuments(filter),
+    // Statuses to exclude from order count and revenue
+    const excludedStatuses = [
+      OrderStatus.DRAFT,
+      OrderStatus.CANCELLED,
+      OrderStatus.FAILED,
+      OrderStatus.REFUNDED,
+    ];
+
+    // Filter for counting orders (exclude draft, cancelled, failed, refunded)
+    const countFilter = {
+      ...baseFilter,
+      status: { $nin: excludedStatuses },
+    };
+
+    const [totalOrders, revenueResult, refundsResult, statusCounts, recentOrders] = await Promise.all([
+      // Count only valid orders (not draft, cancelled, failed, refunded)
+      this.orderModel.countDocuments(countFilter),
+      // Sum revenue only from valid orders
       this.orderModel.aggregate([
-        { $match: filter },
+        { $match: countFilter },
         {
           $group: {
             _id: null,
@@ -438,8 +454,20 @@ export class OrderService {
           },
         },
       ]),
+      // Calculate total refunds to deduct from revenue
       this.orderModel.aggregate([
-        { $match: filter },
+        { $match: baseFilter },
+        { $unwind: { path: '$refunds', preserveNullAndEmptyArrays: false } },
+        {
+          $group: {
+            _id: null,
+            totalRefunds: { $sum: { $toDouble: '$refunds.total' } },
+          },
+        },
+      ]),
+      // Status counts include all orders for the breakdown
+      this.orderModel.aggregate([
+        { $match: baseFilter },
         {
           $group: {
             _id: '$status',
@@ -447,10 +475,12 @@ export class OrderService {
           },
         },
       ]),
-      this.orderModel.find(filter).sort({ dateCreatedWoo: -1 }).limit(5),
+      this.orderModel.find(baseFilter).sort({ dateCreatedWoo: -1 }).limit(5),
     ]);
 
-    const totalRevenue = revenueResult[0]?.totalRevenue || 0;
+    const grossRevenue = revenueResult[0]?.totalRevenue || 0;
+    const totalRefunds = refundsResult[0]?.totalRefunds || 0;
+    const totalRevenue = grossRevenue - totalRefunds;
     const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
     const ordersByStatus: Record<OrderStatus, number> = {} as Record<OrderStatus, number>;
