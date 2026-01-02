@@ -70,6 +70,16 @@ export class SKU extends Document {
   @Prop({ default: 0 })
   sellingPrice: number;
 
+  // Stock settings (for low stock alerts)
+  @Prop({ default: 0 })
+  minStockLevel: number;
+
+  @Prop({ default: 0 })
+  reorderPoint: number;
+
+  @Prop({ default: 0 })
+  reorderQuantity: number;
+
   @Prop({ type: [String], default: [] })
   images: string[];
 

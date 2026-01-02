@@ -27,6 +27,10 @@ export interface ISKU {
   cost: number;
   calculatedCost: number;
   sellingPrice: number;
+  // Stock settings
+  minStockLevel: number;
+  reorderPoint: number;
+  reorderQuantity: number;
   images: string[];
   isDeleted: boolean;
   createdAt: Date;

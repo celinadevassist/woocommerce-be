@@ -1,16 +1,24 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ProductUnit } from './schema';
 import { Store } from '../store/schema';
+import { SKU } from '../inventory-skus/schema';
 import { ProductUnitStatus } from './enum';
-import { IProductUnit, IProductUnitCountsByStatus, IProductUnitListResponse, IBulkCreateResult } from './interface';
+import {
+  IProductUnit,
+  IProductUnitCountsByStatus,
+  IProductUnitListResponse,
+  IBulkCreateResult,
+  IStockItem,
+  IStockSummary,
+  IStockResponse,
+} from './interface';
 import {
   QueryProductUnitDto,
   UpdateUnitStatusDto,
   CreateUnitsFromBatchDto,
 } from './dto';
-import { ProductStockService } from '../product-stock/service';
 
 @Injectable()
 export class ProductUnitService {
@@ -19,8 +27,7 @@ export class ProductUnitService {
   constructor(
     @InjectModel(ProductUnit.name) private unitModel: Model<ProductUnit>,
     @InjectModel(Store.name) private storeModel: Model<Store>,
-    @Inject(forwardRef(() => ProductStockService))
-    private readonly productStockService: ProductStockService,
+    @InjectModel(SKU.name) private skuModel: Model<SKU>,
   ) {}
 
   /**
@@ -286,15 +293,7 @@ export class ProductUnitService {
       },
     );
 
-    // Sync stock for each affected SKU
-    const affectedSkus = new Set(units.map((u) => ({
-      storeId: u.storeId.toString(),
-      skuId: u.skuId.toString(),
-    })));
-
-    for (const { storeId, skuId } of affectedSkus) {
-      await this.syncStockFromUnits(storeId, skuId);
-    }
+    this.logger.log(`Marked ${units.length} units as sold for order ${orderNumber}`);
 
     // Fetch updated units
     const updatedUnits = await this.unitModel.find({ _id: { $in: objectIds } });
@@ -333,16 +332,6 @@ export class ProductUnitService {
         },
       },
     );
-
-    // Sync stock for each affected SKU
-    const affectedSkus = new Set(units.map((u) => ({
-      storeId: u.storeId.toString(),
-      skuId: u.skuId.toString(),
-    })));
-
-    for (const { storeId, skuId } of affectedSkus) {
-      await this.syncStockFromUnits(storeId, skuId);
-    }
 
     this.logger.log(`Placed ${units.length} units on hold by user ${userId}: ${reason}`);
 
@@ -383,16 +372,6 @@ export class ProductUnitService {
         },
       },
     );
-
-    // Sync stock for each affected SKU
-    const affectedSkus = new Set(units.map((u) => ({
-      storeId: u.storeId.toString(),
-      skuId: u.skuId.toString(),
-    })));
-
-    for (const { storeId, skuId } of affectedSkus) {
-      await this.syncStockFromUnits(storeId, skuId);
-    }
 
     this.logger.log(`Released ${units.length} units from hold by user ${userId}`);
 
@@ -437,16 +416,6 @@ export class ProductUnitService {
       },
     );
 
-    // Sync stock for each affected SKU
-    const affectedSkus = new Set(units.map((u) => ({
-      storeId: u.storeId.toString(),
-      skuId: u.skuId.toString(),
-    })));
-
-    for (const { storeId, skuId } of affectedSkus) {
-      await this.syncStockFromUnits(storeId, skuId);
-    }
-
     this.logger.log(`Marked ${units.length} units as damaged by user ${userId}: ${reason}`);
 
     // Fetch updated units
@@ -482,16 +451,6 @@ export class ProductUnitService {
         },
       },
     );
-
-    // Sync stock for each affected SKU
-    const affectedSkus = new Set(units.map((u) => ({
-      storeId: u.storeId.toString(),
-      skuId: u.skuId.toString(),
-    })));
-
-    for (const { storeId, skuId } of affectedSkus) {
-      await this.syncStockFromUnits(storeId, skuId);
-    }
 
     this.logger.log(`Released ${units.length} units from cancelled order`);
   }
@@ -555,21 +514,6 @@ export class ProductUnitService {
     await unit.save();
 
     return this.toInterface(unit);
-  }
-
-  /**
-   * Sync Product Stock from unit counts
-   * Called whenever unit status changes
-   */
-  private async syncStockFromUnits(storeId: string, skuId: string): Promise<void> {
-    try {
-      const counts = await this.getUnitCountsByStatus(storeId, skuId);
-      await this.productStockService.syncFromUnits(storeId, skuId, counts.in_stock);
-      this.logger.log(`Stock synced for SKU ${skuId}: ${counts.in_stock} in_stock`);
-    } catch (error) {
-      this.logger.error(`Failed to sync stock for SKU ${skuId}: ${error.message}`);
-      // Don't throw - unit update succeeded, just log sync failure
-    }
   }
 
   /**
@@ -718,5 +662,268 @@ export class ProductUnitService {
 
     unit.isDeleted = true;
     await unit.save();
+  }
+
+  // ========================================
+  // Stock Aggregation Methods (replaces ProductStock)
+  // ========================================
+
+  /**
+   * Get stock summary across all SKUs
+   */
+  async getStockSummary(userId: string, storeId: string): Promise<IStockSummary> {
+    await this.getStoreWithAccess(storeId, userId);
+
+    // Get all SKUs with their settings
+    const skus = await this.skuModel.find({
+      storeId: new Types.ObjectId(storeId),
+      isDeleted: false,
+    }).lean();
+
+    // Aggregate unit counts by SKU
+    const unitCounts = await this.unitModel.aggregate([
+      {
+        $match: {
+          storeId: new Types.ObjectId(storeId),
+          isDeleted: false,
+        },
+      },
+      {
+        $group: {
+          _id: { skuId: '$skuId', status: '$status' },
+          count: { $sum: 1 },
+          totalValue: { $sum: '$unitCost' },
+        },
+      },
+    ]);
+
+    // Build summary
+    let totalUnits = 0;
+    let totalValue = 0;
+    let inStock = 0;
+    let lowStock = 0;
+    let outOfStock = 0;
+
+    // Create map of SKU -> counts
+    const skuCounts = new Map<string, { in_stock: number; total: number; value: number }>();
+
+    for (const item of unitCounts) {
+      const skuId = item._id.skuId.toString();
+      if (!skuCounts.has(skuId)) {
+        skuCounts.set(skuId, { in_stock: 0, total: 0, value: 0 });
+      }
+      const counts = skuCounts.get(skuId)!;
+      counts.total += item.count;
+
+      if (item._id.status === ProductUnitStatus.IN_STOCK) {
+        counts.in_stock = item.count;
+        counts.value = item.totalValue;
+        totalUnits += item.count;
+        totalValue += item.totalValue;
+      }
+    }
+
+    // Classify SKUs
+    for (const sku of skus) {
+      const counts = skuCounts.get(sku._id.toString()) || { in_stock: 0, total: 0, value: 0 };
+      const minLevel = sku.minStockLevel || 0;
+
+      if (counts.in_stock === 0) {
+        outOfStock++;
+      } else if (minLevel > 0 && counts.in_stock <= minLevel) {
+        lowStock++;
+      } else {
+        inStock++;
+      }
+    }
+
+    return {
+      totalSkus: skus.length,
+      totalUnits,
+      totalValue,
+      inStock,
+      lowStock,
+      outOfStock,
+    };
+  }
+
+  /**
+   * Get stock list with pagination (replaces ProductStock getAll)
+   */
+  async getStockList(
+    userId: string,
+    storeId: string,
+    options: {
+      keyword?: string;
+      status?: 'all' | 'in_stock' | 'low_stock' | 'out_of_stock';
+      category?: string;
+      page?: number;
+      size?: number;
+    } = {},
+  ): Promise<IStockResponse> {
+    await this.getStoreWithAccess(storeId, userId);
+
+    const { keyword, status = 'all', category, page = 1, size = 20 } = options;
+
+    // Get SKUs with optional filters
+    const skuFilter: any = {
+      storeId: new Types.ObjectId(storeId),
+      isDeleted: false,
+    };
+
+    if (keyword) {
+      skuFilter.$or = [
+        { sku: { $regex: keyword, $options: 'i' } },
+        { title: { $regex: keyword, $options: 'i' } },
+      ];
+    }
+
+    if (category) {
+      skuFilter.category = category;
+    }
+
+    const skus = await this.skuModel.find(skuFilter).lean();
+
+    // Aggregate unit counts by SKU
+    const unitAggregation = await this.unitModel.aggregate([
+      {
+        $match: {
+          storeId: new Types.ObjectId(storeId),
+          isDeleted: false,
+        },
+      },
+      {
+        $group: {
+          _id: { skuId: '$skuId', status: '$status' },
+          count: { $sum: 1 },
+          totalCost: { $sum: '$unitCost' },
+          lastDate: { $max: '$productionDate' },
+        },
+      },
+    ]);
+
+    // Build stock items
+    const stockItems: IStockItem[] = [];
+
+    for (const sku of skus) {
+      const skuId = sku._id.toString();
+
+      // Get counts for this SKU
+      const skuUnits = unitAggregation.filter((u) => u._id.skuId.toString() === skuId);
+
+      let currentStock = 0;
+      let holdStock = 0;
+      let soldStock = 0;
+      let damagedStock = 0;
+      let totalUnits = 0;
+      let totalCost = 0;
+      let lastProductionDate: Date | undefined;
+
+      for (const u of skuUnits) {
+        totalUnits += u.count;
+        if (u._id.status === ProductUnitStatus.IN_STOCK) {
+          currentStock = u.count;
+          totalCost = u.totalCost;
+          lastProductionDate = u.lastDate;
+        } else if (u._id.status === ProductUnitStatus.HOLD) {
+          holdStock = u.count;
+        } else if (u._id.status === ProductUnitStatus.SOLD) {
+          soldStock = u.count;
+        } else if (u._id.status === ProductUnitStatus.DAMAGED) {
+          damagedStock = u.count;
+        }
+      }
+
+      const avgUnitCost = currentStock > 0 ? totalCost / currentStock : 0;
+      const minLevel = sku.minStockLevel || 0;
+
+      // Determine status
+      let stockStatus: 'in_stock' | 'low_stock' | 'out_of_stock';
+      if (currentStock === 0) {
+        stockStatus = 'out_of_stock';
+      } else if (minLevel > 0 && currentStock <= minLevel) {
+        stockStatus = 'low_stock';
+      } else {
+        stockStatus = 'in_stock';
+      }
+
+      // Apply status filter
+      if (status !== 'all' && stockStatus !== status) {
+        continue;
+      }
+
+      stockItems.push({
+        skuId,
+        sku: sku.sku,
+        productName: sku.title,
+        category: sku.category,
+        currentStock,
+        holdStock,
+        soldStock,
+        damagedStock,
+        totalUnits,
+        avgUnitCost,
+        totalValue: currentStock * avgUnitCost,
+        minStockLevel: sku.minStockLevel || 0,
+        reorderPoint: sku.reorderPoint || 0,
+        reorderQuantity: sku.reorderQuantity || 0,
+        status: stockStatus,
+        lastProductionDate,
+      });
+    }
+
+    // Sort by productName
+    stockItems.sort((a, b) => a.productName.localeCompare(b.productName));
+
+    // Paginate
+    const total = stockItems.length;
+    const pages = Math.ceil(total / size);
+    const paginatedItems = stockItems.slice((page - 1) * size, page * size);
+
+    // Calculate summary
+    const summary: IStockSummary = {
+      totalSkus: stockItems.length,
+      totalUnits: stockItems.reduce((sum, i) => sum + i.currentStock, 0),
+      totalValue: stockItems.reduce((sum, i) => sum + i.totalValue, 0),
+      inStock: stockItems.filter((i) => i.status === 'in_stock').length,
+      lowStock: stockItems.filter((i) => i.status === 'low_stock').length,
+      outOfStock: stockItems.filter((i) => i.status === 'out_of_stock').length,
+    };
+
+    return {
+      items: paginatedItems,
+      summary,
+      total,
+      page,
+      pages,
+    };
+  }
+
+  /**
+   * Get low stock items (for alerts)
+   */
+  async getLowStockItems(userId: string, storeId: string): Promise<IStockItem[]> {
+    const result = await this.getStockList(userId, storeId, { status: 'low_stock', size: 100 });
+    return result.items;
+  }
+
+  /**
+   * Get stock for a specific SKU
+   */
+  async getStockBySku(userId: string, storeId: string, skuCode: string): Promise<IStockItem | null> {
+    await this.getStoreWithAccess(storeId, userId);
+
+    const sku = await this.skuModel.findOne({
+      storeId: new Types.ObjectId(storeId),
+      sku: skuCode,
+      isDeleted: false,
+    }).lean();
+
+    if (!sku) {
+      return null;
+    }
+
+    const result = await this.getStockList(userId, storeId, { keyword: skuCode, size: 1 });
+    return result.items[0] || null;
   }
 }

@@ -196,6 +196,60 @@ export class ProductUnitController {
   // Status changes must use specific endpoints: hold, unhold, damaged.
 
   // ========================
+  // Stock Aggregation (replaces ProductStock)
+  // ========================
+
+  @Get('stock/summary')
+  @ApiOperation({ summary: 'Get stock summary across all SKUs' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiQuery({ name: 'storeId', required: true })
+  async getStockSummary(@User('_id') userId: string, @Query('storeId') storeId: string) {
+    return this.unitService.getStockSummary(userId, storeId);
+  }
+
+  @Get('stock/list')
+  @ApiOperation({ summary: 'Get stock list with pagination' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiQuery({ name: 'storeId', required: true })
+  @ApiQuery({ name: 'keyword', required: false })
+  @ApiQuery({ name: 'status', required: false, enum: ['all', 'in_stock', 'low_stock', 'out_of_stock'] })
+  @ApiQuery({ name: 'category', required: false })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'size', required: false, type: Number })
+  async getStockList(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+    @Query('keyword') keyword?: string,
+    @Query('status') status?: 'all' | 'in_stock' | 'low_stock' | 'out_of_stock',
+    @Query('category') category?: string,
+    @Query('page') page?: number,
+    @Query('size') size?: number,
+  ) {
+    return this.unitService.getStockList(userId, storeId, { keyword, status, category, page, size });
+  }
+
+  @Get('stock/low')
+  @ApiOperation({ summary: 'Get low stock items' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiQuery({ name: 'storeId', required: true })
+  async getLowStock(@User('_id') userId: string, @Query('storeId') storeId: string) {
+    return this.unitService.getLowStockItems(userId, storeId);
+  }
+
+  @Get('stock/by-sku/:sku')
+  @ApiOperation({ summary: 'Get stock for a specific SKU' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiParam({ name: 'sku', description: 'SKU code' })
+  @ApiQuery({ name: 'storeId', required: true })
+  async getStockBySku(
+    @User('_id') userId: string,
+    @Param('sku') sku: string,
+    @Query('storeId') storeId: string,
+  ) {
+    return this.unitService.getStockBySku(userId, storeId, sku);
+  }
+
+  // ========================
   // Delete
   // ========================
 

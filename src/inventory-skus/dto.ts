@@ -62,6 +62,15 @@ export class CreateSKUDto {
   @ApiPropertyOptional({ description: 'Suggested selling price' })
   sellingPrice?: number;
 
+  @ApiPropertyOptional({ description: 'Minimum stock level for alerts' })
+  minStockLevel?: number;
+
+  @ApiPropertyOptional({ description: 'Reorder point threshold' })
+  reorderPoint?: number;
+
+  @ApiPropertyOptional({ description: 'Quantity to reorder' })
+  reorderQuantity?: number;
+
   @ApiPropertyOptional({ type: [String], description: 'Product images' })
   images?: string[];
 }
@@ -79,6 +88,9 @@ export const CreateSKUSchema = Joi.object({
   fixedCost: Joi.boolean().optional().default(false),
   cost: Joi.number().min(0).optional().default(0),
   sellingPrice: Joi.number().min(0).optional().default(0),
+  minStockLevel: Joi.number().min(0).optional().default(0),
+  reorderPoint: Joi.number().min(0).optional().default(0),
+  reorderQuantity: Joi.number().min(0).optional().default(0),
   images: Joi.array().items(Joi.string()).optional().default([]),
 });
 
@@ -117,6 +129,15 @@ export class UpdateSKUDto {
   @ApiPropertyOptional({ description: 'Suggested selling price' })
   sellingPrice?: number;
 
+  @ApiPropertyOptional({ description: 'Minimum stock level for alerts' })
+  minStockLevel?: number;
+
+  @ApiPropertyOptional({ description: 'Reorder point threshold' })
+  reorderPoint?: number;
+
+  @ApiPropertyOptional({ description: 'Quantity to reorder' })
+  reorderQuantity?: number;
+
   @ApiPropertyOptional({ type: [String], description: 'Product images' })
   images?: string[];
 }
@@ -133,6 +154,9 @@ export const UpdateSKUSchema = Joi.object({
   fixedCost: Joi.boolean().optional(),
   cost: Joi.number().min(0).optional(),
   sellingPrice: Joi.number().min(0).optional(),
+  minStockLevel: Joi.number().min(0).optional(),
+  reorderPoint: Joi.number().min(0).optional(),
+  reorderQuantity: Joi.number().min(0).optional(),
   images: Joi.array().items(Joi.string()).optional(),
 });
 
