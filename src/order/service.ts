@@ -807,10 +807,84 @@ export class OrderService {
 
       Object.assign(existingOrder, orderData);
       await existingOrder.save();
+
+      // Check if stock should be fulfilled for this order
+      await this.fulfillWooOrderStock(existingOrder);
+
       return existingOrder;
     }
 
-    return await this.orderModel.create(orderData);
+    const newOrder = await this.orderModel.create(orderData);
+
+    // Check if stock should be fulfilled for this order
+    await this.fulfillWooOrderStock(newOrder);
+
+    return newOrder;
+  }
+
+  /**
+   * Fulfill stock for WooCommerce orders
+   * Deducts from ProductStock when order status is processing/completed
+   */
+  private async fulfillWooOrderStock(order: OrderDocument): Promise<void> {
+    // Only fulfill stock for processing or completed orders
+    const fulfillStatuses = ['processing', 'completed'];
+    if (!fulfillStatuses.includes(order.status)) {
+      return;
+    }
+
+    // Skip if already fulfilled
+    if (order.fulfillmentStatus === FulfillmentStatus.FULFILLED) {
+      return;
+    }
+
+    // Skip if no line items
+    if (!order.lineItems || order.lineItems.length === 0) {
+      return;
+    }
+
+    try {
+      const warnings: string[] = [];
+
+      // Try to fulfill each line item
+      for (const item of order.lineItems) {
+        if (!item.sku || item.quantity <= 0) {
+          continue;
+        }
+
+        try {
+          // Use OrderItemService to fulfill stock for this line item
+          const result = await this.orderItemService.fulfillWooLineItem(
+            order.storeId.toString(),
+            order._id.toString(),
+            order.orderNumber,
+            item.sku,
+            item.quantity,
+          );
+
+          if (result.warning) {
+            warnings.push(result.warning);
+          }
+        } catch (err) {
+          this.logger.warn(`Failed to fulfill line item ${item.sku} for order ${order.orderNumber}: ${err.message}`);
+          warnings.push(`${item.sku}: ${err.message}`);
+        }
+      }
+
+      // Update fulfillment status
+      order.fulfillmentStatus = warnings.length > 0
+        ? FulfillmentStatus.PARTIALLY_FULFILLED
+        : FulfillmentStatus.FULFILLED;
+      await order.save();
+
+      if (warnings.length > 0) {
+        this.logger.warn(`WooCommerce order ${order.orderNumber} partially fulfilled: ${warnings.join(', ')}`);
+      } else {
+        this.logger.log(`WooCommerce order ${order.orderNumber} stock fulfilled successfully`);
+      }
+    } catch (error) {
+      this.logger.error(`Failed to fulfill WooCommerce order ${order.orderNumber}: ${error.message}`);
+    }
   }
 
   /**

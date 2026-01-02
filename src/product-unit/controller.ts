@@ -26,6 +26,12 @@ import {
   GenerateRfidSchema,
   MarkUnitsSoldDto,
   MarkUnitsSoldSchema,
+  HoldUnitsDto,
+  HoldUnitsSchema,
+  UnholdUnitsDto,
+  UnholdUnitsSchema,
+  MarkDamagedDto,
+  MarkDamagedSchema,
 } from './dto';
 
 @ApiTags('Product Units')
@@ -154,15 +160,40 @@ export class ProductUnitController {
   // ========================
 
   @Post('mark-sold')
-  @ApiOperation({ summary: 'Mark units as sold' })
+  @ApiOperation({ summary: 'Mark units as sold (internal use by order system)' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @UsePipes(new JoiValidationPipe({ body: MarkUnitsSoldSchema }))
   async markAsSold(@User('_id') userId: string, @Body() dto: MarkUnitsSoldDto) {
     return this.unitService.markAsSold(userId, dto.unitIds, dto.orderId, dto.orderNumber);
   }
 
+  @Post('hold')
+  @ApiOperation({ summary: 'Put units on hold (temporarily unavailable, deducts from stock)' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @UsePipes(new JoiValidationPipe({ body: HoldUnitsSchema }))
+  async holdUnits(@User('_id') userId: string, @Body() dto: HoldUnitsDto) {
+    return this.unitService.holdUnits(userId, dto.unitIds, dto.reason);
+  }
+
+  @Post('unhold')
+  @ApiOperation({ summary: 'Release units from hold back to in_stock' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @UsePipes(new JoiValidationPipe({ body: UnholdUnitsSchema }))
+  async unholdUnits(@User('_id') userId: string, @Body() dto: UnholdUnitsDto) {
+    return this.unitService.unholdUnits(userId, dto.unitIds);
+  }
+
+  @Post('damaged')
+  @ApiOperation({ summary: 'Mark units as damaged (permanent, cannot be undone)' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @UsePipes(new JoiValidationPipe({ body: MarkDamagedSchema }))
+  async markAsDamaged(@User('_id') userId: string, @Body() dto: MarkDamagedDto) {
+    return this.unitService.markAsDamaged(userId, dto.unitIds, dto.reason);
+  }
+
   // NOTE: Reserve/Release endpoints have been removed.
   // Units go directly from in_stock to sold via order fulfillment.
+  // Status changes must use specific endpoints: hold, unhold, damaged.
 
   // ========================
   // Delete

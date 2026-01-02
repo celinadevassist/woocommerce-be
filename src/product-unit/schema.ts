@@ -43,6 +43,26 @@ export class ProductUnit extends Document {
   @Prop({ type: Date })
   soldAt: Date;
 
+  // Hold tracking
+  @Prop({ type: String })
+  holdReason: string;
+
+  @Prop({ type: Date })
+  holdAt: Date;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+  holdByUserId: MongooseSchema.Types.ObjectId;
+
+  // Damaged tracking
+  @Prop({ type: String })
+  damagedReason: string;
+
+  @Prop({ type: Date })
+  damagedAt: Date;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+  damagedByUserId: MongooseSchema.Types.ObjectId;
+
   @Prop({ type: Date, required: true })
   productionDate: Date;
 

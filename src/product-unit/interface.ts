@@ -16,6 +16,14 @@ export interface IProductUnit {
   orderId?: Types.ObjectId;
   orderNumber?: string;
   soldAt?: Date;
+  // Hold tracking
+  holdReason?: string;
+  holdAt?: Date;
+  holdByUserId?: Types.ObjectId;
+  // Damaged tracking
+  damagedReason?: string;
+  damagedAt?: Date;
+  damagedByUserId?: Types.ObjectId;
   productionDate: Date;
   notes?: string;
   isDeleted: boolean;
@@ -45,6 +53,7 @@ export interface IProductUnitCountsByStatus {
   in_stock: number;
   sold: number;
   damaged: number;
+  hold: number;
   total: number;
 }
 

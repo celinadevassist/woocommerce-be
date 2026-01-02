@@ -102,6 +102,37 @@ export const ReleaseUnitsSchema = Joi.object({
   unitIds: Joi.array().items(Joi.string()).min(1).required(),
 });
 
+// Hold Units DTO
+export class HoldUnitsDto {
+  unitIds: string[];
+  reason: string;
+}
+
+export const HoldUnitsSchema = Joi.object({
+  unitIds: Joi.array().items(Joi.string()).min(1).required(),
+  reason: Joi.string().required().min(3).max(500),
+});
+
+// Unhold Units DTO
+export class UnholdUnitsDto {
+  unitIds: string[];
+}
+
+export const UnholdUnitsSchema = Joi.object({
+  unitIds: Joi.array().items(Joi.string()).min(1).required(),
+});
+
+// Mark Units as Damaged DTO
+export class MarkDamagedDto {
+  unitIds: string[];
+  reason: string;
+}
+
+export const MarkDamagedSchema = Joi.object({
+  unitIds: Joi.array().items(Joi.string()).min(1).required(),
+  reason: Joi.string().required().min(3).max(500),
+});
+
 // Create Units from Batch DTO (internal use)
 export class CreateUnitsFromBatchDto {
   storeId: string;

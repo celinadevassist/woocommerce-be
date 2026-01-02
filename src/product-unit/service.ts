@@ -42,6 +42,12 @@ export class ProductUnitService {
       orderId: doc.orderId as any,
       orderNumber: doc.orderNumber,
       soldAt: doc.soldAt,
+      holdReason: (doc as any).holdReason,
+      holdAt: (doc as any).holdAt,
+      holdByUserId: (doc as any).holdByUserId as any,
+      damagedReason: (doc as any).damagedReason,
+      damagedAt: (doc as any).damagedAt,
+      damagedByUserId: (doc as any).damagedByUserId as any,
       productionDate: doc.productionDate,
       notes: doc.notes,
       isDeleted: doc.isDeleted,
@@ -296,8 +302,230 @@ export class ProductUnitService {
   }
 
   /**
-   * Update unit status (sold, damaged)
-   * Automatically syncs Product Stock when status changes
+   * Put units on hold (temporarily unavailable)
+   * Deducts from available stock, can be reversed via unholdUnits
+   */
+  async holdUnits(userId: string, unitIds: string[], reason: string): Promise<IProductUnit[]> {
+    const objectIds = unitIds.map((id) => new Types.ObjectId(id));
+
+    // Verify all units are in_stock
+    const units = await this.unitModel.find({
+      _id: { $in: objectIds },
+      status: ProductUnitStatus.IN_STOCK,
+      isDeleted: false,
+    });
+
+    if (units.length !== unitIds.length) {
+      const foundIds = units.map(u => u._id.toString());
+      const missingIds = unitIds.filter(id => !foundIds.includes(id));
+      throw new BadRequestException(`Some units are not available to hold. Missing or invalid: ${missingIds.length} units`);
+    }
+
+    // Mark all units as hold
+    await this.unitModel.updateMany(
+      { _id: { $in: objectIds } },
+      {
+        $set: {
+          status: ProductUnitStatus.HOLD,
+          holdReason: reason,
+          holdAt: new Date(),
+          holdByUserId: new Types.ObjectId(userId),
+        },
+      },
+    );
+
+    // Sync stock for each affected SKU
+    const affectedSkus = new Set(units.map((u) => ({
+      storeId: u.storeId.toString(),
+      skuId: u.skuId.toString(),
+    })));
+
+    for (const { storeId, skuId } of affectedSkus) {
+      await this.syncStockFromUnits(storeId, skuId);
+    }
+
+    this.logger.log(`Placed ${units.length} units on hold by user ${userId}: ${reason}`);
+
+    // Fetch updated units
+    const updatedUnits = await this.unitModel.find({ _id: { $in: objectIds } });
+    return updatedUnits.map((u) => this.toInterface(u));
+  }
+
+  /**
+   * Release units from hold back to in_stock
+   * Restores units to available stock
+   */
+  async unholdUnits(userId: string, unitIds: string[]): Promise<IProductUnit[]> {
+    const objectIds = unitIds.map((id) => new Types.ObjectId(id));
+
+    // Verify all units are on hold
+    const units = await this.unitModel.find({
+      _id: { $in: objectIds },
+      status: ProductUnitStatus.HOLD,
+      isDeleted: false,
+    });
+
+    if (units.length !== unitIds.length) {
+      throw new BadRequestException('Some units are not on hold');
+    }
+
+    // Mark all units as in_stock
+    await this.unitModel.updateMany(
+      { _id: { $in: objectIds } },
+      {
+        $set: {
+          status: ProductUnitStatus.IN_STOCK,
+        },
+        $unset: {
+          holdReason: '',
+          holdAt: '',
+          holdByUserId: '',
+        },
+      },
+    );
+
+    // Sync stock for each affected SKU
+    const affectedSkus = new Set(units.map((u) => ({
+      storeId: u.storeId.toString(),
+      skuId: u.skuId.toString(),
+    })));
+
+    for (const { storeId, skuId } of affectedSkus) {
+      await this.syncStockFromUnits(storeId, skuId);
+    }
+
+    this.logger.log(`Released ${units.length} units from hold by user ${userId}`);
+
+    // Fetch updated units
+    const updatedUnits = await this.unitModel.find({ _id: { $in: objectIds } });
+    return updatedUnits.map((u) => this.toInterface(u));
+  }
+
+  /**
+   * Mark units as damaged (permanent, cannot be reversed)
+   * Deducts from available stock permanently
+   */
+  async markAsDamaged(userId: string, unitIds: string[], reason: string): Promise<IProductUnit[]> {
+    const objectIds = unitIds.map((id) => new Types.ObjectId(id));
+
+    // Can mark in_stock or hold units as damaged
+    const units = await this.unitModel.find({
+      _id: { $in: objectIds },
+      status: { $in: [ProductUnitStatus.IN_STOCK, ProductUnitStatus.HOLD] },
+      isDeleted: false,
+    });
+
+    if (units.length !== unitIds.length) {
+      throw new BadRequestException('Some units cannot be marked as damaged (may be sold or already damaged)');
+    }
+
+    // Mark all units as damaged
+    await this.unitModel.updateMany(
+      { _id: { $in: objectIds } },
+      {
+        $set: {
+          status: ProductUnitStatus.DAMAGED,
+          damagedReason: reason,
+          damagedAt: new Date(),
+          damagedByUserId: new Types.ObjectId(userId),
+        },
+        $unset: {
+          holdReason: '',
+          holdAt: '',
+          holdByUserId: '',
+        },
+      },
+    );
+
+    // Sync stock for each affected SKU
+    const affectedSkus = new Set(units.map((u) => ({
+      storeId: u.storeId.toString(),
+      skuId: u.skuId.toString(),
+    })));
+
+    for (const { storeId, skuId } of affectedSkus) {
+      await this.syncStockFromUnits(storeId, skuId);
+    }
+
+    this.logger.log(`Marked ${units.length} units as damaged by user ${userId}: ${reason}`);
+
+    // Fetch updated units
+    const updatedUnits = await this.unitModel.find({ _id: { $in: objectIds } });
+    return updatedUnits.map((u) => this.toInterface(u));
+  }
+
+  /**
+   * Release sold units back to in_stock (for order cancellation)
+   * Only called by OrderItemService when order is cancelled
+   */
+  async releaseFromOrder(unitIds: string[]): Promise<void> {
+    const objectIds = unitIds.map((id) => new Types.ObjectId(id));
+
+    const units = await this.unitModel.find({
+      _id: { $in: objectIds },
+      status: ProductUnitStatus.SOLD,
+      isDeleted: false,
+    });
+
+    if (units.length === 0) return;
+
+    await this.unitModel.updateMany(
+      { _id: { $in: objectIds } },
+      {
+        $set: {
+          status: ProductUnitStatus.IN_STOCK,
+        },
+        $unset: {
+          orderId: '',
+          orderNumber: '',
+          soldAt: '',
+        },
+      },
+    );
+
+    // Sync stock for each affected SKU
+    const affectedSkus = new Set(units.map((u) => ({
+      storeId: u.storeId.toString(),
+      skuId: u.skuId.toString(),
+    })));
+
+    for (const { storeId, skuId } of affectedSkus) {
+      await this.syncStockFromUnits(storeId, skuId);
+    }
+
+    this.logger.log(`Released ${units.length} units from cancelled order`);
+  }
+
+  /**
+   * Update unit location only
+   * Status changes must go through specific methods (holdUnits, unholdUnits, markAsDamaged)
+   */
+  async updateUnitLocation(userId: string, unitId: string, location: string): Promise<IProductUnit> {
+    const unit = await this.unitModel.findOne({
+      _id: new Types.ObjectId(unitId),
+      isDeleted: false,
+    });
+
+    if (!unit) {
+      throw new NotFoundException('Product unit not found');
+    }
+
+    unit.location = location;
+    await unit.save();
+
+    return this.toInterface(unit);
+  }
+
+  /**
+   * @deprecated Use holdUnits(), unholdUnits(), markAsDamaged() instead
+   * Update unit - RESTRICTED
+   * Only allows location and notes updates, NOT status changes
+   *
+   * Status changes must go through:
+   * - holdUnits() / unholdUnits() - for hold/unhold
+   * - markAsDamaged() - for damage
+   * - markAsSold() - for sales (via order confirmation)
+   * - releaseFromOrder() - for order cancellation
    */
   async updateUnitStatus(userId: string, unitId: string, dto: UpdateUnitStatusDto): Promise<IProductUnit> {
     const unit = await this.unitModel.findOne({
@@ -309,8 +537,14 @@ export class ProductUnitService {
       throw new NotFoundException('Product unit not found');
     }
 
-    const previousStatus = unit.status;
-    unit.status = dto.status;
+    // RESTRICT: Do not allow direct status changes
+    if (dto.status && dto.status !== unit.status) {
+      throw new BadRequestException(
+        'Direct status changes are not allowed. Use holdUnits(), unholdUnits(), or markAsDamaged() instead.',
+      );
+    }
+
+    // Only allow location and notes updates
     if (dto.notes) {
       unit.notes = dto.notes;
     }
@@ -318,17 +552,7 @@ export class ProductUnitService {
       unit.location = dto.location;
     }
 
-    // Set soldAt timestamp when marking as sold
-    if (dto.status === ProductUnitStatus.SOLD && previousStatus !== ProductUnitStatus.SOLD) {
-      unit.soldAt = new Date();
-    }
-
     await unit.save();
-
-    // Sync to Product Stock if status actually changed
-    if (previousStatus !== dto.status) {
-      await this.syncStockFromUnits(unit.storeId.toString(), unit.skuId.toString());
-    }
 
     return this.toInterface(unit);
   }
@@ -396,6 +620,7 @@ export class ProductUnitService {
       in_stock: 0,
       sold: 0,
       damaged: 0,
+      hold: 0,
       total: 0,
     };
 

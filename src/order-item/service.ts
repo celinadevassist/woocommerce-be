@@ -20,6 +20,7 @@ import {
   IOrderItemBulkCreate,
   IOrderTotals,
 } from './interface';
+import { ProductStockService } from '../product-stock/service';
 
 @Injectable()
 export class OrderItemService {
@@ -29,6 +30,8 @@ export class OrderItemService {
     @InjectModel(OrderItem.name) private orderItemModel: Model<OrderItemDocument>,
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     @InjectModel(ProductUnit.name) private productUnitModel: Model<ProductUnit>,
+    @Inject(forwardRef(() => ProductStockService))
+    private readonly productStockService: ProductStockService,
   ) {}
 
   /**
@@ -573,5 +576,85 @@ export class OrderItemService {
    */
   async getOrderTotals(orderId: string): Promise<IOrderTotals> {
     return this.recalculateOrderTotals(orderId);
+  }
+
+  /**
+   * Fulfill stock for a WooCommerce line item
+   * Used when WooCommerce orders are received with processing/completed status
+   * Finds available ProductUnits by SKU and marks them as SOLD
+   */
+  async fulfillWooLineItem(
+    storeId: string,
+    orderId: string,
+    orderNumber: string,
+    sku: string,
+    quantity: number,
+  ): Promise<{ fulfilled: number; warning?: string }> {
+    const storeObjectId = new Types.ObjectId(storeId);
+    const orderObjectId = new Types.ObjectId(orderId);
+
+    // Find available units for this SKU (FIFO - oldest first)
+    const availableUnits = await this.productUnitModel
+      .find({
+        storeId: storeObjectId,
+        sku: sku,
+        status: ProductUnitStatus.IN_STOCK,
+        isDeleted: false,
+      })
+      .sort({ productionDate: 1, createdAt: 1 })
+      .limit(quantity)
+      .lean();
+
+    if (availableUnits.length === 0) {
+      return {
+        fulfilled: 0,
+        warning: `SKU ${sku}: No units available in CartFlow inventory`,
+      };
+    }
+
+    const unitIds = availableUnits.map((u) => u._id);
+
+    // Mark units as SOLD
+    await this.productUnitModel.updateMany(
+      { _id: { $in: unitIds } },
+      {
+        $set: {
+          status: ProductUnitStatus.SOLD,
+          orderId: orderObjectId,
+          orderNumber: orderNumber,
+          soldAt: new Date(),
+        },
+      },
+    );
+
+    // Sync ProductStock for affected SKU
+    const skuId = availableUnits[0].skuId;
+    if (skuId) {
+      try {
+        // Count remaining in_stock units for this SKU
+        const inStockCount = await this.productUnitModel.countDocuments({
+          storeId: storeObjectId,
+          skuId: skuId,
+          status: ProductUnitStatus.IN_STOCK,
+          isDeleted: false,
+        });
+
+        // Sync ProductStock with new in_stock count
+        await this.productStockService.syncFromUnits(storeId, skuId.toString(), inStockCount);
+        this.logger.log(`SKU ${sku}: Marked ${availableUnits.length} units as SOLD, ${inStockCount} remaining in stock`);
+      } catch (error) {
+        this.logger.warn(`Failed to sync stock for SKU ${sku}: ${error.message}`);
+      }
+    }
+
+    // Return result
+    if (availableUnits.length < quantity) {
+      return {
+        fulfilled: availableUnits.length,
+        warning: `SKU ${sku}: Only ${availableUnits.length} of ${quantity} units available`,
+      };
+    }
+
+    return { fulfilled: availableUnits.length };
   }
 }
