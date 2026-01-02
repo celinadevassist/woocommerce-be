@@ -547,6 +547,7 @@ export class ProductStockService {
           $group: {
             _id: null,
             totalProducts: { $sum: 1 },
+            totalUnits: { $sum: '$currentStock' },
             totalValue: { $sum: '$totalValue' },
           },
         },
@@ -564,6 +565,7 @@ export class ProductStockService {
 
     return {
       totalProducts: totals[0]?.totalProducts || 0,
+      totalUnits: totals[0]?.totalUnits || 0,
       totalValue: totals[0]?.totalValue || 0,
       inStock: statusMap[StockStatus.IN_STOCK] || 0,
       lowStock: statusMap[StockStatus.LOW_STOCK] || 0,

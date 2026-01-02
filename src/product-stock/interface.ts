@@ -64,6 +64,7 @@ export interface IProductStockResponse extends IProductStock {
 // Stock summary for dashboard
 export interface IStockSummary {
   totalProducts: number;
+  totalUnits: number;
   totalValue: number;
   inStock: number;
   lowStock: number;
