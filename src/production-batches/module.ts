@@ -7,7 +7,6 @@ import { Material, MaterialSchema } from '../inventory-materials/schema';
 import { SKU, SKUSchema } from '../inventory-skus/schema';
 import { Store, StoreSchema } from '../store/schema';
 import { InventoryMaterialsModule } from '../inventory-materials/module';
-import { ProductStockModule } from '../product-stock/module';
 import { ProductUnitModule } from '../product-unit/module';
 
 @Module({
@@ -19,7 +18,6 @@ import { ProductUnitModule } from '../product-unit/module';
       { name: Store.name, schema: StoreSchema },
     ]),
     InventoryMaterialsModule,
-    ProductStockModule,
     ProductUnitModule,
   ],
   controllers: [ProductionBatchesController],

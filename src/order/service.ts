@@ -824,7 +824,7 @@ export class OrderService {
 
   /**
    * Fulfill stock for WooCommerce orders
-   * Deducts from ProductStock when order status is processing/completed
+   * Marks ProductUnits as sold when order status is processing/completed
    */
   private async fulfillWooOrderStock(order: OrderDocument): Promise<void> {
     // Only fulfill stock for processing or completed orders

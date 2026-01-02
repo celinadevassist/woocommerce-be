@@ -3,8 +3,6 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
-  Inject,
-  forwardRef,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -20,7 +18,6 @@ import {
   IOrderItemBulkCreate,
   IOrderTotals,
 } from './interface';
-import { ProductStockService } from '../product-stock/service';
 
 @Injectable()
 export class OrderItemService {
@@ -30,8 +27,6 @@ export class OrderItemService {
     @InjectModel(OrderItem.name) private orderItemModel: Model<OrderItemDocument>,
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     @InjectModel(ProductUnit.name) private productUnitModel: Model<ProductUnit>,
-    @Inject(forwardRef(() => ProductStockService))
-    private readonly productStockService: ProductStockService,
   ) {}
 
   /**
@@ -627,25 +622,7 @@ export class OrderItemService {
       },
     );
 
-    // Sync ProductStock for affected SKU
-    const skuId = availableUnits[0].skuId;
-    if (skuId) {
-      try {
-        // Count remaining in_stock units for this SKU
-        const inStockCount = await this.productUnitModel.countDocuments({
-          storeId: storeObjectId,
-          skuId: skuId,
-          status: ProductUnitStatus.IN_STOCK,
-          isDeleted: false,
-        });
-
-        // Sync ProductStock with new in_stock count
-        await this.productStockService.syncFromUnits(storeId, skuId.toString(), inStockCount);
-        this.logger.log(`SKU ${sku}: Marked ${availableUnits.length} units as SOLD, ${inStockCount} remaining in stock`);
-      } catch (error) {
-        this.logger.warn(`Failed to sync stock for SKU ${sku}: ${error.message}`);
-      }
-    }
+    this.logger.log(`SKU ${sku}: Marked ${availableUnits.length} units as SOLD`);
 
     // Return result
     if (availableUnits.length < quantity) {

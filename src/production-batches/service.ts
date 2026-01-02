@@ -6,7 +6,6 @@ import { Material } from '../inventory-materials/schema';
 import { SKU } from '../inventory-skus/schema';
 import { Store } from '../store/schema';
 import { InventoryMaterialsService } from '../inventory-materials/service';
-import { ProductStockService } from '../product-stock/service';
 import { ProductUnitService } from '../product-unit/service';
 import { ProductionBatchStatus, ProductionBatchType } from './enum';
 import { IProductionBatch, IProductionBatchResponse, IProductionBatchCostSummary } from './interface';
@@ -29,7 +28,6 @@ export class ProductionBatchesService {
     @InjectModel(SKU.name) private skuModel: Model<SKU>,
     @InjectModel(Store.name) private storeModel: Model<Store>,
     private readonly materialsService: InventoryMaterialsService,
-    private readonly productStockService: ProductStockService,
     private readonly productUnitService: ProductUnitService,
   ) {}
 
@@ -487,23 +485,10 @@ export class ProductionBatchesService {
 
     await batch.save();
 
-    // Add completed products to Product Stock
+    // Create individual ProductUnit records (stock is calculated from units)
     if (dto.completedQuantity > 0) {
       const sku = await this.skuModel.findById(batch.skuId);
       if (sku) {
-        await this.productStockService.addStockFromProduction(
-          batch.storeId.toString(),
-          userId,
-          batch.skuId.toString(),
-          sku.sku,
-          sku.title,
-          dto.completedQuantity,
-          batch.costPerUnit,
-          batch.batchNumber,
-        );
-        this.logger.log(`Added ${dto.completedQuantity} units to product stock for SKU: ${sku.sku}`);
-
-        // Create individual ProductUnit records for RFID tracking
         const unitResult = await this.productUnitService.createUnitsFromBatch({
           storeId: batch.storeId.toString(),
           skuId: batch.skuId.toString(),
@@ -515,7 +500,7 @@ export class ProductionBatchesService {
           unitCost: batch.costPerUnit,
           rfidCodes: dto.rfidCodes,
         });
-        this.logger.log(`Created ${unitResult.created} product units with RFID codes for batch ${batch.batchNumber}`);
+        this.logger.log(`Created ${unitResult.created} product units for batch ${batch.batchNumber}`);
       }
     }
 

@@ -39,7 +39,6 @@ import { AdminModule } from './admin/module';
 import { InventoryMaterialsModule } from './inventory-materials/module';
 import { InventorySKUsModule } from './inventory-skus/module';
 import { ProductionBatchesModule } from './production-batches/module';
-import { ProductStockModule } from './product-stock/module';
 import { ProductUnitModule } from './product-unit/module';
 import { OrderFulfillmentModule } from './order-fulfillment/module';
 import { OrderItemModule } from './order-item/module';
@@ -88,7 +87,6 @@ import { FixedAssetsModule } from './fixed-assets/module';
     InventoryMaterialsModule,
     InventorySKUsModule,
     ProductionBatchesModule,
-    ProductStockModule,
     ProductUnitModule,
     OrderFulfillmentModule,
     OrderItemModule,
