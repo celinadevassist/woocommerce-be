@@ -91,6 +91,24 @@ export class ProductStockController {
     return this.stockService.findBySku(userId, storeId, sku);
   }
 
+  @Get('audit/check')
+  @ApiOperation({ summary: 'Audit stock to find mismatches between ProductStock and ProductUnits' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiQuery({ name: 'storeId', required: true })
+  async auditStock(@User('_id') userId: string, @Query('storeId') storeId: string) {
+    return this.stockService.auditStock(userId, storeId);
+  }
+
+  @Post('audit/reconcile')
+  @ApiOperation({ summary: 'Reconcile stock mismatches - updates ProductStock to match ProductUnit counts' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiQuery({ name: 'storeId', required: true })
+  async reconcileStock(@User('_id') userId: string, @Query('storeId') storeId: string) {
+    return this.stockService.reconcileStock(userId, storeId);
+  }
+
+  // Parameterized routes MUST come after static routes
+
   @Get(':id')
   @ApiOperation({ summary: 'Get stock by ID' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
@@ -154,5 +172,6 @@ export class ProductStockController {
   // NOTE: Manual stock operations (add/deduct/adjust/reserve) have been removed.
   // Stock is now automatically managed through:
   // 1. Production Batches → creates Product Units → adds to stock
-  // 2. Product Unit status changes (sold/damaged) → syncs to stock
+  // 2. Product Unit status changes (sold/damaged/hold) → syncs to stock
+  // Use audit/check and audit/reconcile endpoints to verify and fix any mismatches.
 }

@@ -78,3 +78,31 @@ export interface ITransactionResponse {
   page: number;
   pages: number;
 }
+
+// Stock audit item (mismatch details)
+export interface IStockAuditItem {
+  stockId: string;
+  sku: string;
+  productName: string;
+  hasUnitTracking: boolean;
+  stockCount: number;           // ProductStock.currentStock
+  unitCount: number;            // Count of ProductUnits with status=in_stock
+  difference: number;           // unitCount - stockCount
+  totalUnits: number;           // Total ProductUnits (all statuses)
+  unitsByStatus: {
+    in_stock: number;
+    sold: number;
+    hold: number;
+    damaged: number;
+  };
+}
+
+// Stock audit result
+export interface IStockAuditResult {
+  storeId: string;
+  auditedAt: Date;
+  totalStocks: number;
+  matchedCount: number;
+  mismatchedCount: number;
+  mismatches: IStockAuditItem[];
+}

@@ -3,8 +3,10 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ProductStock, StockTransaction } from './schema';
 import { Store } from '../store/schema';
+import { ProductUnit } from '../product-unit/schema';
+import { ProductUnitStatus } from '../product-unit/enum';
 import { StockTransactionType, StockStatus } from './enum';
-import { IProductStock, IProductStockResponse, IStockSummary, ITransactionResponse } from './interface';
+import { IProductStock, IProductStockResponse, IStockSummary, ITransactionResponse, IStockAuditResult, IStockAuditItem } from './interface';
 import {
   CreateProductStockDto,
   UpdateProductStockDto,
@@ -24,6 +26,7 @@ export class ProductStockService {
     @InjectModel(ProductStock.name) private stockModel: Model<ProductStock>,
     @InjectModel(StockTransaction.name) private transactionModel: Model<StockTransaction>,
     @InjectModel(Store.name) private storeModel: Model<Store>,
+    @InjectModel(ProductUnit.name) private unitModel: Model<ProductUnit>,
   ) {}
 
   /**
@@ -758,5 +761,148 @@ export class ProductStockService {
 
       this.logger.log(`Stock synced from units for ${stock.sku}: ${previousStock} → ${inStockCount}`);
     }
+  }
+
+  /**
+   * Audit stock to find mismatches between ProductStock and ProductUnits
+   * Returns list of stocks where currentStock != count of in_stock units
+   */
+  async auditStock(userId: string, storeId: string): Promise<IStockAuditResult> {
+    await this.getStoreWithAccess(storeId, userId);
+
+    // Get all stocks for the store
+    const stocks = await this.stockModel.find({
+      storeId: new Types.ObjectId(storeId),
+      isDeleted: false,
+    }).lean();
+
+    const mismatches: IStockAuditItem[] = [];
+
+    for (const stock of stocks) {
+      // Count units by status for this SKU
+      const unitCounts = await this.unitModel.aggregate([
+        {
+          $match: {
+            storeId: new Types.ObjectId(storeId),
+            skuId: stock.skuId,
+            isDeleted: false,
+          },
+        },
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      // Build status counts
+      const unitsByStatus = {
+        in_stock: 0,
+        sold: 0,
+        hold: 0,
+        damaged: 0,
+      };
+      let totalUnits = 0;
+
+      for (const result of unitCounts) {
+        unitsByStatus[result._id as keyof typeof unitsByStatus] = result.count;
+        totalUnits += result.count;
+      }
+
+      const inStockUnits = unitsByStatus.in_stock;
+      const difference = inStockUnits - stock.currentStock;
+
+      // Only report mismatches
+      if (difference !== 0) {
+        mismatches.push({
+          stockId: stock._id.toString(),
+          sku: stock.sku,
+          productName: stock.productName,
+          hasUnitTracking: stock.hasUnitTracking || false,
+          stockCount: stock.currentStock,
+          unitCount: inStockUnits,
+          difference,
+          totalUnits,
+          unitsByStatus,
+        });
+      }
+    }
+
+    return {
+      storeId,
+      auditedAt: new Date(),
+      totalStocks: stocks.length,
+      matchedCount: stocks.length - mismatches.length,
+      mismatchedCount: mismatches.length,
+      mismatches,
+    };
+  }
+
+  /**
+   * Reconcile stock to fix mismatches
+   * Updates ProductStock.currentStock to match actual in_stock unit count
+   * Only reconciles stocks with hasUnitTracking=true
+   */
+  async reconcileStock(userId: string, storeId: string): Promise<{ reconciled: number; skipped: number; details: any[] }> {
+    await this.getStoreWithAccess(storeId, userId);
+
+    // First audit to find mismatches
+    const audit = await this.auditStock(userId, storeId);
+
+    let reconciled = 0;
+    let skipped = 0;
+    const details: any[] = [];
+
+    for (const mismatch of audit.mismatches) {
+      // Skip stocks without unit tracking - they need manual review
+      if (!mismatch.hasUnitTracking) {
+        skipped++;
+        details.push({
+          sku: mismatch.sku,
+          action: 'skipped',
+          reason: 'hasUnitTracking is false - manual review required',
+          stockCount: mismatch.stockCount,
+          unitCount: mismatch.unitCount,
+        });
+        continue;
+      }
+
+      // Update stock to match unit count
+      const stock = await this.stockModel.findById(mismatch.stockId);
+      if (!stock) continue;
+
+      const previousStock = stock.currentStock;
+      stock.currentStock = mismatch.unitCount;
+      await this.updateCalculatedFields(stock);
+      await stock.save();
+
+      // Create transaction record
+      await this.transactionModel.create({
+        storeId: new Types.ObjectId(storeId),
+        stockId: stock._id,
+        type: StockTransactionType.ADJUSTMENT,
+        quantity: mismatch.difference,
+        previousStock,
+        newStock: mismatch.unitCount,
+        totalCost: Math.abs(mismatch.difference) * stock.unitCost,
+        notes: `Reconciliation: adjusted from ${previousStock} to ${mismatch.unitCount} (${mismatch.difference > 0 ? '+' : ''}${mismatch.difference})`,
+        referenceType: 'reconciliation',
+        performedBy: new Types.ObjectId(userId),
+      });
+
+      reconciled++;
+      details.push({
+        sku: mismatch.sku,
+        action: 'reconciled',
+        previousStock,
+        newStock: mismatch.unitCount,
+        difference: mismatch.difference,
+      });
+
+      this.logger.log(`Reconciled stock for ${mismatch.sku}: ${previousStock} → ${mismatch.unitCount}`);
+    }
+
+    return { reconciled, skipped, details };
   }
 }
