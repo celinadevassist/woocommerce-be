@@ -1010,6 +1010,12 @@ export class OrderService {
       throw new ForbiddenException('Only draft orders can be confirmed');
     }
 
+    // Check if order has items
+    const orderItems = await this.orderItemService.getOrderItems(orderId);
+    if (orderItems.length === 0) {
+      throw new ForbiddenException('Cannot confirm an order with no items. Please add items first.');
+    }
+
     // Fulfill order items (deduct stock)
     const fulfillResult = await this.orderItemService.fulfillOrderItems(
       orderId,
