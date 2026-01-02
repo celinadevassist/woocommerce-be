@@ -80,6 +80,9 @@ export const ProductUnitSchema = SchemaFactory.createForClass(ProductUnit);
 // Compound index for inventory queries (available units per SKU)
 ProductUnitSchema.index({ storeId: 1, skuId: 1, status: 1 });
 
+// Optimized index for stock aggregation queries (includes isDeleted for filtering)
+ProductUnitSchema.index({ storeId: 1, isDeleted: 1, skuId: 1, status: 1 });
+
 // RFID lookup per store
 ProductUnitSchema.index({ storeId: 1, rfidCode: 1 });
 
