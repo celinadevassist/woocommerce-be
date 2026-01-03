@@ -11,13 +11,30 @@ import {
   Res,
   UseGuards,
   UsePipes,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { ApiBearerAuth, ApiOperation, ApiTags, ApiParam, ApiQuery, ApiResponse, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { ReviewService } from './service';
 import { QueryReviewDto, QueryReviewSchema } from './dto.query';
 import { UpdateReviewDto, UpdateReviewSchema, ReplyReviewDto, ReplyReviewSchema } from './dto.update';
+import {
+  CreateReviewDto,
+  CreateReviewSchema,
+  RejectReviewDto,
+  RejectReviewSchema,
+  FeatureReviewDto,
+  FeatureReviewSchema,
+  BulkReviewIdsDto,
+  BulkReviewIdsSchema,
+  ReorderPhotosDto,
+  ReorderPhotosSchema,
+  UploadPhotoDto,
+  UploadPhotoSchema,
+} from './dto.create';
 import {
   CreateResponseTemplateDto,
   CreateResponseTemplateSchema,
@@ -27,7 +44,9 @@ import {
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
 import { User } from '../decorators/user.decorator';
 import { LanguageSchema } from '../dtos/lang.dto';
-import { ReviewStatus } from './enum';
+import { ReviewStatus, ReviewType, ReviewSource, ModerationStatus } from './enum';
+import { UploadedFile as UploadedFileType } from '../modules/s3-upload/s3-upload.service';
+import { Multer } from 'multer';
 
 @ApiTags('Reviews')
 @ApiBearerAuth()
@@ -210,5 +229,183 @@ export class ReviewController {
     @Query('storeId') storeId?: string,
   ) {
     return this.reviewService.syncAllProductRatings(userId, storeId);
+  }
+
+  // ==================== Manual Review Creation ====================
+
+  @Post()
+  @ApiOperation({ summary: 'Create a manual review' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiQuery({ name: 'storeId', required: true, description: 'Store ID' })
+  @UsePipes(new JoiValidationPipe({ body: CreateReviewSchema, param: { lang: LanguageSchema } }))
+  async createManualReview(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+    @Body() dto: CreateReviewDto,
+  ) {
+    return this.reviewService.createManualReview(storeId, userId, dto);
+  }
+
+  // ==================== Photo Management ====================
+
+  @Post(':id/photos')
+  @ApiOperation({ summary: 'Upload a photo to a review' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiParam({ name: 'id', description: 'Review ID' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+        caption: { type: 'string' },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async uploadPhoto(
+    @User('_id') userId: string,
+    @Param('id') reviewId: string,
+    @UploadedFile() file: Multer.File,
+    @Body('caption') caption?: string,
+  ) {
+    const uploadedFile: UploadedFileType = {
+      buffer: file.buffer,
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+    };
+    return this.reviewService.uploadPhoto(reviewId, userId, uploadedFile, caption);
+  }
+
+  @Delete(':id/photos/:photoId')
+  @ApiOperation({ summary: 'Remove a photo from a review' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiParam({ name: 'id', description: 'Review ID' })
+  @ApiParam({ name: 'photoId', description: 'Photo ID' })
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async removePhoto(
+    @User('_id') userId: string,
+    @Param('id') reviewId: string,
+    @Param('photoId') photoId: string,
+  ) {
+    return this.reviewService.removePhoto(reviewId, photoId, userId);
+  }
+
+  @Post(':id/photos/reorder')
+  @ApiOperation({ summary: 'Reorder photos in a review' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiParam({ name: 'id', description: 'Review ID' })
+  @UsePipes(new JoiValidationPipe({ body: ReorderPhotosSchema, param: { lang: LanguageSchema } }))
+  async reorderPhotos(
+    @User('_id') userId: string,
+    @Param('id') reviewId: string,
+    @Body() dto: ReorderPhotosDto,
+  ) {
+    return this.reviewService.reorderPhotos(reviewId, userId, dto.photoIds);
+  }
+
+  // ==================== Moderation ====================
+
+  @Post(':id/approve')
+  @ApiOperation({ summary: 'Approve a review' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiParam({ name: 'id', description: 'Review ID' })
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async approve(@User('_id') userId: string, @Param('id') reviewId: string) {
+    return this.reviewService.approve(reviewId, userId);
+  }
+
+  @Post(':id/reject')
+  @ApiOperation({ summary: 'Reject a review' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiParam({ name: 'id', description: 'Review ID' })
+  @UsePipes(new JoiValidationPipe({ body: RejectReviewSchema, param: { lang: LanguageSchema } }))
+  async reject(
+    @User('_id') userId: string,
+    @Param('id') reviewId: string,
+    @Body() dto: RejectReviewDto,
+  ) {
+    return this.reviewService.reject(reviewId, userId, dto.reason);
+  }
+
+  @Post(':id/flag')
+  @ApiOperation({ summary: 'Flag a review for further review' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiParam({ name: 'id', description: 'Review ID' })
+  @UsePipes(new JoiValidationPipe({ body: RejectReviewSchema, param: { lang: LanguageSchema } }))
+  async flag(
+    @User('_id') userId: string,
+    @Param('id') reviewId: string,
+    @Body() dto: RejectReviewDto,
+  ) {
+    return this.reviewService.flag(reviewId, userId, dto.reason || 'Flagged for review');
+  }
+
+  @Post('bulk-approve')
+  @ApiOperation({ summary: 'Bulk approve reviews' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @UsePipes(new JoiValidationPipe({ body: BulkReviewIdsSchema, param: { lang: LanguageSchema } }))
+  async bulkApprove(@User('_id') userId: string, @Body() dto: BulkReviewIdsDto) {
+    return this.reviewService.bulkApprove(dto.reviewIds, userId);
+  }
+
+  @Post('bulk-reject')
+  @ApiOperation({ summary: 'Bulk reject reviews' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @UsePipes(new JoiValidationPipe({ body: BulkReviewIdsSchema, param: { lang: LanguageSchema } }))
+  async bulkReject(@User('_id') userId: string, @Body() dto: BulkReviewIdsDto) {
+    return this.reviewService.bulkReject(dto.reviewIds, userId, dto.reason);
+  }
+
+  // ==================== Publishing ====================
+
+  @Post(':id/publish')
+  @ApiOperation({ summary: 'Publish a review' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiParam({ name: 'id', description: 'Review ID' })
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async publish(@User('_id') userId: string, @Param('id') reviewId: string) {
+    return this.reviewService.publish(reviewId, userId);
+  }
+
+  @Post(':id/unpublish')
+  @ApiOperation({ summary: 'Unpublish a review' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiParam({ name: 'id', description: 'Review ID' })
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async unpublish(@User('_id') userId: string, @Param('id') reviewId: string) {
+    return this.reviewService.unpublish(reviewId, userId);
+  }
+
+  @Post('bulk-publish')
+  @ApiOperation({ summary: 'Bulk publish reviews' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @UsePipes(new JoiValidationPipe({ body: BulkReviewIdsSchema, param: { lang: LanguageSchema } }))
+  async bulkPublish(@User('_id') userId: string, @Body() dto: BulkReviewIdsDto) {
+    return this.reviewService.bulkPublish(dto.reviewIds, userId);
+  }
+
+  @Post(':id/feature')
+  @ApiOperation({ summary: 'Feature a review' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiParam({ name: 'id', description: 'Review ID' })
+  @UsePipes(new JoiValidationPipe({ body: FeatureReviewSchema, param: { lang: LanguageSchema } }))
+  async feature(
+    @User('_id') userId: string,
+    @Param('id') reviewId: string,
+    @Body() dto: FeatureReviewDto,
+  ) {
+    return this.reviewService.feature(reviewId, userId, dto.order);
+  }
+
+  @Post(':id/unfeature')
+  @ApiOperation({ summary: 'Unfeature a review' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiParam({ name: 'id', description: 'Review ID' })
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async unfeature(@User('_id') userId: string, @Param('id') reviewId: string) {
+    return this.reviewService.unfeature(reviewId, userId);
   }
 }

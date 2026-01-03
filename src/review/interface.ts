@@ -1,10 +1,20 @@
-import { ReviewStatus, ReviewSource } from './enum';
+import { ReviewStatus, ReviewSource, ReviewType, ModerationStatus } from './enum';
+
+export interface IReviewPhoto {
+  _id?: string;
+  url: string;
+  thumbnailUrl?: string;
+  s3Key?: string;
+  caption?: string;
+  order: number;
+  uploadedAt: Date;
+}
 
 export interface IReview {
   _id: string;
-  externalId: number;
+  externalId?: number;
   storeId: string;
-  productExternalId: number;
+  productExternalId?: number;
   localProductId?: string;
   reviewer: string;
   reviewerEmail: string;
@@ -14,6 +24,29 @@ export interface IReview {
   verified: boolean;
   status: ReviewStatus;
   source: ReviewSource;
+  reviewType: ReviewType;
+  // Photos
+  photos: IReviewPhoto[];
+  // Moderation
+  moderationStatus: ModerationStatus;
+  moderatedBy?: string;
+  moderatedAt?: Date;
+  rejectionReason?: string;
+  // Publishing
+  isPublished: boolean;
+  publishedAt?: Date;
+  isFeatured: boolean;
+  featuredOrder?: number;
+  // Customer info (for manual reviews)
+  customerEmail?: string;
+  customerPhone?: string;
+  customerId?: string;
+  // Engagement
+  helpfulCount: number;
+  viewCount: number;
+  // Review request reference
+  reviewRequestId?: string;
+  // Internal fields
   reply?: string;
   repliedAt?: Date;
   repliedBy?: string;

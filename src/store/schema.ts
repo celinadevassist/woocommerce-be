@@ -125,6 +125,10 @@ export class Store extends Document {
   @Prop()
   webhookSecret?: string;
 
+  // Public API key for external widget/API access
+  @Prop({ unique: true, sparse: true })
+  publicApiKey?: string;
+
   @Prop()
   lastError?: string;
 
@@ -149,3 +153,4 @@ StoreSchema.index({ status: 1 });
 StoreSchema.index({ platform: 1 });
 StoreSchema.index({ createdAt: -1 });
 StoreSchema.index({ url: 1 }, { unique: true }); // Prevent duplicate stores
+StoreSchema.index({ publicApiKey: 1 }); // For public API lookups

@@ -8,4 +8,19 @@ export enum ReviewStatus {
 export enum ReviewSource {
   WOOCOMMERCE = 'woocommerce',
   MANUAL = 'manual',
+  REVIEW_REQUEST = 'review_request',
+  IMPORT = 'import',
+}
+
+export enum ReviewType {
+  PRODUCT = 'product',
+  GENERAL = 'general',
+  SERVICE = 'service',
+}
+
+export enum ModerationStatus {
+  PENDING = 'pending',
+  APPROVED = 'approved',
+  REJECTED = 'rejected',
+  FLAGGED = 'flagged',
 }

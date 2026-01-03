@@ -20,6 +20,7 @@ import { WooOrder } from '../integrations/woocommerce/woocommerce.types';
 import { CustomerService } from '../customer/service';
 import { PhoneService } from '../phone/service';
 import { EmailService } from '../email/service';
+import { ReviewRequestService } from '../review-request/service';
 
 @Injectable()
 export class OrderService {
@@ -37,6 +38,8 @@ export class OrderService {
     private readonly emailService: EmailService,
     @Inject(forwardRef(() => OrderItemService))
     private readonly orderItemService: OrderItemService,
+    @Inject(forwardRef(() => ReviewRequestService))
+    private readonly reviewRequestService: ReviewRequestService,
   ) {}
 
   /**
@@ -1269,6 +1272,15 @@ export class OrderService {
         await this.syncOrderStatusToWoo(order);
       } catch (error) {
         this.logger.error(`Failed to sync status to WooCommerce: ${error.message}`);
+      }
+    }
+
+    // Schedule review request when order is delivered or completed
+    if (newStatus === OrderStatus.DELIVERED || newStatus === OrderStatus.COMPLETED) {
+      try {
+        await this.reviewRequestService.scheduleRequest(order._id.toString(), newStatus);
+      } catch (error) {
+        this.logger.error(`Failed to schedule review request: ${error.message}`);
       }
     }
 

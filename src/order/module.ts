@@ -10,6 +10,7 @@ import { CustomerModule } from '../customer/module';
 import { PhoneModule } from '../phone/module';
 import { EmailModule } from '../email/module';
 import { OrderItemModule } from '../order-item/module';
+import { ReviewRequestModule } from '../review-request/module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { OrderItemModule } from '../order-item/module';
     forwardRef(() => PhoneModule),
     forwardRef(() => EmailModule),
     forwardRef(() => OrderItemModule),
+    forwardRef(() => ReviewRequestModule),
     WooCommerceModule,
   ],
   controllers: [OrderController],

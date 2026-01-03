@@ -782,6 +782,84 @@ Create webhooks for all the topics you want to sync in real-time.`,
     await store.save();
   }
 
+  // ==================== PUBLIC API KEY MANAGEMENT ====================
+
+  /**
+   * Generate or get public API key for a store
+   */
+  async getPublicApiKey(storeId: string, userId: string): Promise<{
+    publicApiKey: string;
+    isNew: boolean;
+  }> {
+    const store = await this.storeModel.findOne({
+      _id: new Types.ObjectId(storeId),
+      isDeleted: false,
+    });
+
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+
+    this.verifyStoreAccess(store, userId, [StoreMemberRole.OWNER, StoreMemberRole.ADMIN]);
+
+    if (store.publicApiKey) {
+      return { publicApiKey: store.publicApiKey, isNew: false };
+    }
+
+    // Generate new API key
+    store.publicApiKey = this.generatePublicApiKey();
+    await store.save();
+
+    return { publicApiKey: store.publicApiKey, isNew: true };
+  }
+
+  /**
+   * Regenerate public API key for a store
+   */
+  async regeneratePublicApiKey(storeId: string, userId: string): Promise<{
+    publicApiKey: string;
+    message: string;
+  }> {
+    const store = await this.storeModel.findOne({
+      _id: new Types.ObjectId(storeId),
+      isDeleted: false,
+    });
+
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+
+    this.verifyStoreAccess(store, userId, [StoreMemberRole.OWNER, StoreMemberRole.ADMIN]);
+
+    store.publicApiKey = this.generatePublicApiKey();
+    await store.save();
+
+    return {
+      publicApiKey: store.publicApiKey,
+      message: 'Public API key regenerated. Update your widget/integration with the new key.',
+    };
+  }
+
+  /**
+   * Find store by public API key (for public API access)
+   */
+  async findByPublicApiKey(apiKey: string): Promise<StoreDocument | null> {
+    return this.storeModel.findOne({
+      publicApiKey: apiKey,
+      isDeleted: false,
+      status: StoreStatus.ACTIVE,
+    });
+  }
+
+  /**
+   * Generate a random public API key
+   */
+  private generatePublicApiKey(): string {
+    const crypto = require('crypto');
+    // Generate a unique key with prefix for easy identification
+    return `pk_${crypto.randomBytes(24).toString('hex')}`;
+  }
+
   // ==================== HELPER METHODS ====================
 
   /**

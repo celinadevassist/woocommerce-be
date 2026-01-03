@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -10,13 +11,15 @@ import { Review, ReviewDocument } from './schema';
 import { ResponseTemplate, ResponseTemplateDocument } from './response-template.schema';
 import { UpdateReviewDto, ReplyReviewDto } from './dto.update';
 import { QueryReviewDto } from './dto.query';
+import { CreateReviewDto } from './dto.create';
 import { CreateResponseTemplateDto, UpdateResponseTemplateDto, IResponseTemplate } from './response-template.dto';
-import { IReview, IReviewResponse, IReviewStats } from './interface';
-import { ReviewStatus, ReviewSource } from './enum';
+import { IReview, IReviewResponse, IReviewStats, IReviewPhoto } from './interface';
+import { ReviewStatus, ReviewSource, ReviewType, ModerationStatus } from './enum';
 import { Product, ProductDocument } from '../product/schema';
 import { Store, StoreDocument } from '../store/schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 import { WooProductReview } from '../integrations/woocommerce/woocommerce.types';
+import { S3UploadService, UploadedFile } from '../modules/s3-upload/s3-upload.service';
 
 @Injectable()
 export class ReviewService {
@@ -28,6 +31,7 @@ export class ReviewService {
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     @InjectModel(ResponseTemplate.name) private responseTemplateModel: Model<ResponseTemplateDocument>,
     private readonly wooCommerceService: WooCommerceService,
+    private readonly s3UploadService: S3UploadService,
   ) {}
 
   /**
@@ -109,6 +113,21 @@ export class ReviewService {
     }
     if (query.isFlagged !== undefined) {
       filter.isFlagged = query.isFlagged;
+    }
+    if (query.reviewType) {
+      filter.reviewType = query.reviewType;
+    }
+    if (query.source) {
+      filter.source = query.source;
+    }
+    if (query.moderationStatus) {
+      filter.moderationStatus = query.moderationStatus;
+    }
+    if (query.isPublished !== undefined) {
+      filter.isPublished = query.isPublished;
+    }
+    if (query.isFeatured !== undefined) {
+      filter.isFeatured = query.isFeatured;
     }
     if (query.reviewerEmail) {
       filter.reviewerEmail = { $regex: query.reviewerEmail, $options: 'i' };
@@ -1034,6 +1053,37 @@ export class ReviewService {
       verified: obj.verified,
       status: obj.status,
       source: obj.source,
+      reviewType: obj.reviewType || ReviewType.PRODUCT,
+      // Photos
+      photos: (obj.photos || []).map((p: any) => ({
+        _id: p._id?.toString(),
+        url: p.url,
+        thumbnailUrl: p.thumbnailUrl,
+        s3Key: p.s3Key,
+        caption: p.caption,
+        order: p.order,
+        uploadedAt: p.uploadedAt,
+      })),
+      // Moderation
+      moderationStatus: obj.moderationStatus || ModerationStatus.PENDING,
+      moderatedBy: obj.moderatedBy?.toString(),
+      moderatedAt: obj.moderatedAt,
+      rejectionReason: obj.rejectionReason,
+      // Publishing
+      isPublished: obj.isPublished || false,
+      publishedAt: obj.publishedAt,
+      isFeatured: obj.isFeatured || false,
+      featuredOrder: obj.featuredOrder,
+      // Customer info
+      customerEmail: obj.customerEmail,
+      customerPhone: obj.customerPhone,
+      customerId: obj.customerId?.toString(),
+      // Engagement
+      helpfulCount: obj.helpfulCount || 0,
+      viewCount: obj.viewCount || 0,
+      // Review request
+      reviewRequestId: obj.reviewRequestId?.toString(),
+      // Internal fields
       reply: obj.reply,
       repliedAt: obj.repliedAt,
       repliedBy: obj.repliedBy?.toString(),
@@ -1044,6 +1094,664 @@ export class ReviewService {
       isDeleted: obj.isDeleted,
       wooCreatedAt: obj.wooCreatedAt,
       lastSyncedAt: obj.lastSyncedAt,
+      createdAt: obj.createdAt,
+      updatedAt: obj.updatedAt,
+      productName: product?.name,
+      productImage: product?.images?.[0]?.src,
+    };
+  }
+
+  // ==================== Photo Management ====================
+
+  /**
+   * Upload a photo for a review
+   */
+  async uploadPhoto(
+    reviewId: string,
+    userId: string,
+    file: UploadedFile,
+    caption?: string,
+  ): Promise<IReview> {
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(reviewId),
+      isDeleted: false,
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    await this.verifyStoreAccess(review.storeId.toString(), userId);
+
+    // Upload to S3
+    const folder = `reviews/${review.storeId.toString()}/${reviewId}`;
+    const result = await this.s3UploadService.uploadImage(file, file.originalname, folder);
+
+    // Add photo to review
+    const newPhoto = {
+      url: result.url,
+      s3Key: result.key,
+      caption: caption || '',
+      order: review.photos?.length || 0,
+      uploadedAt: new Date(),
+    };
+
+    review.photos = [...(review.photos || []), newPhoto];
+    await review.save();
+
+    this.logger.log(`Photo uploaded for review ${reviewId}: ${result.url}`);
+
+    return this.toInterface(review);
+  }
+
+  /**
+   * Remove a photo from a review
+   */
+  async removePhoto(reviewId: string, photoId: string, userId: string): Promise<IReview> {
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(reviewId),
+      isDeleted: false,
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    await this.verifyStoreAccess(review.storeId.toString(), userId);
+
+    const photoIndex = review.photos?.findIndex(
+      (p: any) => p._id?.toString() === photoId,
+    );
+
+    if (photoIndex === undefined || photoIndex === -1) {
+      throw new NotFoundException('Photo not found');
+    }
+
+    const photo = review.photos[photoIndex];
+
+    // Delete from S3
+    if (photo.s3Key) {
+      try {
+        await this.s3UploadService.deleteFile(photo.s3Key);
+        this.logger.log(`Deleted photo from S3: ${photo.s3Key}`);
+      } catch (error) {
+        this.logger.error(`Failed to delete photo from S3: ${error.message}`);
+      }
+    }
+
+    // Remove from array
+    review.photos.splice(photoIndex, 1);
+
+    // Reorder remaining photos
+    review.photos.forEach((p: any, idx: number) => {
+      p.order = idx;
+    });
+
+    await review.save();
+
+    return this.toInterface(review);
+  }
+
+  /**
+   * Reorder photos for a review
+   */
+  async reorderPhotos(
+    reviewId: string,
+    userId: string,
+    photoIds: string[],
+  ): Promise<IReview> {
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(reviewId),
+      isDeleted: false,
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    await this.verifyStoreAccess(review.storeId.toString(), userId);
+
+    // Reorder photos based on photoIds array
+    const reorderedPhotos = photoIds
+      .map((id, index) => {
+        const photo = review.photos?.find((p: any) => p._id?.toString() === id);
+        if (photo) {
+          photo.order = index;
+          return photo;
+        }
+        return null;
+      })
+      .filter(Boolean);
+
+    review.photos = reorderedPhotos;
+    await review.save();
+
+    return this.toInterface(review);
+  }
+
+  // ==================== Moderation ====================
+
+  /**
+   * Approve a review
+   */
+  async approve(reviewId: string, userId: string): Promise<IReview> {
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(reviewId),
+      isDeleted: false,
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    await this.verifyStoreAccess(review.storeId.toString(), userId);
+
+    review.moderationStatus = ModerationStatus.APPROVED;
+    review.moderatedBy = new Types.ObjectId(userId) as any;
+    review.moderatedAt = new Date();
+    review.rejectionReason = undefined;
+
+    await review.save();
+
+    this.logger.log(`Review ${reviewId} approved by user ${userId}`);
+
+    return this.toInterface(review);
+  }
+
+  /**
+   * Reject a review
+   */
+  async reject(reviewId: string, userId: string, reason?: string): Promise<IReview> {
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(reviewId),
+      isDeleted: false,
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    await this.verifyStoreAccess(review.storeId.toString(), userId);
+
+    review.moderationStatus = ModerationStatus.REJECTED;
+    review.moderatedBy = new Types.ObjectId(userId) as any;
+    review.moderatedAt = new Date();
+    review.rejectionReason = reason;
+    review.isPublished = false;
+
+    await review.save();
+
+    this.logger.log(`Review ${reviewId} rejected by user ${userId}: ${reason || 'No reason'}`);
+
+    return this.toInterface(review);
+  }
+
+  /**
+   * Flag a review for further review
+   */
+  async flag(reviewId: string, userId: string, reason: string): Promise<IReview> {
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(reviewId),
+      isDeleted: false,
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    await this.verifyStoreAccess(review.storeId.toString(), userId);
+
+    review.moderationStatus = ModerationStatus.FLAGGED;
+    review.isFlagged = true;
+    review.flagReason = reason;
+
+    await review.save();
+
+    this.logger.log(`Review ${reviewId} flagged by user ${userId}: ${reason}`);
+
+    return this.toInterface(review);
+  }
+
+  /**
+   * Bulk approve reviews
+   */
+  async bulkApprove(reviewIds: string[], userId: string): Promise<{ updated: number }> {
+    const storeIds = await this.getUserStoreIds(userId);
+
+    const result = await this.reviewModel.updateMany(
+      {
+        _id: { $in: reviewIds.map((id) => new Types.ObjectId(id)) },
+        storeId: { $in: storeIds },
+        isDeleted: false,
+      },
+      {
+        $set: {
+          moderationStatus: ModerationStatus.APPROVED,
+          moderatedBy: new Types.ObjectId(userId),
+          moderatedAt: new Date(),
+        },
+        $unset: { rejectionReason: 1 },
+      },
+    );
+
+    this.logger.log(`Bulk approved ${result.modifiedCount} reviews by user ${userId}`);
+
+    return { updated: result.modifiedCount };
+  }
+
+  /**
+   * Bulk reject reviews
+   */
+  async bulkReject(reviewIds: string[], userId: string, reason?: string): Promise<{ updated: number }> {
+    const storeIds = await this.getUserStoreIds(userId);
+
+    const result = await this.reviewModel.updateMany(
+      {
+        _id: { $in: reviewIds.map((id) => new Types.ObjectId(id)) },
+        storeId: { $in: storeIds },
+        isDeleted: false,
+      },
+      {
+        $set: {
+          moderationStatus: ModerationStatus.REJECTED,
+          moderatedBy: new Types.ObjectId(userId),
+          moderatedAt: new Date(),
+          rejectionReason: reason,
+          isPublished: false,
+        },
+      },
+    );
+
+    this.logger.log(`Bulk rejected ${result.modifiedCount} reviews by user ${userId}`);
+
+    return { updated: result.modifiedCount };
+  }
+
+  // ==================== Publishing ====================
+
+  /**
+   * Publish a review
+   */
+  async publish(reviewId: string, userId: string): Promise<IReview> {
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(reviewId),
+      isDeleted: false,
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    await this.verifyStoreAccess(review.storeId.toString(), userId);
+
+    if (review.moderationStatus !== ModerationStatus.APPROVED) {
+      throw new BadRequestException('Review must be approved before publishing');
+    }
+
+    review.isPublished = true;
+    review.publishedAt = new Date();
+
+    await review.save();
+
+    this.logger.log(`Review ${reviewId} published by user ${userId}`);
+
+    return this.toInterface(review);
+  }
+
+  /**
+   * Unpublish a review
+   */
+  async unpublish(reviewId: string, userId: string): Promise<IReview> {
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(reviewId),
+      isDeleted: false,
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    await this.verifyStoreAccess(review.storeId.toString(), userId);
+
+    review.isPublished = false;
+
+    await review.save();
+
+    this.logger.log(`Review ${reviewId} unpublished by user ${userId}`);
+
+    return this.toInterface(review);
+  }
+
+  /**
+   * Bulk publish reviews
+   */
+  async bulkPublish(reviewIds: string[], userId: string): Promise<{ updated: number }> {
+    const storeIds = await this.getUserStoreIds(userId);
+
+    const result = await this.reviewModel.updateMany(
+      {
+        _id: { $in: reviewIds.map((id) => new Types.ObjectId(id)) },
+        storeId: { $in: storeIds },
+        moderationStatus: ModerationStatus.APPROVED,
+        isDeleted: false,
+      },
+      {
+        $set: {
+          isPublished: true,
+          publishedAt: new Date(),
+        },
+      },
+    );
+
+    this.logger.log(`Bulk published ${result.modifiedCount} reviews by user ${userId}`);
+
+    return { updated: result.modifiedCount };
+  }
+
+  /**
+   * Feature a review
+   */
+  async feature(reviewId: string, userId: string, order?: number): Promise<IReview> {
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(reviewId),
+      isDeleted: false,
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    await this.verifyStoreAccess(review.storeId.toString(), userId);
+
+    review.isFeatured = true;
+    review.featuredOrder = order;
+
+    await review.save();
+
+    this.logger.log(`Review ${reviewId} featured by user ${userId}`);
+
+    return this.toInterface(review);
+  }
+
+  /**
+   * Unfeature a review
+   */
+  async unfeature(reviewId: string, userId: string): Promise<IReview> {
+    const review = await this.reviewModel.findOne({
+      _id: new Types.ObjectId(reviewId),
+      isDeleted: false,
+    });
+
+    if (!review) {
+      throw new NotFoundException('Review not found');
+    }
+
+    await this.verifyStoreAccess(review.storeId.toString(), userId);
+
+    review.isFeatured = false;
+    review.featuredOrder = undefined;
+
+    await review.save();
+
+    return this.toInterface(review);
+  }
+
+  // ==================== Manual Review Creation ====================
+
+  /**
+   * Create a manual review (from WhatsApp, social media, etc.)
+   */
+  async createManualReview(storeId: string, userId: string, dto: CreateReviewDto): Promise<IReview> {
+    await this.verifyStoreAccess(storeId, userId);
+
+    // Find local product if productId provided
+    let localProduct: ProductDocument | null = null;
+    if (dto.productId) {
+      localProduct = await this.productModel.findOne({
+        _id: new Types.ObjectId(dto.productId),
+        storeId: new Types.ObjectId(storeId),
+        isDeleted: false,
+      });
+    }
+
+    const reviewData: any = {
+      storeId: new Types.ObjectId(storeId),
+      reviewer: dto.reviewer,
+      reviewerEmail: dto.reviewerEmail?.toLowerCase() || `manual-${Date.now()}@no-email.local`,
+      review: dto.review,
+      rating: dto.rating,
+      verified: dto.verified || false,
+      status: ReviewStatus.APPROVED,
+      source: dto.source || ReviewSource.MANUAL,
+      reviewType: dto.reviewType || ReviewType.PRODUCT,
+      moderationStatus: dto.autoApprove ? ModerationStatus.APPROVED : ModerationStatus.PENDING,
+      isPublished: dto.autoApprove && dto.autoPublish ? true : false,
+      publishedAt: dto.autoApprove && dto.autoPublish ? new Date() : undefined,
+      customerEmail: dto.customerEmail,
+      customerPhone: dto.customerPhone,
+      customerId: dto.customerId ? new Types.ObjectId(dto.customerId) : undefined,
+      tags: dto.tags || [],
+      internalNotes: dto.internalNotes,
+      photos: [],
+      isDeleted: false,
+    };
+
+    if (localProduct) {
+      reviewData.localProductId = localProduct._id;
+      reviewData.productExternalId = localProduct.externalId;
+    }
+
+    if (dto.autoApprove) {
+      reviewData.moderatedBy = new Types.ObjectId(userId);
+      reviewData.moderatedAt = new Date();
+    }
+
+    const review = await this.reviewModel.create(reviewData);
+
+    this.logger.log(`Manual review created for store ${storeId} by user ${userId}`);
+
+    // Sync product rating if applicable
+    if (localProduct && reviewData.moderationStatus === ModerationStatus.APPROVED) {
+      await this.syncProductRating(localProduct._id.toString()).catch((err) => {
+        this.logger.error(`Failed to sync product rating: ${err.message}`);
+      });
+    }
+
+    return this.toInterface(review, localProduct);
+  }
+
+  // ==================== Engagement ====================
+
+  /**
+   * Increment helpful count for a review
+   */
+  async incrementHelpful(reviewId: string): Promise<void> {
+    await this.reviewModel.updateOne(
+      { _id: new Types.ObjectId(reviewId) },
+      { $inc: { helpfulCount: 1 } },
+    );
+  }
+
+  /**
+   * Increment view count for a review
+   */
+  async incrementViewCount(reviewId: string): Promise<void> {
+    await this.reviewModel.updateOne(
+      { _id: new Types.ObjectId(reviewId) },
+      { $inc: { viewCount: 1 } },
+    );
+  }
+
+  // ==================== Public API Methods ====================
+
+  /**
+   * Get published reviews for public API (no auth required)
+   */
+  async getPublishedReviews(
+    storeId: string,
+    options: {
+      productId?: string;
+      reviewType?: ReviewType;
+      featured?: boolean;
+      page?: number;
+      size?: number;
+      sortBy?: 'createdAt' | 'rating' | 'helpfulCount';
+      sortOrder?: 'asc' | 'desc';
+    } = {},
+  ): Promise<IReviewResponse> {
+    const filter: any = {
+      storeId: new Types.ObjectId(storeId),
+      isPublished: true,
+      moderationStatus: ModerationStatus.APPROVED,
+      isDeleted: false,
+    };
+
+    if (options.productId) {
+      filter.localProductId = new Types.ObjectId(options.productId);
+    }
+
+    if (options.reviewType) {
+      filter.reviewType = options.reviewType;
+    }
+
+    if (options.featured) {
+      filter.isFeatured = true;
+    }
+
+    const page = options.page || 1;
+    const size = options.size || 10;
+    const skip = (page - 1) * size;
+
+    const sortField = options.sortBy || 'createdAt';
+    const sortOrder = options.sortOrder === 'asc' ? 1 : -1;
+    const sort: any = { [sortField]: sortOrder };
+
+    // Featured reviews should be sorted by featuredOrder first
+    if (options.featured) {
+      sort.featuredOrder = 1;
+    }
+
+    const [reviews, total] = await Promise.all([
+      this.reviewModel.find(filter).sort(sort).skip(skip).limit(size),
+      this.reviewModel.countDocuments(filter),
+    ]);
+
+    // Get product info
+    const productIds = [...new Set(reviews.map((r) => r.localProductId?.toString()).filter(Boolean))];
+    const products = productIds.length > 0
+      ? await this.productModel.find({ _id: { $in: productIds } })
+      : [];
+    const productMap = new Map(products.map((p) => [p._id.toString(), p]));
+
+    return {
+      reviews: reviews.map((r) => {
+        const product = r.localProductId ? productMap.get(r.localProductId.toString()) : null;
+        return this.toPublicInterface(r, product);
+      }),
+      pagination: {
+        total,
+        page,
+        size,
+        pages: Math.ceil(total / size),
+      },
+    };
+  }
+
+  /**
+   * Get review summary for public API
+   */
+  async getPublicSummary(storeId: string): Promise<{
+    totalReviews: number;
+    averageRating: number;
+    ratingDistribution: { 1: number; 2: number; 3: number; 4: number; 5: number };
+    featuredCount: number;
+    photoCount: number;
+  }> {
+    const filter = {
+      storeId: new Types.ObjectId(storeId),
+      isPublished: true,
+      moderationStatus: ModerationStatus.APPROVED,
+      isDeleted: false,
+    };
+
+    const [stats, featuredCount, photoStats] = await Promise.all([
+      this.reviewModel.aggregate([
+        { $match: filter },
+        {
+          $group: {
+            _id: null,
+            totalReviews: { $sum: 1 },
+            avgRating: { $avg: '$rating' },
+          },
+        },
+      ]),
+      this.reviewModel.countDocuments({ ...filter, isFeatured: true }),
+      this.reviewModel.aggregate([
+        { $match: filter },
+        { $project: { photoCount: { $size: { $ifNull: ['$photos', []] } } } },
+        { $group: { _id: null, total: { $sum: '$photoCount' } } },
+      ]),
+    ]);
+
+    const ratingDist = await this.reviewModel.aggregate([
+      { $match: filter },
+      { $group: { _id: '$rating', count: { $sum: 1 } } },
+    ]);
+
+    const ratingDistribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    ratingDist.forEach((item: any) => {
+      if (item._id >= 1 && item._id <= 5) {
+        ratingDistribution[item._id as 1 | 2 | 3 | 4 | 5] = item.count;
+      }
+    });
+
+    return {
+      totalReviews: stats[0]?.totalReviews || 0,
+      averageRating: Math.round((stats[0]?.avgRating || 0) * 10) / 10,
+      ratingDistribution,
+      featuredCount,
+      photoCount: photoStats[0]?.total || 0,
+    };
+  }
+
+  /**
+   * Convert to public interface (hides internal fields)
+   */
+  private toPublicInterface(doc: ReviewDocument, product?: ProductDocument | null): IReview {
+    const obj = doc.toObject();
+    return {
+      _id: obj._id.toString(),
+      storeId: obj.storeId.toString(),
+      localProductId: obj.localProductId?.toString(),
+      reviewer: obj.reviewer,
+      reviewerEmail: '', // Hidden for privacy
+      reviewerAvatarUrl: obj.reviewerAvatarUrl,
+      review: obj.review,
+      rating: obj.rating,
+      verified: obj.verified,
+      status: obj.status,
+      source: obj.source,
+      reviewType: obj.reviewType || ReviewType.PRODUCT,
+      photos: (obj.photos || []).map((p: any) => ({
+        _id: p._id?.toString(),
+        url: p.url,
+        thumbnailUrl: p.thumbnailUrl,
+        caption: p.caption,
+        order: p.order,
+        uploadedAt: p.uploadedAt,
+      })),
+      moderationStatus: obj.moderationStatus,
+      isPublished: obj.isPublished,
+      publishedAt: obj.publishedAt,
+      isFeatured: obj.isFeatured,
+      featuredOrder: obj.featuredOrder,
+      helpfulCount: obj.helpfulCount || 0,
+      viewCount: obj.viewCount || 0,
+      reply: obj.reply,
+      repliedAt: obj.repliedAt,
+      tags: [],
+      isFlagged: false,
+      isDeleted: false,
       createdAt: obj.createdAt,
       updatedAt: obj.updatedAt,
       productName: product?.name,

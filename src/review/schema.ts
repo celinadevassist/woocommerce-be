@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { ReviewStatus, ReviewSource } from './enum';
+import { ReviewStatus, ReviewSource, ReviewType, ModerationStatus } from './enum';
+import { ReviewPhoto, ReviewPhotoSchema } from './review-photo.schema';
 
 @Schema({ timestamps: true, versionKey: false, collection: 'reviews' })
 export class Review extends Document {
@@ -45,6 +46,61 @@ export class Review extends Document {
 
   @Prop({ type: String, enum: Object.values(ReviewSource), default: ReviewSource.WOOCOMMERCE })
   source: ReviewSource;
+
+  // Review type
+  @Prop({ type: String, enum: Object.values(ReviewType), default: ReviewType.PRODUCT })
+  reviewType: ReviewType;
+
+  // Photos
+  @Prop({ type: [ReviewPhotoSchema], default: [] })
+  photos: ReviewPhoto[];
+
+  // Moderation
+  @Prop({ type: String, enum: Object.values(ModerationStatus), default: ModerationStatus.PENDING })
+  moderationStatus: ModerationStatus;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+  moderatedBy?: MongooseSchema.Types.ObjectId;
+
+  @Prop()
+  moderatedAt?: Date;
+
+  @Prop()
+  rejectionReason?: string;
+
+  // Publishing
+  @Prop({ default: false })
+  isPublished: boolean;
+
+  @Prop()
+  publishedAt?: Date;
+
+  @Prop({ default: false })
+  isFeatured: boolean;
+
+  @Prop()
+  featuredOrder?: number;
+
+  // Customer info (for manual reviews)
+  @Prop()
+  customerEmail?: string;
+
+  @Prop()
+  customerPhone?: string;
+
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Customer' })
+  customerId?: MongooseSchema.Types.ObjectId;
+
+  // Engagement
+  @Prop({ default: 0 })
+  helpfulCount: number;
+
+  @Prop({ default: 0 })
+  viewCount: number;
+
+  // Review request reference
+  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ReviewRequest' })
+  reviewRequestId?: MongooseSchema.Types.ObjectId;
 
   // Internal fields
   @Prop()
@@ -91,9 +147,18 @@ export type ReviewDocument = Review & Document;
 export const ReviewSchema = SchemaFactory.createForClass(Review);
 
 // Indexes
-ReviewSchema.index({ storeId: 1, externalId: 1 }, { unique: true });
+ReviewSchema.index({ storeId: 1, externalId: 1 }, { unique: true, sparse: true });
 ReviewSchema.index({ storeId: 1, productExternalId: 1 });
 ReviewSchema.index({ storeId: 1, status: 1 });
 ReviewSchema.index({ storeId: 1, createdAt: -1 });
 ReviewSchema.index({ rating: 1 });
 ReviewSchema.index({ reviewerEmail: 1 });
+
+// New indexes for moderation and publishing
+ReviewSchema.index({ storeId: 1, moderationStatus: 1 });
+ReviewSchema.index({ storeId: 1, isPublished: 1 });
+ReviewSchema.index({ storeId: 1, reviewType: 1 });
+ReviewSchema.index({ storeId: 1, source: 1 });
+ReviewSchema.index({ storeId: 1, isFeatured: 1, featuredOrder: 1 });
+ReviewSchema.index({ reviewRequestId: 1 });
+ReviewSchema.index({ customerId: 1 });

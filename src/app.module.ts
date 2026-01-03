@@ -44,6 +44,7 @@ import { OrderFulfillmentModule } from './order-fulfillment/module';
 import { OrderItemModule } from './order-item/module';
 import { RunningCostsModule } from './running-costs/module';
 import { FixedAssetsModule } from './fixed-assets/module';
+import { ReviewRequestModule } from './review-request/module';
 
 @Module({
   imports: [
@@ -92,6 +93,7 @@ import { FixedAssetsModule } from './fixed-assets/module';
     OrderItemModule,
     RunningCostsModule,
     FixedAssetsModule,
+    ReviewRequestModule,
   ],
   controllers: [HealthController],
   providers: [ValidationPipe],
