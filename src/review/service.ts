@@ -1504,9 +1504,18 @@ export class ReviewService {
   async createManualReview(storeId: string, userId: string, dto: CreateReviewDto): Promise<IReview> {
     await this.verifyStoreAccess(storeId, userId);
 
-    // Find local product if productId provided
+    // Helper to check if a value is a valid MongoDB ObjectId
+    const isValidObjectId = (value: any): boolean => {
+      if (!value) return false;
+      if (typeof value === 'number') return false;
+      const str = value.toString().trim();
+      if (str === '') return false;
+      return /^[a-fA-F0-9]{24}$/.test(str);
+    };
+
+    // Find local product if productId provided and valid
     let localProduct: ProductDocument | null = null;
-    if (dto.productId) {
+    if (dto.productId && isValidObjectId(dto.productId)) {
       localProduct = await this.productModel.findOne({
         _id: new Types.ObjectId(dto.productId),
         storeId: new Types.ObjectId(storeId),
@@ -1529,7 +1538,7 @@ export class ReviewService {
       publishedAt: dto.autoApprove && dto.autoPublish ? new Date() : undefined,
       customerEmail: dto.customerEmail,
       customerPhone: dto.customerPhone,
-      customerId: dto.customerId ? new Types.ObjectId(dto.customerId) : undefined,
+      customerId: isValidObjectId(dto.customerId) ? new Types.ObjectId(dto.customerId) : undefined,
       tags: dto.tags || [],
       internalNotes: dto.internalNotes,
       photos: [],
@@ -1546,7 +1555,16 @@ export class ReviewService {
       reviewData.moderatedAt = new Date();
     }
 
-    const review = await this.reviewModel.create(reviewData);
+    this.logger.log(`Creating manual review with data: ${JSON.stringify(reviewData, null, 2)}`);
+
+    let review;
+    try {
+      review = await this.reviewModel.create(reviewData);
+    } catch (error) {
+      this.logger.error(`Failed to create manual review: ${error.message}`);
+      this.logger.error(`Review data was: ${JSON.stringify(reviewData)}`);
+      throw error;
+    }
 
     this.logger.log(`Manual review created for store ${storeId} by user ${userId}`);
 

@@ -5,17 +5,17 @@ import { ReviewPhoto, ReviewPhotoSchema } from './review-photo.schema';
 
 @Schema({ timestamps: true, versionKey: false, collection: 'reviews' })
 export class Review extends Document {
-  // WooCommerce reference
-  @Prop({ required: true, index: true })
-  externalId: number;
+  // WooCommerce reference (optional for manual reviews)
+  @Prop({ index: true })
+  externalId?: number;
 
   // Store reference
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
   storeId: MongooseSchema.Types.ObjectId;
 
-  // Product reference
-  @Prop({ required: true, index: true })
-  productExternalId: number;
+  // Product reference (optional for service/general reviews)
+  @Prop({ index: true })
+  productExternalId?: number;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Product', index: true })
   localProductId?: MongooseSchema.Types.ObjectId;

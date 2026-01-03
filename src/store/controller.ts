@@ -194,6 +194,44 @@ export class StoreController {
     return await this.storeService.regenerateWebhookSecret(id, user._id.toString());
   }
 
+  // ==================== PUBLIC API KEY MANAGEMENT ====================
+
+  @Get(':id/public-api-key')
+  @ApiOperation({ summary: 'Get or generate public API key for the store' })
+  @ApiResponse({ status: 200, description: 'Public API key retrieved' })
+  @ApiResponse({ status: 404, description: 'Store not found' })
+  @ApiParam({ name: 'id', description: 'Store ID' })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async getPublicApiKey(
+    @Param('id') id: string,
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    return await this.storeService.getPublicApiKey(id, user._id.toString());
+  }
+
+  @Post(':id/public-api-key/regenerate')
+  @ApiOperation({ summary: 'Regenerate public API key for the store' })
+  @ApiResponse({ status: 200, description: 'Public API key regenerated' })
+  @ApiResponse({ status: 404, description: 'Store not found' })
+  @ApiParam({ name: 'id', description: 'Store ID' })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async regeneratePublicApiKey(
+    @Param('id') id: string,
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    return await this.storeService.regeneratePublicApiKey(id, user._id.toString());
+  }
+
   // ==================== MEMBER MANAGEMENT ====================
 
   @Get(':id/members')
