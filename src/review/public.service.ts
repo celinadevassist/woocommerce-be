@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Review, ReviewDocument } from './schema';
 import { Product, ProductDocument } from '../product/schema';
 import { ModerationStatus, ReviewType } from './enum';
@@ -38,8 +38,9 @@ export class PublicReviewService {
       sortOrder = 'desc',
     } = options;
 
+    const storeObjectId = new Types.ObjectId(storeId);
     const query: any = {
-      storeId,
+      storeId: storeObjectId,
       isPublished: true,
       moderationStatus: ModerationStatus.APPROVED,
       isDeleted: false,
@@ -120,8 +121,9 @@ export class PublicReviewService {
    * Get public summary statistics
    */
   async getPublicSummary(storeId: string) {
+    const storeObjectId = new Types.ObjectId(storeId);
     const query = {
-      storeId,
+      storeId: storeObjectId,
       isPublished: true,
       moderationStatus: ModerationStatus.APPROVED,
       isDeleted: false,
