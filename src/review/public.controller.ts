@@ -6,18 +6,23 @@ import {
   Query,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags, ApiQuery, ApiResponse } from '@nestjs/swagger';
-import { ReviewService } from './service';
-import { StoreService } from '../store/service';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { PublicReviewService } from './public.service';
+import { Store, StoreDocument } from '../store/schema';
 import { ReviewType } from './enum';
 
 @ApiTags('Public Reviews API')
-@Controller('public/reviews')
+@Controller('widget/store-reviews')
 export class PublicReviewController {
+  private readonly logger = new Logger(PublicReviewController.name);
+
   constructor(
-    private readonly reviewService: ReviewService,
-    private readonly storeService: StoreService,
+    private readonly publicReviewService: PublicReviewService,
+    @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
   ) {}
 
   /**
@@ -28,7 +33,11 @@ export class PublicReviewController {
       throw new BadRequestException('API key is required');
     }
 
-    const store = await this.storeService.findByPublicApiKey(apiKey);
+    const store = await this.storeModel.findOne({
+      publicApiKey: apiKey,
+      isDeleted: false,
+    });
+
     if (!store) {
       throw new NotFoundException('Invalid API key or store not found');
     }
@@ -57,9 +66,10 @@ export class PublicReviewController {
     @Query('sort_by') sortBy?: 'createdAt' | 'rating' | 'helpfulCount',
     @Query('sort_order') sortOrder?: 'asc' | 'desc',
   ) {
+    this.logger.log(`Public reviews request received with api_key: ${apiKey?.substring(0, 10)}...`);
     const storeId = await this.validateApiKey(apiKey);
 
-    return this.reviewService.getPublishedReviews(storeId, {
+    return this.publicReviewService.getPublishedReviews(storeId, {
       productId,
       reviewType,
       featured: featured === 'true',
@@ -76,7 +86,7 @@ export class PublicReviewController {
   @ApiResponse({ status: 200, description: 'Returns review summary with counts and averages' })
   async getSummary(@Query('api_key') apiKey: string) {
     const storeId = await this.validateApiKey(apiKey);
-    return this.reviewService.getPublicSummary(storeId);
+    return this.publicReviewService.getPublicSummary(storeId);
   }
 
   @Get('featured')
@@ -90,7 +100,7 @@ export class PublicReviewController {
   ) {
     const storeId = await this.validateApiKey(apiKey);
 
-    return this.reviewService.getPublishedReviews(storeId, {
+    return this.publicReviewService.getPublishedReviews(storeId, {
       featured: true,
       size: limit ? parseInt(limit, 10) : 5,
       sortBy: 'createdAt',
@@ -109,14 +119,14 @@ export class PublicReviewController {
     const storeId = await this.validateApiKey(apiKey);
 
     // Get the review - it must be published and approved
-    const result = await this.reviewService.getPublishedReviews(storeId, {
+    const result = await this.publicReviewService.getPublishedReviews(storeId, {
       page: 1,
       size: 1,
     });
 
     // Find the specific review by filtering from published reviews
     // Note: For performance, we might want to add a getPublicReviewById method
-    const allReviews = await this.reviewService.getPublishedReviews(storeId, {
+    const allReviews = await this.publicReviewService.getPublishedReviews(storeId, {
       size: 1000, // Fetch more to find the specific one
     });
 
@@ -126,7 +136,7 @@ export class PublicReviewController {
     }
 
     // Increment view count
-    await this.reviewService.incrementViewCount(id);
+    await this.publicReviewService.incrementViewCount(id);
 
     return review;
   }
@@ -140,7 +150,7 @@ export class PublicReviewController {
     @Query('api_key') apiKey: string,
   ) {
     await this.validateApiKey(apiKey);
-    await this.reviewService.incrementHelpful(id);
+    await this.publicReviewService.incrementHelpful(id);
     return { success: true, message: 'Marked as helpful' };
   }
 
@@ -158,7 +168,7 @@ export class PublicReviewController {
   ) {
     const storeId = await this.validateApiKey(apiKey);
 
-    return this.reviewService.getPublishedReviews(storeId, {
+    return this.publicReviewService.getPublishedReviews(storeId, {
       productId,
       page: page ? parseInt(page, 10) : 1,
       size: size ? parseInt(size, 10) : 10,
