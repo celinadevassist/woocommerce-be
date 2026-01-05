@@ -203,6 +203,23 @@ export class ProductController {
     });
   }
 
+  @Get('variants/attributes')
+  @ApiOperation({ summary: 'Get all unique variant attributes for filtering' })
+  @ApiResponse({ status: 200, description: 'Attributes retrieved successfully' })
+  @ApiQuery({ name: 'storeId', required: false })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async getVariantAttributes(
+    @Query('storeId') storeId: string,
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    return await this.productService.getVariantAttributes(user._id.toString(), storeId);
+  }
+
   @Get('variants/:variantId')
   @ApiOperation({ summary: 'Get a single variant by ID' })
   @ApiResponse({ status: 200, description: 'Variant retrieved successfully' })
@@ -362,23 +379,6 @@ export class ProductController {
   ) {
     const shouldPush = pushToWoo !== 'false';
     return await this.productService.bulkUpdateVariants(user._id.toString(), dto, shouldPush);
-  }
-
-  @Get('variants/attributes')
-  @ApiOperation({ summary: 'Get all unique variant attributes for filtering' })
-  @ApiResponse({ status: 200, description: 'Attributes retrieved successfully' })
-  @ApiQuery({ name: 'storeId', required: false })
-  @UsePipes(
-    new JoiValidationPipe({
-      param: { lang: LanguageSchema },
-    }),
-  )
-  async getVariantAttributes(
-    @Query('storeId') storeId: string,
-    @User() user: UserDocument,
-    @Param('lang') lang: string,
-  ) {
-    return await this.productService.getVariantAttributes(user._id.toString(), storeId);
   }
 
   @Post('variants/search')
