@@ -20,7 +20,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger';
 import { ProductService } from './service';
-import { UpdateProductDto, UpdateProductSchema, UpdateStockDto, UpdateStockSchema, BulkUpdateProductDto, BulkUpdateProductSchema, BulkUpdateVariantDto, BulkUpdateVariantSchema } from './dto.update';
+import { UpdateProductDto, UpdateProductSchema, UpdateStockDto, UpdateStockSchema, BulkUpdateProductDto, BulkUpdateProductSchema, BulkUpdateVariantDto, BulkUpdateVariantSchema, CreateProductDto, CreateProductSchema, UpdateVariantDto, UpdateVariantSchema } from './dto.update';
 import { QueryProductDto, QueryProductSchema } from './dto.query';
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
 import { User } from '../decorators/user.decorator';
@@ -53,6 +53,27 @@ export class ProductController {
     @Param('lang') lang: string,
   ) {
     return await this.productService.findAll(user._id.toString(), query);
+  }
+
+  @Post()
+  @ApiOperation({ summary: 'Create a new product' })
+  @ApiResponse({ status: 201, description: 'Product created successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
+  @ApiQuery({ name: 'pushToWoo', required: false, type: Boolean, description: 'Push to WooCommerce (default: true)' })
+  @UsePipes(
+    new JoiValidationPipe({
+      body: CreateProductSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async create(
+    @Body() dto: CreateProductDto,
+    @Query('pushToWoo') pushToWoo: string,
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    const shouldPush = pushToWoo !== 'false';
+    return await this.productService.create(user._id.toString(), dto, shouldPush);
   }
 
   @Get('low-stock')
@@ -180,6 +201,45 @@ export class ProductController {
       sortBy,
       sortOrder,
     });
+  }
+
+  @Get('variants/:variantId')
+  @ApiOperation({ summary: 'Get a single variant by ID' })
+  @ApiResponse({ status: 200, description: 'Variant retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Variant not found' })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async findVariantById(
+    @Param('variantId') variantId: string,
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    return await this.productService.findVariantById(variantId, user._id.toString());
+  }
+
+  @Patch('variants/:variantId')
+  @ApiOperation({ summary: 'Update a single variant' })
+  @ApiResponse({ status: 200, description: 'Variant updated successfully' })
+  @ApiResponse({ status: 404, description: 'Variant not found' })
+  @ApiQuery({ name: 'pushToWoo', required: false, type: Boolean, description: 'Push to WooCommerce (default: true)' })
+  @UsePipes(
+    new JoiValidationPipe({
+      body: UpdateVariantSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async updateVariant(
+    @Param('variantId') variantId: string,
+    @Body() dto: UpdateVariantDto,
+    @Query('pushToWoo') pushToWoo: string,
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    const shouldPush = pushToWoo !== 'false';
+    return await this.productService.updateVariant(variantId, user._id.toString(), dto, shouldPush);
   }
 
   @Get(':id')

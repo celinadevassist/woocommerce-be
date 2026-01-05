@@ -9,7 +9,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Product, ProductDocument } from './schema';
 import { ProductVariant, ProductVariantDocument } from './variant.schema';
-import { UpdateProductDto, UpdateStockDto, BulkUpdateProductDto, BulkUpdateVariantDto } from './dto.update';
+import { UpdateProductDto, UpdateStockDto, BulkUpdateProductDto, BulkUpdateVariantDto, CreateProductDto, UpdateVariantDto } from './dto.update';
 import { QueryProductDto } from './dto.query';
 import { IProduct, IProductVariant, IProductWithVariants, IProductResponse } from './interface';
 import { StockStatus } from './enum';
@@ -163,6 +163,102 @@ export class ProductService {
       ...this.toProductInterface(product),
       variants: variants.map((v) => this.toVariantInterface(v)),
     };
+  }
+
+  /**
+   * Create a new product locally and push to WooCommerce
+   */
+  async create(
+    userId: string,
+    dto: CreateProductDto,
+    pushToWoo: boolean = true,
+  ): Promise<IProduct> {
+    // Verify user has access to store
+    const store = await this.verifyStoreAccess(dto.storeId, userId);
+
+    // Prepare WooCommerce product data
+    const wooProductData: any = {
+      name: dto.name,
+      type: dto.type || 'simple',
+      status: dto.status || 'draft',
+      description: dto.description || '',
+      short_description: dto.shortDescription || '',
+      regular_price: dto.regularPrice || '',
+      sale_price: dto.salePrice || '',
+      sku: dto.sku || '',
+      manage_stock: dto.manageStock ?? false,
+      stock_quantity: dto.stockQuantity,
+      stock_status: dto.stockStatus || 'instock',
+      weight: dto.weight || '',
+      categories: dto.categories?.map((id) => ({ id })) || [],
+      tags: dto.tags?.map((id) => ({ id })) || [],
+      images: dto.images?.map((img) => ({
+        src: img.src,
+        alt: img.alt || '',
+        name: img.name || '',
+      })) || [],
+    };
+
+    let wooProduct: WooProduct | null = null;
+
+    // Push to WooCommerce if requested
+    if (pushToWoo) {
+      const credentials = {
+        url: store.url,
+        consumerKey: store.credentials.consumerKey,
+        consumerSecret: store.credentials.consumerSecret,
+      };
+
+      wooProduct = await this.wooCommerceService.createProduct(credentials, wooProductData);
+    }
+
+    // Create local product
+    const productData: any = {
+      storeId: new Types.ObjectId(dto.storeId),
+      externalId: wooProduct?.id || 0,
+      name: dto.name,
+      type: dto.type || 'simple',
+      status: dto.status || 'draft',
+      description: dto.description || '',
+      shortDescription: dto.shortDescription || '',
+      regularPrice: dto.regularPrice || '',
+      salePrice: dto.salePrice || '',
+      price: dto.salePrice || dto.regularPrice || '',
+      sku: dto.sku || '',
+      manageStock: dto.manageStock ?? false,
+      stockQuantity: dto.stockQuantity,
+      stockStatus: dto.stockStatus || 'instock',
+      lowStockAmount: dto.lowStockAmount,
+      weight: dto.weight || '',
+      categories: wooProduct?.categories || dto.categories?.map((id) => ({ externalId: id })) || [],
+      tags: wooProduct?.tags || dto.tags?.map((id) => ({ externalId: id })) || [],
+      images: dto.images?.map((img, idx) => ({
+        src: img.src,
+        alt: img.alt || '',
+        name: img.name || '',
+        position: img.position ?? idx,
+      })) || [],
+      slug: wooProduct?.slug || '',
+      permalink: wooProduct?.permalink || '',
+      onSale: !!dto.salePrice,
+      purchasable: true,
+      featured: false,
+      catalogVisibility: 'visible',
+      virtual: false,
+      downloadable: false,
+      parentId: 0,
+      variationIds: [],
+      variationCount: 0,
+      pendingSync: !pushToWoo,
+      lastSyncedAt: pushToWoo ? new Date() : undefined,
+      isDeleted: false,
+    };
+
+    const product = await this.productModel.create(productData);
+
+    this.logger.log(`Created product ${product._id} (WooCommerce ID: ${wooProduct?.id || 'not synced'})`);
+
+    return this.toProductInterface(product);
   }
 
   /**
@@ -433,6 +529,99 @@ export class ProductService {
     }
 
     return { updated, failed, results };
+  }
+
+  /**
+   * Update a single variant locally and optionally push to WooCommerce
+   */
+  async updateVariant(
+    variantId: string,
+    userId: string,
+    dto: UpdateVariantDto,
+    pushToWoo: boolean = true,
+  ): Promise<IProductVariant> {
+    const variant = await this.variantModel.findOne({
+      _id: new Types.ObjectId(variantId),
+      isDeleted: false,
+    });
+
+    if (!variant) {
+      throw new NotFoundException('Variant not found');
+    }
+
+    await this.verifyStoreAccess(variant.storeId.toString(), userId);
+
+    // Update variant fields
+    if (dto.regularPrice !== undefined) {
+      variant.regularPrice = dto.regularPrice;
+      variant.price = dto.salePrice || dto.regularPrice;
+    }
+    if (dto.salePrice !== undefined) {
+      variant.salePrice = dto.salePrice;
+      if (dto.salePrice) {
+        variant.price = dto.salePrice;
+        variant.onSale = true;
+      } else {
+        variant.onSale = false;
+        if (variant.regularPrice) {
+          variant.price = variant.regularPrice;
+        }
+      }
+    }
+    if (dto.sku !== undefined) {
+      variant.sku = dto.sku;
+    }
+    if (dto.manageStock !== undefined) {
+      variant.manageStock = dto.manageStock;
+    }
+    if (dto.stockQuantity !== undefined) {
+      variant.stockQuantity = dto.stockQuantity;
+      if (dto.stockQuantity === 0) {
+        variant.stockStatus = StockStatus.OUT_OF_STOCK;
+      } else {
+        variant.stockStatus = StockStatus.IN_STOCK;
+      }
+    }
+    if (dto.stockStatus !== undefined) {
+      variant.stockStatus = dto.stockStatus;
+    }
+    if (dto.status !== undefined) {
+      variant.status = dto.status;
+    }
+    if (dto.weight !== undefined) {
+      variant.weight = dto.weight;
+    }
+    if (dto.description !== undefined) {
+      variant.description = dto.description;
+    }
+
+    variant.pendingSync = !pushToWoo;
+    await variant.save();
+
+    // Push to WooCommerce
+    if (pushToWoo && variant.externalId) {
+      await this.syncVariantToWoo(variant);
+    }
+
+    return this.toVariantInterface(variant);
+  }
+
+  /**
+   * Get variant by ID
+   */
+  async findVariantById(variantId: string, userId: string): Promise<IProductVariant> {
+    const variant = await this.variantModel.findOne({
+      _id: new Types.ObjectId(variantId),
+      isDeleted: false,
+    });
+
+    if (!variant) {
+      throw new NotFoundException('Variant not found');
+    }
+
+    await this.verifyStoreAccess(variant.storeId.toString(), userId);
+
+    return this.toVariantInterface(variant);
   }
 
   /**
