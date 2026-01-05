@@ -808,22 +808,27 @@ export class ProductService {
       consumerSecret: store.credentials.consumerSecret,
     };
 
-    await this.wooCommerceService.updateProduct(credentials, product.externalId, {
-      name: product.name,
-      description: product.description,
-      short_description: product.shortDescription,
-      regular_price: product.regularPrice,
-      sale_price: product.salePrice,
-      sku: product.sku,
-      status: product.status,
-      manage_stock: product.manageStock,
-      stock_quantity: product.stockQuantity,
-      stock_status: product.stockStatus,
-    });
+    try {
+      await this.wooCommerceService.updateProduct(credentials, product.externalId, {
+        name: product.name,
+        description: product.description,
+        short_description: product.shortDescription,
+        regular_price: product.regularPrice,
+        sale_price: product.salePrice,
+        sku: product.sku,
+        status: product.status,
+        manage_stock: product.manageStock,
+        stock_quantity: product.stockQuantity,
+        stock_status: product.stockStatus,
+      });
 
-    product.pendingSync = false;
-    product.lastSyncedAt = new Date();
-    await product.save();
+      product.pendingSync = false;
+      product.lastSyncedAt = new Date();
+      await product.save();
+    } catch (error) {
+      this.logger.error(`Failed to sync product to WooCommerce: ${error.message}`, error.stack);
+      throw new BadRequestException(`Failed to sync product to WooCommerce: ${error.message}`);
+    }
   }
 
   /**
