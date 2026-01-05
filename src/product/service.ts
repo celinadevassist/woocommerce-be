@@ -174,7 +174,7 @@ export class ProductService {
     pushToWoo: boolean = true,
   ): Promise<IProduct> {
     // Verify user has access to store
-    const store = await this.verifyStoreAccess(dto.storeId, userId);
+    await this.verifyStoreAccess(dto.storeId, userId);
 
     // Prepare WooCommerce product data
     const wooProductData: any = {
@@ -203,13 +203,27 @@ export class ProductService {
 
     // Push to WooCommerce if requested
     if (pushToWoo) {
+      // Fetch store with credentials
+      const store = await this.storeModel
+        .findById(dto.storeId)
+        .select('+credentials');
+
+      if (!store) {
+        throw new NotFoundException('Store not found');
+      }
+
       const credentials = {
         url: store.url,
         consumerKey: store.credentials.consumerKey,
         consumerSecret: store.credentials.consumerSecret,
       };
 
-      wooProduct = await this.wooCommerceService.createProduct(credentials, wooProductData);
+      try {
+        wooProduct = await this.wooCommerceService.createProduct(credentials, wooProductData);
+      } catch (error) {
+        this.logger.error(`Failed to create product in WooCommerce: ${error.message}`, error.stack);
+        throw new BadRequestException(`Failed to create product in WooCommerce: ${error.message}`);
+      }
     }
 
     // Create local product
