@@ -1118,6 +1118,9 @@ export class ProductService {
       stockStatus?: string;
       status?: string;
       lowStock?: boolean;
+      minPrice?: number;
+      maxPrice?: number;
+      attributes?: { name: string; values: string[] }[];
       page?: number;
       size?: number;
       sortBy?: string;
@@ -1160,6 +1163,45 @@ export class ProductService {
         { sku: { $regex: query.keyword, $options: 'i' } },
         { 'attributes.option': { $regex: query.keyword, $options: 'i' } },
       ];
+    }
+
+    // Price range filter
+    if (query.minPrice !== undefined || query.maxPrice !== undefined) {
+      filter.$expr = filter.$expr || { $and: [] };
+      if (!Array.isArray(filter.$expr.$and)) {
+        filter.$expr = { $and: [filter.$expr] };
+      }
+
+      // Convert price string to number for comparison
+      if (query.minPrice !== undefined) {
+        filter.$expr.$and.push({
+          $gte: [{ $toDouble: { $ifNull: ['$price', '$regularPrice'] } }, query.minPrice],
+        });
+      }
+      if (query.maxPrice !== undefined) {
+        filter.$expr.$and.push({
+          $lte: [{ $toDouble: { $ifNull: ['$price', '$regularPrice'] } }, query.maxPrice],
+        });
+      }
+    }
+
+    // Attribute filters (e.g., Color: Red, Size: L)
+    if (query.attributes && query.attributes.length > 0) {
+      const attrConditions = query.attributes.map((attr) => ({
+        attributes: {
+          $elemMatch: {
+            name: { $regex: `^${attr.name}$`, $options: 'i' },
+            option: { $in: attr.values },
+          },
+        },
+      }));
+
+      if (attrConditions.length === 1) {
+        Object.assign(filter, attrConditions[0]);
+      } else {
+        filter.$and = filter.$and || [];
+        filter.$and.push(...attrConditions);
+      }
     }
 
     const page = query.page || 1;

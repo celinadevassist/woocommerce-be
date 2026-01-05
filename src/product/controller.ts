@@ -121,11 +121,14 @@ export class ProductController {
   @ApiOperation({ summary: 'Get all variants with filters and pagination' })
   @ApiResponse({ status: 200, description: 'Variants retrieved successfully' })
   @ApiQuery({ name: 'storeId', required: false })
-  @ApiQuery({ name: 'productId', required: false })
+  @ApiQuery({ name: 'productId', required: false, description: 'Filter by parent product ID' })
   @ApiQuery({ name: 'keyword', required: false })
   @ApiQuery({ name: 'stockStatus', required: false })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'lowStock', required: false, type: Boolean })
+  @ApiQuery({ name: 'minPrice', required: false, type: Number, description: 'Minimum price filter' })
+  @ApiQuery({ name: 'maxPrice', required: false, type: Number, description: 'Maximum price filter' })
+  @ApiQuery({ name: 'attributes', required: false, description: 'JSON string of attribute filters' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'size', required: false, type: Number })
   @ApiQuery({ name: 'sortBy', required: false })
@@ -142,6 +145,9 @@ export class ProductController {
     @Query('stockStatus') stockStatus: string,
     @Query('status') status: string,
     @Query('lowStock') lowStock: string,
+    @Query('minPrice') minPrice: string,
+    @Query('maxPrice') maxPrice: string,
+    @Query('attributes') attributes: string,
     @Query('page') page: string,
     @Query('size') size: string,
     @Query('sortBy') sortBy: string,
@@ -149,6 +155,16 @@ export class ProductController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
+    // Parse attributes JSON if provided
+    let parsedAttributes;
+    if (attributes) {
+      try {
+        parsedAttributes = JSON.parse(attributes);
+      } catch (e) {
+        // Invalid JSON, ignore
+      }
+    }
+
     return await this.productService.findAllVariants(user._id.toString(), {
       storeId,
       productId,
@@ -156,6 +172,9 @@ export class ProductController {
       stockStatus,
       status,
       lowStock: lowStock === 'true',
+      minPrice: minPrice ? parseFloat(minPrice) : undefined,
+      maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
+      attributes: parsedAttributes,
       page: page ? parseInt(page, 10) : undefined,
       size: size ? parseInt(size, 10) : undefined,
       sortBy,
