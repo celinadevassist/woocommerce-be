@@ -45,6 +45,9 @@ import { OrderItemModule } from './order-item/module';
 import { RunningCostsModule } from './running-costs/module';
 import { FixedAssetsModule } from './fixed-assets/module';
 import { ReviewRequestModule } from './review-request/module';
+import { ShippingModule } from './shipping/module';
+import { PluginsModule } from './plugins/module';
+import { StoreSettingsModule } from './store-settings/module';
 
 @Module({
   imports: [
@@ -94,6 +97,9 @@ import { ReviewRequestModule } from './review-request/module';
     RunningCostsModule,
     FixedAssetsModule,
     ReviewRequestModule,
+    ShippingModule,
+    PluginsModule,
+    StoreSettingsModule,
   ],
   controllers: [HealthController],
   providers: [ValidationPipe],

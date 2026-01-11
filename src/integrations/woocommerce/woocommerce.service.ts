@@ -27,6 +27,14 @@ import {
   WooTagFull,
   WooTagCreate,
   WooTagUpdate,
+  WooShippingZone,
+  WooShippingZoneCreate,
+  WooShippingZoneUpdate,
+  WooShippingZoneLocation,
+  WooShippingZoneMethod,
+  WooShippingZoneMethodCreate,
+  WooShippingZoneMethodUpdate,
+  WooShippingMethod,
 } from './woocommerce.types';
 import {
   IPlatformAdapter,
@@ -820,5 +828,316 @@ export class WooCommerceService implements IPlatformAdapter {
       return 'Connection timed out. Please try again.';
     }
     return error.message || 'Unknown error occurred';
+  }
+
+  // ============== SHIPPING ZONES ==============
+
+  /**
+   * Get all shipping zones
+   */
+  async getShippingZones(credentials: WooCommerceCredentials): Promise<WooShippingZone[]> {
+    return this.request<WooShippingZone[]>(credentials, 'GET', 'shipping/zones');
+  }
+
+  /**
+   * Get a single shipping zone
+   */
+  async getShippingZone(credentials: WooCommerceCredentials, zoneId: number): Promise<WooShippingZone> {
+    return this.request<WooShippingZone>(credentials, 'GET', `shipping/zones/${zoneId}`);
+  }
+
+  /**
+   * Create a shipping zone
+   */
+  async createShippingZone(
+    credentials: WooCommerceCredentials,
+    data: WooShippingZoneCreate,
+  ): Promise<WooShippingZone> {
+    return this.request<WooShippingZone>(credentials, 'POST', 'shipping/zones', undefined, data);
+  }
+
+  /**
+   * Update a shipping zone
+   */
+  async updateShippingZone(
+    credentials: WooCommerceCredentials,
+    zoneId: number,
+    data: WooShippingZoneUpdate,
+  ): Promise<WooShippingZone> {
+    return this.request<WooShippingZone>(credentials, 'PUT', `shipping/zones/${zoneId}`, undefined, data);
+  }
+
+  /**
+   * Delete a shipping zone
+   */
+  async deleteShippingZone(
+    credentials: WooCommerceCredentials,
+    zoneId: number,
+    force: boolean = true,
+  ): Promise<WooShippingZone> {
+    return this.request<WooShippingZone>(credentials, 'DELETE', `shipping/zones/${zoneId}`, { force });
+  }
+
+  // ============== SHIPPING ZONE LOCATIONS ==============
+
+  /**
+   * Get locations for a shipping zone
+   */
+  async getShippingZoneLocations(
+    credentials: WooCommerceCredentials,
+    zoneId: number,
+  ): Promise<WooShippingZoneLocation[]> {
+    return this.request<WooShippingZoneLocation[]>(credentials, 'GET', `shipping/zones/${zoneId}/locations`);
+  }
+
+  /**
+   * Update locations for a shipping zone (replaces all locations)
+   */
+  async updateShippingZoneLocations(
+    credentials: WooCommerceCredentials,
+    zoneId: number,
+    locations: WooShippingZoneLocation[],
+  ): Promise<WooShippingZoneLocation[]> {
+    return this.request<WooShippingZoneLocation[]>(
+      credentials,
+      'PUT',
+      `shipping/zones/${zoneId}/locations`,
+      undefined,
+      locations,
+    );
+  }
+
+  // ============== SHIPPING ZONE METHODS ==============
+
+  /**
+   * Get methods for a shipping zone
+   */
+  async getShippingZoneMethods(
+    credentials: WooCommerceCredentials,
+    zoneId: number,
+  ): Promise<WooShippingZoneMethod[]> {
+    return this.request<WooShippingZoneMethod[]>(credentials, 'GET', `shipping/zones/${zoneId}/methods`);
+  }
+
+  /**
+   * Get a single method from a shipping zone
+   */
+  async getShippingZoneMethod(
+    credentials: WooCommerceCredentials,
+    zoneId: number,
+    instanceId: number,
+  ): Promise<WooShippingZoneMethod> {
+    return this.request<WooShippingZoneMethod>(
+      credentials,
+      'GET',
+      `shipping/zones/${zoneId}/methods/${instanceId}`,
+    );
+  }
+
+  /**
+   * Add a method to a shipping zone
+   */
+  async createShippingZoneMethod(
+    credentials: WooCommerceCredentials,
+    zoneId: number,
+    data: WooShippingZoneMethodCreate,
+  ): Promise<WooShippingZoneMethod> {
+    return this.request<WooShippingZoneMethod>(
+      credentials,
+      'POST',
+      `shipping/zones/${zoneId}/methods`,
+      undefined,
+      data,
+    );
+  }
+
+  /**
+   * Update a method in a shipping zone
+   */
+  async updateShippingZoneMethod(
+    credentials: WooCommerceCredentials,
+    zoneId: number,
+    instanceId: number,
+    data: WooShippingZoneMethodUpdate,
+  ): Promise<WooShippingZoneMethod> {
+    return this.request<WooShippingZoneMethod>(
+      credentials,
+      'PUT',
+      `shipping/zones/${zoneId}/methods/${instanceId}`,
+      undefined,
+      data,
+    );
+  }
+
+  /**
+   * Delete a method from a shipping zone
+   */
+  async deleteShippingZoneMethod(
+    credentials: WooCommerceCredentials,
+    zoneId: number,
+    instanceId: number,
+    force: boolean = true,
+  ): Promise<WooShippingZoneMethod> {
+    return this.request<WooShippingZoneMethod>(
+      credentials,
+      'DELETE',
+      `shipping/zones/${zoneId}/methods/${instanceId}`,
+      { force },
+    );
+  }
+
+  // ============== SHIPPING METHODS (Available Types) ==============
+
+  /**
+   * Get all available shipping method types
+   */
+  async getShippingMethods(credentials: WooCommerceCredentials): Promise<WooShippingMethod[]> {
+    return this.request<WooShippingMethod[]>(credentials, 'GET', 'shipping_methods');
+  }
+
+  /**
+   * Get a single shipping method type
+   */
+  async getShippingMethod(credentials: WooCommerceCredentials, methodId: string): Promise<WooShippingMethod> {
+    return this.request<WooShippingMethod>(credentials, 'GET', `shipping_methods/${methodId}`);
+  }
+
+  // ============== DATA (Countries/States) ==============
+
+  /**
+   * Get all countries with their states
+   */
+  async getCountries(credentials: WooCommerceCredentials): Promise<any[]> {
+    return this.request<any[]>(credentials, 'GET', 'data/countries');
+  }
+
+  /**
+   * Get a single country with its states
+   */
+  async getCountry(credentials: WooCommerceCredentials, countryCode: string): Promise<any> {
+    return this.request<any>(credentials, 'GET', `data/countries/${countryCode}`);
+  }
+
+  // ============== CARTFLOW CUSTOM LOCATIONS (via WordPress Plugin) ==============
+
+  /**
+   * Build URL for CartFlow Locations plugin API
+   */
+  private buildCartFlowApiUrl(credentials: WooCommerceCredentials, endpoint: string): string {
+    const baseUrl = credentials.url.replace(/\/+$/, '');
+    return `${baseUrl}/wp-json/cartflow/v1/${endpoint}`;
+  }
+
+  /**
+   * Make request to CartFlow Locations plugin
+   */
+  private async cartflowRequest<T>(
+    credentials: WooCommerceCredentials,
+    method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+    endpoint: string,
+    data?: any,
+  ): Promise<T> {
+    const url = this.buildCartFlowApiUrl(credentials, endpoint);
+    const config: AxiosRequestConfig = {
+      ...this.getAuthConfig(credentials),
+      method,
+      url,
+      data,
+    };
+
+    try {
+      const response = await firstValueFrom(this.httpService.request<T>(config));
+      return response.data;
+    } catch (error) {
+      this.logger.error(`CartFlow Locations API error: ${method} ${endpoint}`, error.message);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all custom states from CartFlow Locations plugin
+   */
+  async getCustomStates(credentials: WooCommerceCredentials): Promise<Record<string, Record<string, string>>> {
+    return this.cartflowRequest<Record<string, Record<string, string>>>(
+      credentials,
+      'GET',
+      'locations/states',
+    );
+  }
+
+  /**
+   * Add a custom state via CartFlow Locations plugin
+   */
+  async addCustomState(
+    credentials: WooCommerceCredentials,
+    countryCode: string,
+    stateCode: string,
+    stateName: string,
+  ): Promise<{ success: boolean; message: string; state: any }> {
+    return this.cartflowRequest(
+      credentials,
+      'POST',
+      'locations/states',
+      { country_code: countryCode, state_code: stateCode, state_name: stateName },
+    );
+  }
+
+  /**
+   * Update a custom state via CartFlow Locations plugin
+   */
+  async updateCustomState(
+    credentials: WooCommerceCredentials,
+    countryCode: string,
+    stateCode: string,
+    stateName: string,
+  ): Promise<{ success: boolean; message: string; state: any }> {
+    return this.cartflowRequest(
+      credentials,
+      'PUT',
+      `locations/states/${countryCode}/${stateCode}`,
+      { state_name: stateName },
+    );
+  }
+
+  /**
+   * Delete a custom state via CartFlow Locations plugin
+   */
+  async deleteCustomState(
+    credentials: WooCommerceCredentials,
+    countryCode: string,
+    stateCode: string,
+  ): Promise<{ success: boolean; message: string }> {
+    return this.cartflowRequest(
+      credentials,
+      'DELETE',
+      `locations/states/${countryCode}/${stateCode}`,
+    );
+  }
+
+  /**
+   * Bulk update states for a country via CartFlow Locations plugin
+   */
+  async bulkUpdateStates(
+    credentials: WooCommerceCredentials,
+    countryCode: string,
+    states: Array<{ code: string; name: string }>,
+  ): Promise<{ success: boolean; message: string; states: Record<string, string> }> {
+    return this.cartflowRequest(
+      credentials,
+      'POST',
+      `locations/states/${countryCode}/bulk`,
+      { states },
+    );
+  }
+
+  /**
+   * Get all countries with states (including custom) from CartFlow Locations plugin
+   */
+  async getCountriesWithCustomStates(credentials: WooCommerceCredentials): Promise<any[]> {
+    return this.cartflowRequest<any[]>(
+      credentials,
+      'GET',
+      'locations/countries',
+    );
   }
 }

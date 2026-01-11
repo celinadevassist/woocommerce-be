@@ -435,3 +435,85 @@ export interface WooAttributeTermUpdate {
   description?: string;
   menu_order?: number;
 }
+
+// ============== SHIPPING TYPES ==============
+
+// Shipping Zone
+export interface WooShippingZone {
+  id: number;
+  name: string;
+  order: number;
+}
+
+export interface WooShippingZoneCreate {
+  name: string;
+  order?: number;
+}
+
+export interface WooShippingZoneUpdate {
+  name?: string;
+  order?: number;
+}
+
+// Shipping Zone Location
+export interface WooShippingZoneLocation {
+  code: string;
+  type: 'postcode' | 'state' | 'country' | 'continent';
+}
+
+// Shipping Zone Method
+export interface WooShippingZoneMethod {
+  instance_id: number;
+  title: string;
+  order: number;
+  enabled: boolean;
+  method_id: string;
+  method_title: string;
+  method_description: string;
+  settings: WooShippingMethodSettings;
+}
+
+export interface WooShippingMethodSettings {
+  title?: WooShippingSetting;
+  tax_status?: WooShippingSetting;
+  cost?: WooShippingSetting;
+  class_costs?: WooShippingSetting;
+  no_class_cost?: WooShippingSetting;
+  type?: WooShippingSetting;
+  requires?: WooShippingSetting;
+  min_amount?: WooShippingSetting;
+  ignore_discounts?: WooShippingSetting;
+  [key: string]: WooShippingSetting | undefined;
+}
+
+export interface WooShippingSetting {
+  id: string;
+  label: string;
+  description: string;
+  type: string;
+  value: string;
+  default: string;
+  tip: string;
+  placeholder: string;
+  options?: { [key: string]: string };
+}
+
+export interface WooShippingZoneMethodCreate {
+  method_id: string;
+  order?: number;
+  enabled?: boolean;
+  settings?: { [key: string]: string };
+}
+
+export interface WooShippingZoneMethodUpdate {
+  order?: number;
+  enabled?: boolean;
+  settings?: { [key: string]: string };
+}
+
+// Available Shipping Methods (system-wide)
+export interface WooShippingMethod {
+  id: string;
+  title: string;
+  description: string;
+}
