@@ -263,39 +263,60 @@ export class LocationLibraryService {
     storeId: string,
     countryCode: string,
     stateIds?: string[],
-  ): Promise<{ success: boolean; synced: number; message: string }> {
-    // Get states to sync
+  ): Promise<{ success: boolean; synced: number; groupsSynced: number; message: string }> {
+    // Get states to sync (with populated groups)
     let states: LocalStateDocument[];
     if (stateIds && stateIds.length > 0) {
       states = await this.localStateModel.find({
         _id: { $in: stateIds.map((id) => new Types.ObjectId(id)) },
         ownerId: new Types.ObjectId(userId),
         countryCode: countryCode.toUpperCase(),
-      });
+      }).populate('groups');
     } else {
       states = await this.localStateModel.find({
         ownerId: new Types.ObjectId(userId),
         countryCode: countryCode.toUpperCase(),
-      });
+      }).populate('groups');
     }
 
     if (states.length === 0) {
       throw new BadRequestException('No states found to sync');
     }
 
-    // Format for bulk update
+    // Get groups for this country
+    const groups = await this.stateGroupModel.find({
+      ownerId: new Types.ObjectId(userId),
+      countryCode: countryCode.toUpperCase(),
+    });
+
+    // Format groups for sync
+    const groupsToSync = groups.map((g) => ({
+      name: g.name,
+      color: g.color,
+      description: g.description,
+    }));
+
+    // Format states for bulk update (include group names)
     const statesToSync = states.map((s) => ({
       code: s.stateCode,
       name: s.stateName,
+      groups: (s.groups as any[]).map((g) => g.name), // Group names for WooCommerce
     }));
 
     // Call shipping service to sync
     try {
-      await this.shippingService.bulkUpdateStates(storeId, userId, countryCode.toUpperCase(), statesToSync);
+      const result = await this.shippingService.bulkUpdateStates(
+        storeId,
+        userId,
+        countryCode.toUpperCase(),
+        statesToSync,
+        groupsToSync,
+      );
       return {
         success: true,
         synced: states.length,
-        message: `Successfully synced ${states.length} states to store`,
+        groupsSynced: result.groups_synced || groups.length,
+        message: `Successfully synced ${states.length} states and ${groups.length} groups to store`,
       };
     } catch (error) {
       this.logger.error(`Failed to sync states to store: ${error.message}`);

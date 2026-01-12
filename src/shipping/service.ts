@@ -549,8 +549,9 @@ export class ShippingService {
     storeId: string,
     userId: string,
     countryCode: string,
-    states: Array<{ code: string; name: string }>,
-  ): Promise<{ success: boolean; message: string; states: Record<string, string> }> {
+    states: Array<{ code: string; name: string; groups?: string[] }>,
+    groups?: Array<{ name: string; color?: string; description?: string }>,
+  ): Promise<{ success: boolean; message: string; states: Record<string, string>; groups_synced?: number }> {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
@@ -558,6 +559,7 @@ export class ShippingService {
         credentials,
         countryCode,
         states,
+        groups,
       );
     } catch (error) {
       if (error.response?.status === 404) {

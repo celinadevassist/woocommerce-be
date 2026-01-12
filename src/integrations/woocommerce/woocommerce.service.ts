@@ -1120,13 +1120,14 @@ export class WooCommerceService implements IPlatformAdapter {
   async bulkUpdateStates(
     credentials: WooCommerceCredentials,
     countryCode: string,
-    states: Array<{ code: string; name: string }>,
-  ): Promise<{ success: boolean; message: string; states: Record<string, string> }> {
+    states: Array<{ code: string; name: string; groups?: string[] }>,
+    groups?: Array<{ name: string; color?: string; description?: string }>,
+  ): Promise<{ success: boolean; message: string; states: Record<string, string>; groups_synced?: number }> {
     return this.cartflowRequest(
       credentials,
       'POST',
       `locations/states/${countryCode}/bulk`,
-      { states },
+      { states, groups },
     );
   }
 
