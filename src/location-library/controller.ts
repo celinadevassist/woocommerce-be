@@ -1,10 +1,10 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, UsePipes } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/jwt.guard';
 import { User } from '../decorators/user.decorator';
 import { UserDocument } from '../schema/user.schema';
-import { JoiValidationPipe } from '../pipes/joi-validation.pipe';
-import { LanguageSchema } from '../dtos/language.dto';
+import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
+import { LanguageSchema } from '../dtos/lang.dto';
 import { LocationLibraryService } from './service';
 import {
   CreateStateGroupDto,
@@ -23,7 +23,7 @@ import {
 
 @ApiTags('Location Library')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@UseGuards(AuthGuard('jwt'))
 @Controller(':lang/location-library')
 export class LocationLibraryController {
   constructor(private readonly locationLibraryService: LocationLibraryService) {}
