@@ -48,6 +48,7 @@ import { ReviewRequestModule } from './review-request/module';
 import { ShippingModule } from './shipping/module';
 import { PluginsModule } from './plugins/module';
 import { StoreSettingsModule } from './store-settings/module';
+import { LocationLibraryModule } from './location-library/module';
 
 @Module({
   imports: [
@@ -100,6 +101,7 @@ import { StoreSettingsModule } from './store-settings/module';
     ShippingModule,
     PluginsModule,
     StoreSettingsModule,
+    LocationLibraryModule,
   ],
   controllers: [HealthController],
   providers: [ValidationPipe],
