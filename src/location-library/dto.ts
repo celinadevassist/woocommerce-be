@@ -162,5 +162,5 @@ export class SyncToStoreDto {
 export const SyncToStoreSchema = Joi.object({
   storeId: Joi.string().required().hex().length(24),
   countryCode: Joi.string().required().length(2).uppercase(),
-  stateIds: Joi.array().items(Joi.string().hex().length(24)).optional(),
+  stateIds: Joi.array().items(Joi.string().hex().length(24)).optional().allow(null),
 });
