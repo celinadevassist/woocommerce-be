@@ -9,7 +9,7 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Order, OrderDocument } from './schema';
-import { UpdateOrderDto, AddTrackingDto, AddOrderNoteDto } from './dto.update';
+import { UpdateOrderDto, AddTrackingDto, AddOrderNoteDto, BatchOrdersDto, BatchCreateOrderItemDto, BatchUpdateOrderItemDto } from './dto.update';
 import { QueryOrderDto } from './dto.query';
 import { IOrder, IOrderResponse, IOrderStats, ICreateManualOrderDto } from './interface';
 import { OrderStatus, PaymentStatus, FulfillmentStatus, OrderSource } from './enum';
@@ -59,11 +59,17 @@ export class OrderService {
   /**
    * Verify user has access to a specific store
    */
-  private async verifyStoreAccess(storeId: string, userId: string): Promise<StoreDocument> {
-    const store = await this.storeModel.findOne({
+  private async verifyStoreAccess(storeId: string, userId: string, includeCredentials = false): Promise<StoreDocument> {
+    let query = this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       isDeleted: false,
     });
+
+    if (includeCredentials) {
+      query = query.select('+credentials');
+    }
+
+    const store = await query;
 
     if (!store) {
       throw new NotFoundException('Store not found');
@@ -1343,6 +1349,274 @@ export class OrderService {
 
     this.logger.log(`Order ${originalOrder.orderNumber} cloned to ${newOrder.orderNumber}`);
     return this.findById(newOrder._id, userId);
+  }
+
+  // ========================
+  // WooCommerce Batch Operations
+  // ========================
+
+  /**
+   * Map CartFlow status to valid WooCommerce status
+   * WooCommerce only supports: pending, processing, on-hold, completed, cancelled, refunded, failed, trash
+   */
+  private mapToWooCommerceStatus(status: string): string {
+    const statusMap: Record<string, string> = {
+      // Direct mappings
+      'pending': 'pending',
+      'processing': 'processing',
+      'on-hold': 'on-hold',
+      'completed': 'completed',
+      'cancelled': 'cancelled',
+      'refunded': 'refunded',
+      'failed': 'failed',
+      'trash': 'trash',
+      // CartFlow-specific mappings
+      'draft': 'pending',        // Draft → Pending
+      'confirmed': 'processing', // Confirmed → Processing
+      'shipped': 'completed',    // Shipped → Completed (WooCommerce has no shipped status)
+      'delivered': 'completed',  // Delivered → Completed
+    };
+    return statusMap[status] || 'processing';
+  }
+
+  /**
+   * Batch create, update, and delete orders in WooCommerce
+   * This is a direct pass-through to WooCommerce's batch API
+   */
+  async batchOrders(
+    userId: string,
+    dto: BatchOrdersDto,
+  ): Promise<{
+    create?: { success: IOrder[]; failed: Array<{ index: number; error: string }> };
+    update?: { success: IOrder[]; failed: Array<{ id: number; error: string }> };
+    delete?: { success: IOrder[]; failed: Array<{ id: number; error: string }> };
+  }> {
+    const store = await this.verifyStoreAccess(dto.storeId, userId, true);
+
+    const credentials = {
+      url: store.url,
+      consumerKey: store.credentials.consumerKey,
+      consumerSecret: store.credentials.consumerSecret,
+    };
+
+    const result: {
+      create?: { success: IOrder[]; failed: Array<{ index: number; error: string }> };
+      update?: { success: IOrder[]; failed: Array<{ id: number; error: string }> };
+      delete?: { success: IOrder[]; failed: Array<{ id: number; error: string }> };
+    } = {};
+
+    try {
+      // Map CartFlow statuses to WooCommerce statuses
+      const mappedCreate = dto.create?.map(order => ({
+        ...order,
+        status: order.status ? this.mapToWooCommerceStatus(order.status) : undefined,
+      }));
+
+      const mappedUpdate = dto.update?.map(order => ({
+        ...order,
+        status: order.status ? this.mapToWooCommerceStatus(order.status) : undefined,
+      }));
+
+      // Call WooCommerce batch API
+      const wooResponse = await this.wooCommerceService.batchOrders(credentials, {
+        create: mappedCreate,
+        update: mappedUpdate,
+        delete: dto.delete,
+      });
+
+      // Process created orders
+      if (wooResponse.create && wooResponse.create.length > 0) {
+        result.create = { success: [], failed: [] };
+        for (let i = 0; i < wooResponse.create.length; i++) {
+          const wooOrder = wooResponse.create[i];
+          try {
+            // Upsert created order to local database
+            const localOrder = await this.upsertFromWoo(dto.storeId, wooOrder);
+            result.create.success.push(this.toInterface(localOrder));
+          } catch (error) {
+            result.create.failed.push({ index: i, error: error.message });
+            this.logger.error(`Failed to save created order ${wooOrder.id} locally: ${error.message}`);
+          }
+        }
+      }
+
+      // Process updated orders
+      if (wooResponse.update && wooResponse.update.length > 0) {
+        result.update = { success: [], failed: [] };
+        for (const wooOrder of wooResponse.update) {
+          try {
+            // Upsert updated order to local database
+            const localOrder = await this.upsertFromWoo(dto.storeId, wooOrder);
+            result.update.success.push(this.toInterface(localOrder));
+          } catch (error) {
+            result.update.failed.push({ id: wooOrder.id, error: error.message });
+            this.logger.error(`Failed to update order ${wooOrder.id} locally: ${error.message}`);
+          }
+        }
+      }
+
+      // Process deleted orders
+      if (wooResponse.delete && wooResponse.delete.length > 0) {
+        result.delete = { success: [], failed: [] };
+        for (const wooOrder of wooResponse.delete) {
+          try {
+            // Mark order as deleted in local database
+            const localOrder = await this.orderModel.findOne({
+              storeId: new Types.ObjectId(dto.storeId),
+              externalId: wooOrder.id,
+            });
+            if (localOrder) {
+              localOrder.isDeleted = true;
+              await localOrder.save();
+              result.delete.success.push(this.toInterface(localOrder));
+            } else {
+              // Order not in local database, just report as success
+              result.delete.success.push({ _id: '', externalId: wooOrder.id } as any);
+            }
+          } catch (error) {
+            result.delete.failed.push({ id: wooOrder.id, error: error.message });
+            this.logger.error(`Failed to delete order ${wooOrder.id} locally: ${error.message}`);
+          }
+        }
+      }
+
+      this.logger.log(
+        `Batch orders completed: created=${result.create?.success.length || 0}, ` +
+        `updated=${result.update?.success.length || 0}, deleted=${result.delete?.success.length || 0}`,
+      );
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Batch orders failed: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Create a single order in WooCommerce and sync to local database
+   */
+  async createWooOrder(
+    userId: string,
+    storeId: string,
+    orderData: BatchCreateOrderItemDto,
+  ): Promise<IOrder> {
+    const store = await this.verifyStoreAccess(storeId, userId, true);
+
+    const credentials = {
+      url: store.url,
+      consumerKey: store.credentials.consumerKey,
+      consumerSecret: store.credentials.consumerSecret,
+    };
+
+    try {
+      // Create order in WooCommerce
+      const wooOrder = await this.wooCommerceService.createOrder(credentials, orderData);
+
+      // Upsert to local database
+      const localOrder = await this.upsertFromWoo(storeId, wooOrder);
+
+      this.logger.log(`WooCommerce order ${wooOrder.id} created and synced locally`);
+      return this.toInterface(localOrder);
+    } catch (error) {
+      this.logger.error(`Failed to create WooCommerce order: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Delete an order from WooCommerce and mark as deleted locally
+   */
+  async deleteWooOrder(
+    userId: string,
+    storeId: string,
+    wooOrderId: number,
+    force: boolean = false,
+  ): Promise<{ success: boolean; message: string }> {
+    const store = await this.verifyStoreAccess(storeId, userId, true);
+
+    const credentials = {
+      url: store.url,
+      consumerKey: store.credentials.consumerKey,
+      consumerSecret: store.credentials.consumerSecret,
+    };
+
+    try {
+      // Delete from WooCommerce
+      await this.wooCommerceService.deleteOrder(credentials, wooOrderId, force);
+
+      // Mark as deleted locally
+      const localOrder = await this.orderModel.findOne({
+        storeId: new Types.ObjectId(storeId),
+        externalId: wooOrderId,
+      });
+
+      if (localOrder) {
+        localOrder.isDeleted = true;
+        await localOrder.save();
+      }
+
+      this.logger.log(`WooCommerce order ${wooOrderId} deleted`);
+      return { success: true, message: `Order ${wooOrderId} deleted successfully` };
+    } catch (error) {
+      this.logger.error(`Failed to delete WooCommerce order ${wooOrderId}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Bulk delete orders from WooCommerce
+   */
+  async bulkDeleteWooOrders(
+    userId: string,
+    storeId: string,
+    wooOrderIds: number[],
+    force: boolean = false,
+  ): Promise<{ deleted: number; failed: number; errors: string[] }> {
+    const store = await this.verifyStoreAccess(storeId, userId, true);
+
+    const credentials = {
+      url: store.url,
+      consumerKey: store.credentials.consumerKey,
+      consumerSecret: store.credentials.consumerSecret,
+    };
+
+    let deleted = 0;
+    let failed = 0;
+    const errors: string[] = [];
+
+    try {
+      // Use batch API for deletion
+      const wooResponse = await this.wooCommerceService.batchOrders(credentials, {
+        delete: wooOrderIds,
+      });
+
+      // Process deleted orders
+      if (wooResponse.delete) {
+        for (const wooOrder of wooResponse.delete) {
+          try {
+            const localOrder = await this.orderModel.findOne({
+              storeId: new Types.ObjectId(storeId),
+              externalId: wooOrder.id,
+            });
+            if (localOrder) {
+              localOrder.isDeleted = true;
+              await localOrder.save();
+            }
+            deleted++;
+          } catch (error) {
+            failed++;
+            errors.push(`Order ${wooOrder.id}: ${error.message}`);
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Bulk delete failed: ${error.message}`);
+      failed = wooOrderIds.length;
+      errors.push(error.message);
+    }
+
+    this.logger.log(`Bulk delete orders: ${deleted} deleted, ${failed} failed`);
+    return { deleted, failed, errors };
   }
 
   private toInterface(doc: OrderDocument): IOrder {

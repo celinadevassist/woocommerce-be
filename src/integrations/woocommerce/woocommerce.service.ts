@@ -1002,6 +1002,160 @@ export class WooCommerceService implements IPlatformAdapter {
     return this.request<WooShippingMethod>(credentials, 'GET', `shipping_methods/${methodId}`);
   }
 
+  // ============== ORDERS BATCH ==============
+
+  /**
+   * Batch create, update, and delete orders
+   * Uses WooCommerce batch endpoint: POST /orders/batch
+   */
+  async batchOrders(
+    credentials: WooCommerceCredentials,
+    batch: {
+      create?: Array<{
+        payment_method?: string;
+        payment_method_title?: string;
+        set_paid?: boolean;
+        billing?: {
+          first_name?: string;
+          last_name?: string;
+          company?: string;
+          address_1?: string;
+          address_2?: string;
+          city?: string;
+          state?: string;
+          postcode?: string;
+          country?: string;
+          email?: string;
+          phone?: string;
+        };
+        shipping?: {
+          first_name?: string;
+          last_name?: string;
+          company?: string;
+          address_1?: string;
+          address_2?: string;
+          city?: string;
+          state?: string;
+          postcode?: string;
+          country?: string;
+        };
+        line_items?: Array<{
+          product_id?: number;
+          variation_id?: number;
+          quantity?: number;
+          price?: string;
+        }>;
+        shipping_lines?: Array<{
+          method_id?: string;
+          method_title?: string;
+          total?: string;
+        }>;
+        fee_lines?: Array<{
+          name?: string;
+          total?: string;
+        }>;
+        coupon_lines?: Array<{
+          code?: string;
+        }>;
+        customer_id?: number;
+        customer_note?: string;
+        status?: string;
+        meta_data?: Array<{ key: string; value: string }>;
+      }>;
+      update?: Array<{
+        id: number;
+        status?: string;
+        billing?: any;
+        shipping?: any;
+        line_items?: any[];
+        shipping_lines?: any[];
+        fee_lines?: any[];
+        coupon_lines?: any[];
+        customer_note?: string;
+        meta_data?: Array<{ key: string; value: string }>;
+      }>;
+      delete?: number[];
+    },
+  ): Promise<{
+    create?: WooOrder[];
+    update?: WooOrder[];
+    delete?: WooOrder[];
+  }> {
+    this.logger.log(`[WooCommerce] BATCH orders: create=${batch.create?.length || 0}, update=${batch.update?.length || 0}, delete=${batch.delete?.length || 0}`);
+    return this.request(credentials, 'POST', 'orders/batch', undefined, batch);
+  }
+
+  /**
+   * Create a new order in WooCommerce
+   */
+  async createOrder(
+    credentials: WooCommerceCredentials,
+    data: {
+      payment_method?: string;
+      payment_method_title?: string;
+      set_paid?: boolean;
+      billing?: {
+        first_name?: string;
+        last_name?: string;
+        company?: string;
+        address_1?: string;
+        address_2?: string;
+        city?: string;
+        state?: string;
+        postcode?: string;
+        country?: string;
+        email?: string;
+        phone?: string;
+      };
+      shipping?: {
+        first_name?: string;
+        last_name?: string;
+        company?: string;
+        address_1?: string;
+        address_2?: string;
+        city?: string;
+        state?: string;
+        postcode?: string;
+        country?: string;
+      };
+      line_items?: Array<{
+        product_id?: number;
+        variation_id?: number;
+        quantity?: number;
+        price?: string;
+      }>;
+      shipping_lines?: Array<{
+        method_id?: string;
+        method_title?: string;
+        total?: string;
+      }>;
+      fee_lines?: Array<{
+        name?: string;
+        total?: string;
+      }>;
+      coupon_lines?: Array<{
+        code?: string;
+      }>;
+      customer_id?: number;
+      customer_note?: string;
+      status?: string;
+      meta_data?: Array<{ key: string; value: string }>;
+    },
+  ): Promise<WooOrder> {
+    return this.request<WooOrder>(credentials, 'POST', 'orders', undefined, data);
+  }
+
+  /**
+   * Delete an order from WooCommerce
+   */
+  async deleteOrder(
+    credentials: WooCommerceCredentials,
+    orderId: number,
+    force: boolean = false,
+  ): Promise<WooOrder> {
+    return this.request<WooOrder>(credentials, 'DELETE', `orders/${orderId}`, { force });
+  }
+
   // ============== DATA (Countries/States) ==============
 
   /**
