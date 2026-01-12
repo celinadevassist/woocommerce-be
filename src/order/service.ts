@@ -1493,6 +1493,66 @@ export class OrderService {
   }
 
   /**
+   * Update a single order in WooCommerce with full field support
+   */
+  async updateWooOrder(
+    userId: string,
+    storeId: string,
+    wooOrderId: number,
+    updateData: {
+      status?: string;
+      billing?: any;
+      shipping?: any;
+      line_items?: any[];
+      shipping_lines?: any[];
+      fee_lines?: any[];
+      coupon_lines?: any[];
+      customer_note?: string;
+      meta_data?: Array<{ key: string; value: string }>;
+    },
+  ): Promise<IOrder> {
+    const store = await this.verifyStoreAccess(storeId, userId, true);
+
+    const credentials = {
+      url: store.url,
+      consumerKey: store.credentials.consumerKey,
+      consumerSecret: store.credentials.consumerSecret,
+    };
+
+    try {
+      // Map status if provided
+      const mappedData = {
+        ...updateData,
+        status: updateData.status ? this.mapToWooCommerceStatus(updateData.status) : undefined,
+      };
+
+      // Use batch API with single update
+      const wooResponse = await this.wooCommerceService.batchOrders(credentials, {
+        update: [{ id: wooOrderId, ...mappedData }],
+      });
+
+      if (!wooResponse.update || wooResponse.update.length === 0) {
+        throw new BadRequestException('Failed to update order in WooCommerce');
+      }
+
+      // Upsert to local database
+      const localOrder = await this.upsertFromWoo(storeId, wooResponse.update[0]);
+
+      // Also update CartFlow-specific status if different from WooCommerce
+      if (updateData.status && updateData.status !== mappedData.status) {
+        localOrder.status = updateData.status as any;
+        await localOrder.save();
+      }
+
+      this.logger.log(`WooCommerce order ${wooOrderId} updated and synced locally`);
+      return this.toInterface(localOrder);
+    } catch (error) {
+      this.logger.error(`Failed to update WooCommerce order ${wooOrderId}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
    * Create a single order in WooCommerce and sync to local database
    */
   async createWooOrder(

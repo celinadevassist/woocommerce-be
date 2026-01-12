@@ -279,6 +279,28 @@ export class OrderController {
     return this.orderService.createWooOrder(userId, storeId, dto);
   }
 
+  @Patch('woo/:wooOrderId')
+  @ApiOperation({ summary: 'Update an order in WooCommerce with full field support' })
+  @ApiResponse({ status: 200, description: 'Order updated in WooCommerce' })
+  async updateWooOrder(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+    @Param('wooOrderId') wooOrderId: number,
+    @Body() updateData: {
+      status?: string;
+      billing?: any;
+      shipping?: any;
+      line_items?: any[];
+      shipping_lines?: any[];
+      fee_lines?: any[];
+      coupon_lines?: any[];
+      customer_note?: string;
+      meta_data?: Array<{ key: string; value: string }>;
+    },
+  ) {
+    return this.orderService.updateWooOrder(userId, storeId, Number(wooOrderId), updateData);
+  }
+
   @Delete('woo/:wooOrderId')
   @ApiOperation({ summary: 'Delete an order from WooCommerce' })
   @ApiResponse({ status: 200, description: 'Order deleted from WooCommerce' })
