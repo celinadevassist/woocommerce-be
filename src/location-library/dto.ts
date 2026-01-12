@@ -23,8 +23,8 @@ export class CreateStateGroupDto {
 export const CreateStateGroupSchema = Joi.object({
   name: Joi.string().required().min(1).max(100),
   countryCode: Joi.string().required().length(2).uppercase(),
-  color: Joi.string().optional().pattern(/^#[0-9A-Fa-f]{6}$/),
-  description: Joi.string().optional().max(500),
+  color: Joi.string().optional().allow('').pattern(/^#[0-9A-Fa-f]{6}$|^$/),
+  description: Joi.string().optional().allow('').max(500),
   order: Joi.number().optional().min(0),
 });
 
@@ -44,8 +44,8 @@ export class UpdateStateGroupDto {
 
 export const UpdateStateGroupSchema = Joi.object({
   name: Joi.string().optional().min(1).max(100),
-  color: Joi.string().optional().pattern(/^#[0-9A-Fa-f]{6}$/),
-  description: Joi.string().optional().max(500),
+  color: Joi.string().optional().allow('').pattern(/^#[0-9A-Fa-f]{6}$|^$/),
+  description: Joi.string().optional().allow('').max(500),
   order: Joi.number().optional().min(0),
 });
 
@@ -81,11 +81,11 @@ export const CreateLocalStateSchema = Joi.object({
   countryCode: Joi.string().required().length(2).uppercase(),
   stateCode: Joi.string().required().min(1).max(20),
   stateName: Joi.string().required().min(1).max(200),
-  originalName: Joi.string().optional().max(200),
+  originalName: Joi.string().optional().allow('').max(200),
   groups: Joi.array().items(Joi.string().hex().length(24)).optional(),
   isNew: Joi.boolean().optional(),
   order: Joi.number().optional().min(0),
-  notes: Joi.string().optional().max(500),
+  notes: Joi.string().optional().allow('').max(500),
 });
 
 export class UpdateLocalStateDto {
@@ -106,7 +106,7 @@ export const UpdateLocalStateSchema = Joi.object({
   stateName: Joi.string().optional().min(1).max(200),
   groups: Joi.array().items(Joi.string().hex().length(24)).optional(),
   order: Joi.number().optional().min(0),
-  notes: Joi.string().optional().max(500),
+  notes: Joi.string().optional().allow('').max(500),
 });
 
 // ============== BULK OPERATIONS ==============
