@@ -91,6 +91,84 @@ export class OrderController {
     );
   }
 
+  // ========================
+  // WooCommerce Batch Endpoints
+  // IMPORTANT: These must come BEFORE :id routes to avoid route conflicts
+  // ========================
+
+  @Post('woo/batch')
+  @ApiOperation({ summary: 'Batch create, update, and delete orders in WooCommerce' })
+  @ApiResponse({ status: 200, description: 'Batch operation completed' })
+  @UsePipes(new JoiValidationPipe({ body: BatchOrdersSchema, param: { lang: LanguageSchema } }))
+  async batchOrders(
+    @User('_id') userId: string,
+    @Body() dto: BatchOrdersDto,
+  ) {
+    return this.orderService.batchOrders(userId, dto);
+  }
+
+  @Post('woo/create')
+  @ApiOperation({ summary: 'Create a single order in WooCommerce' })
+  @ApiResponse({ status: 201, description: 'Order created in WooCommerce' })
+  @UsePipes(new JoiValidationPipe({ body: BatchCreateOrderItemSchema, param: { lang: LanguageSchema } }))
+  async createWooOrder(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+    @Body() dto: BatchCreateOrderItemDto,
+  ): Promise<IOrder> {
+    return this.orderService.createWooOrder(userId, storeId, dto);
+  }
+
+  @Patch('woo/:wooOrderId')
+  @ApiOperation({ summary: 'Update an order in WooCommerce with full field support' })
+  @ApiResponse({ status: 200, description: 'Order updated in WooCommerce' })
+  async updateWooOrder(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+    @Param('wooOrderId') wooOrderId: number,
+    @Body() updateData: {
+      status?: string;
+      billing?: any;
+      shipping?: any;
+      line_items?: any[];
+      shipping_lines?: any[];
+      fee_lines?: any[];
+      coupon_lines?: any[];
+      customer_note?: string;
+      meta_data?: Array<{ key: string; value: string }>;
+    },
+  ) {
+    return this.orderService.updateWooOrder(userId, storeId, Number(wooOrderId), updateData);
+  }
+
+  @Delete('woo/:wooOrderId')
+  @ApiOperation({ summary: 'Delete an order from WooCommerce' })
+  @ApiResponse({ status: 200, description: 'Order deleted from WooCommerce' })
+  async deleteWooOrder(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+    @Param('wooOrderId') wooOrderId: number,
+    @Query('force') force?: boolean,
+  ) {
+    return this.orderService.deleteWooOrder(userId, storeId, Number(wooOrderId), force === true);
+  }
+
+  @Post('woo/bulk-delete')
+  @ApiOperation({ summary: 'Bulk delete orders from WooCommerce' })
+  @ApiResponse({ status: 200, description: 'Orders deleted from WooCommerce' })
+  async bulkDeleteWooOrders(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+    @Body('orderIds') wooOrderIds: number[],
+    @Query('force') force?: boolean,
+  ) {
+    return this.orderService.bulkDeleteWooOrders(userId, storeId, wooOrderIds, force === true);
+  }
+
+  // ========================
+  // Order ID-based Endpoints
+  // ========================
+
   @Get(':id')
   @ApiOperation({ summary: 'Get order by ID' })
   @ApiResponse({ status: 200, description: 'Returns order details' })
@@ -250,78 +328,5 @@ export class OrderController {
     @User('_id') userId: string,
   ): Promise<IOrder> {
     return this.orderService.cloneOrder(id, userId);
-  }
-
-  // ========================
-  // WooCommerce Batch Endpoints
-  // ========================
-
-  @Post('woo/batch')
-  @ApiOperation({ summary: 'Batch create, update, and delete orders in WooCommerce' })
-  @ApiResponse({ status: 200, description: 'Batch operation completed' })
-  @UsePipes(new JoiValidationPipe({ body: BatchOrdersSchema, param: { lang: LanguageSchema } }))
-  async batchOrders(
-    @User('_id') userId: string,
-    @Body() dto: BatchOrdersDto,
-  ) {
-    return this.orderService.batchOrders(userId, dto);
-  }
-
-  @Post('woo/create')
-  @ApiOperation({ summary: 'Create a single order in WooCommerce' })
-  @ApiResponse({ status: 201, description: 'Order created in WooCommerce' })
-  @UsePipes(new JoiValidationPipe({ body: BatchCreateOrderItemSchema, param: { lang: LanguageSchema } }))
-  async createWooOrder(
-    @User('_id') userId: string,
-    @Query('storeId') storeId: string,
-    @Body() dto: BatchCreateOrderItemDto,
-  ): Promise<IOrder> {
-    return this.orderService.createWooOrder(userId, storeId, dto);
-  }
-
-  @Patch('woo/:wooOrderId')
-  @ApiOperation({ summary: 'Update an order in WooCommerce with full field support' })
-  @ApiResponse({ status: 200, description: 'Order updated in WooCommerce' })
-  async updateWooOrder(
-    @User('_id') userId: string,
-    @Query('storeId') storeId: string,
-    @Param('wooOrderId') wooOrderId: number,
-    @Body() updateData: {
-      status?: string;
-      billing?: any;
-      shipping?: any;
-      line_items?: any[];
-      shipping_lines?: any[];
-      fee_lines?: any[];
-      coupon_lines?: any[];
-      customer_note?: string;
-      meta_data?: Array<{ key: string; value: string }>;
-    },
-  ) {
-    return this.orderService.updateWooOrder(userId, storeId, Number(wooOrderId), updateData);
-  }
-
-  @Delete('woo/:wooOrderId')
-  @ApiOperation({ summary: 'Delete an order from WooCommerce' })
-  @ApiResponse({ status: 200, description: 'Order deleted from WooCommerce' })
-  async deleteWooOrder(
-    @User('_id') userId: string,
-    @Query('storeId') storeId: string,
-    @Param('wooOrderId') wooOrderId: number,
-    @Query('force') force?: boolean,
-  ) {
-    return this.orderService.deleteWooOrder(userId, storeId, Number(wooOrderId), force === true);
-  }
-
-  @Post('woo/bulk-delete')
-  @ApiOperation({ summary: 'Bulk delete orders from WooCommerce' })
-  @ApiResponse({ status: 200, description: 'Orders deleted from WooCommerce' })
-  async bulkDeleteWooOrders(
-    @User('_id') userId: string,
-    @Query('storeId') storeId: string,
-    @Body('orderIds') wooOrderIds: number[],
-    @Query('force') force?: boolean,
-  ) {
-    return this.orderService.bulkDeleteWooOrders(userId, storeId, wooOrderIds, force === true);
   }
 }
