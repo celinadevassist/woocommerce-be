@@ -24,3 +24,15 @@ export enum CatalogVisibility {
   SEARCH = 'search',
   HIDDEN = 'hidden',
 }
+
+export enum TaxStatus {
+  TAXABLE = 'taxable',
+  SHIPPING = 'shipping',
+  NONE = 'none',
+}
+
+export enum BackorderStatus {
+  NO = 'no',
+  NOTIFY = 'notify',
+  YES = 'yes',
+}

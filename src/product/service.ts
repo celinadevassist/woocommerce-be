@@ -181,11 +181,13 @@ export class ProductService {
       name: dto.name,
       type: dto.type || 'simple',
       status: dto.status || 'draft',
+      featured: dto.featured ?? false,
+      catalog_visibility: dto.catalogVisibility || 'visible',
       description: dto.description || '',
       short_description: dto.shortDescription || '',
+      sku: dto.sku || '',
       regular_price: dto.regularPrice || '',
       sale_price: dto.salePrice || '',
-      sku: dto.sku || '',
       manage_stock: dto.manageStock ?? false,
       stock_quantity: dto.stockQuantity,
       stock_status: dto.stockStatus || 'instock',
@@ -193,11 +195,54 @@ export class ProductService {
       categories: dto.categories?.map((id) => ({ id })) || [],
       tags: dto.tags?.map((id) => ({ id })) || [],
       images: dto.images?.map((img) => ({
+        id: img.id,
         src: img.src,
         alt: img.alt || '',
         name: img.name || '',
       })) || [],
     };
+
+    // Add optional fields if provided
+    if (dto.slug) wooProductData.slug = dto.slug;
+    if (dto.globalUniqueId) wooProductData.global_unique_id = dto.globalUniqueId;
+    if (dto.dateOnSaleFrom) wooProductData.date_on_sale_from = dto.dateOnSaleFrom;
+    if (dto.dateOnSaleFromGmt) wooProductData.date_on_sale_from_gmt = dto.dateOnSaleFromGmt;
+    if (dto.dateOnSaleTo) wooProductData.date_on_sale_to = dto.dateOnSaleTo;
+    if (dto.dateOnSaleToGmt) wooProductData.date_on_sale_to_gmt = dto.dateOnSaleToGmt;
+    if (dto.virtual !== undefined) wooProductData.virtual = dto.virtual;
+    if (dto.downloadable !== undefined) wooProductData.downloadable = dto.downloadable;
+    if (dto.downloads?.length) wooProductData.downloads = dto.downloads;
+    if (dto.downloadLimit !== undefined) wooProductData.download_limit = dto.downloadLimit;
+    if (dto.downloadExpiry !== undefined) wooProductData.download_expiry = dto.downloadExpiry;
+    if (dto.externalUrl) wooProductData.external_url = dto.externalUrl;
+    if (dto.buttonText) wooProductData.button_text = dto.buttonText;
+    if (dto.taxStatus) wooProductData.tax_status = dto.taxStatus;
+    if (dto.taxClass) wooProductData.tax_class = dto.taxClass;
+    if (dto.backorders) wooProductData.backorders = dto.backorders;
+    if (dto.soldIndividually !== undefined) wooProductData.sold_individually = dto.soldIndividually;
+    if (dto.dimensions) wooProductData.dimensions = dto.dimensions;
+    if (dto.shippingClass) wooProductData.shipping_class = dto.shippingClass;
+    if (dto.reviewsAllowed !== undefined) wooProductData.reviews_allowed = dto.reviewsAllowed;
+    if (dto.upsellIds?.length) wooProductData.upsell_ids = dto.upsellIds;
+    if (dto.crossSellIds?.length) wooProductData.cross_sell_ids = dto.crossSellIds;
+    if (dto.parentId) wooProductData.parent_id = dto.parentId;
+    if (dto.purchaseNote) wooProductData.purchase_note = dto.purchaseNote;
+    if (dto.attributes?.length) wooProductData.attributes = dto.attributes.map(attr => ({
+      id: attr.id,
+      name: attr.name,
+      position: attr.position ?? 0,
+      visible: attr.visible ?? true,
+      variation: attr.variation ?? false,
+      options: attr.options || [],
+    }));
+    if (dto.defaultAttributes?.length) wooProductData.default_attributes = dto.defaultAttributes.map(attr => ({
+      id: attr.id,
+      name: attr.name,
+      option: attr.option,
+    }));
+    if (dto.groupedProducts?.length) wooProductData.grouped_products = dto.groupedProducts;
+    if (dto.menuOrder !== undefined) wooProductData.menu_order = dto.menuOrder;
+    if (dto.metaData?.length) wooProductData.meta_data = dto.metaData;
 
     let wooProduct: WooProduct | null = null;
 
@@ -226,43 +271,109 @@ export class ProductService {
       }
     }
 
-    // Create local product
+    // Create local product - merge WooCommerce response with DTO data
     const productData: any = {
       storeId: new Types.ObjectId(dto.storeId),
       externalId: wooProduct?.id || 0,
-      name: dto.name,
-      type: dto.type || 'simple',
-      status: dto.status || 'draft',
-      description: dto.description || '',
-      shortDescription: dto.shortDescription || '',
-      regularPrice: dto.regularPrice || '',
-      salePrice: dto.salePrice || '',
-      price: dto.salePrice || dto.regularPrice || '',
-      sku: dto.sku || '',
-      manageStock: dto.manageStock ?? false,
-      stockQuantity: dto.stockQuantity,
-      stockStatus: dto.stockStatus || 'instock',
+      name: wooProduct?.name || dto.name,
+      slug: wooProduct?.slug || dto.slug || '',
+      permalink: wooProduct?.permalink || '',
+      type: wooProduct?.type || dto.type || 'simple',
+      status: wooProduct?.status || dto.status || 'draft',
+      featured: wooProduct?.featured ?? dto.featured ?? false,
+      catalogVisibility: wooProduct?.catalog_visibility || dto.catalogVisibility || 'visible',
+      description: wooProduct?.description || dto.description || '',
+      shortDescription: wooProduct?.short_description || dto.shortDescription || '',
+      sku: wooProduct?.sku || dto.sku || '',
+      globalUniqueId: wooProduct?.global_unique_id || dto.globalUniqueId || '',
+      price: wooProduct?.price || dto.salePrice || dto.regularPrice || '',
+      regularPrice: wooProduct?.regular_price || dto.regularPrice || '',
+      salePrice: wooProduct?.sale_price || dto.salePrice || '',
+      dateOnSaleFrom: wooProduct?.date_on_sale_from ? new Date(wooProduct.date_on_sale_from) : (dto.dateOnSaleFrom ? new Date(dto.dateOnSaleFrom) : null),
+      dateOnSaleFromGmt: wooProduct?.date_on_sale_from_gmt ? new Date(wooProduct.date_on_sale_from_gmt) : (dto.dateOnSaleFromGmt ? new Date(dto.dateOnSaleFromGmt) : null),
+      dateOnSaleTo: wooProduct?.date_on_sale_to ? new Date(wooProduct.date_on_sale_to) : (dto.dateOnSaleTo ? new Date(dto.dateOnSaleTo) : null),
+      dateOnSaleToGmt: wooProduct?.date_on_sale_to_gmt ? new Date(wooProduct.date_on_sale_to_gmt) : (dto.dateOnSaleToGmt ? new Date(dto.dateOnSaleToGmt) : null),
+      priceHtml: wooProduct?.price_html || '',
+      onSale: wooProduct?.on_sale ?? !!dto.salePrice,
+      purchasable: wooProduct?.purchasable ?? true,
+      totalSales: wooProduct?.total_sales || 0,
+      virtual: wooProduct?.virtual ?? dto.virtual ?? false,
+      downloadable: wooProduct?.downloadable ?? dto.downloadable ?? false,
+      downloads: wooProduct?.downloads || dto.downloads || [],
+      downloadLimit: wooProduct?.download_limit ?? dto.downloadLimit ?? -1,
+      downloadExpiry: wooProduct?.download_expiry ?? dto.downloadExpiry ?? -1,
+      externalUrl: wooProduct?.external_url || dto.externalUrl || '',
+      buttonText: wooProduct?.button_text || dto.buttonText || '',
+      taxStatus: wooProduct?.tax_status || dto.taxStatus || 'taxable',
+      taxClass: wooProduct?.tax_class || dto.taxClass || '',
+      manageStock: wooProduct?.manage_stock ?? dto.manageStock ?? false,
+      stockQuantity: wooProduct?.stock_quantity ?? dto.stockQuantity,
+      stockStatus: wooProduct?.stock_status || dto.stockStatus || 'instock',
+      backorders: wooProduct?.backorders || dto.backorders || 'no',
+      backordersAllowed: wooProduct?.backorders_allowed ?? false,
+      backordered: wooProduct?.backordered ?? false,
+      soldIndividually: wooProduct?.sold_individually ?? dto.soldIndividually ?? false,
       lowStockAmount: dto.lowStockAmount,
-      weight: dto.weight || '',
-      categories: wooProduct?.categories || dto.categories?.map((id) => ({ externalId: id })) || [],
-      tags: wooProduct?.tags || dto.tags?.map((id) => ({ externalId: id })) || [],
-      images: dto.images?.map((img, idx) => ({
+      weight: wooProduct?.weight || dto.weight || '',
+      dimensions: wooProduct?.dimensions || dto.dimensions || {},
+      shippingRequired: wooProduct?.shipping_required ?? true,
+      shippingTaxable: wooProduct?.shipping_taxable ?? true,
+      shippingClass: wooProduct?.shipping_class || dto.shippingClass || '',
+      shippingClassId: wooProduct?.shipping_class_id || 0,
+      reviewsAllowed: wooProduct?.reviews_allowed ?? dto.reviewsAllowed ?? true,
+      averageRating: parseFloat(wooProduct?.average_rating || '0'),
+      ratingCount: wooProduct?.rating_count || 0,
+      relatedIds: wooProduct?.related_ids || [],
+      upsellIds: wooProduct?.upsell_ids || dto.upsellIds || [],
+      crossSellIds: wooProduct?.cross_sell_ids || dto.crossSellIds || [],
+      parentId: wooProduct?.parent_id || dto.parentId || 0,
+      purchaseNote: wooProduct?.purchase_note || dto.purchaseNote || '',
+      categories: wooProduct?.categories?.map((c: any) => ({ externalId: c.id, name: c.name, slug: c.slug })) || dto.categories?.map((id) => ({ externalId: id })) || [],
+      tags: wooProduct?.tags?.map((t: any) => ({ externalId: t.id, name: t.name, slug: t.slug })) || dto.tags?.map((id) => ({ externalId: id })) || [],
+      images: wooProduct?.images?.map((img: any, idx: number) => ({
+        externalId: img.id,
+        src: img.src,
+        name: img.name || '',
+        alt: img.alt || '',
+        position: idx,
+      })) || dto.images?.map((img, idx) => ({
         src: img.src,
         alt: img.alt || '',
         name: img.name || '',
         position: img.position ?? idx,
       })) || [],
-      slug: wooProduct?.slug || '',
-      permalink: wooProduct?.permalink || '',
-      onSale: !!dto.salePrice,
-      purchasable: true,
-      featured: false,
-      catalogVisibility: 'visible',
-      virtual: false,
-      downloadable: false,
-      parentId: 0,
-      variationIds: [],
-      variationCount: 0,
+      attributes: wooProduct?.attributes?.map((a: any) => ({
+        externalId: a.id,
+        name: a.name,
+        position: a.position,
+        visible: a.visible,
+        variation: a.variation,
+        options: a.options || [],
+      })) || dto.attributes?.map(a => ({
+        name: a.name,
+        position: a.position ?? 0,
+        visible: a.visible ?? true,
+        variation: a.variation ?? false,
+        options: a.options || [],
+      })) || [],
+      defaultAttributes: wooProduct?.default_attributes?.map((a: any) => ({
+        externalId: a.id,
+        name: a.name,
+        option: a.option,
+      })) || dto.defaultAttributes || [],
+      variationIds: wooProduct?.variations || [],
+      variationCount: wooProduct?.variations?.length || 0,
+      groupedProducts: wooProduct?.grouped_products || dto.groupedProducts || [],
+      menuOrder: wooProduct?.menu_order ?? dto.menuOrder ?? 0,
+      metaData: wooProduct?.meta_data?.map((m: any) => ({
+        externalId: m.id,
+        key: m.key,
+        value: m.value,
+      })) || dto.metaData || [],
+      dateCreatedWoo: wooProduct?.date_created ? new Date(wooProduct.date_created) : null,
+      dateCreatedGmtWoo: wooProduct?.date_created_gmt ? new Date(wooProduct.date_created_gmt) : null,
+      dateModifiedWoo: wooProduct?.date_modified ? new Date(wooProduct.date_modified) : null,
+      dateModifiedGmtWoo: wooProduct?.date_modified_gmt ? new Date(wooProduct.date_modified_gmt) : null,
       pendingSync: !pushToWoo,
       lastSyncedAt: pushToWoo ? new Date() : undefined,
       isDeleted: false,
@@ -295,18 +406,101 @@ export class ProductService {
 
     await this.verifyStoreAccess(product.storeId.toString(), userId);
 
-    // Update local product
+    // Update local product - basic fields
     if (dto.name) product.name = dto.name;
-    if (dto.description) product.description = dto.description;
-    if (dto.shortDescription) product.shortDescription = dto.shortDescription;
-    if (dto.regularPrice) product.regularPrice = dto.regularPrice;
-    if (dto.salePrice !== undefined) product.salePrice = dto.salePrice;
-    if (dto.sku) product.sku = dto.sku;
+    if (dto.slug) product.slug = dto.slug;
+    if (dto.type) product.type = dto.type;
     if (dto.status) product.status = dto.status;
+    if (dto.featured !== undefined) product.featured = dto.featured;
+    if (dto.catalogVisibility) product.catalogVisibility = dto.catalogVisibility;
+    if (dto.description !== undefined) product.description = dto.description;
+    if (dto.shortDescription !== undefined) product.shortDescription = dto.shortDescription;
+    if (dto.sku !== undefined) product.sku = dto.sku;
+    if (dto.globalUniqueId !== undefined) product.globalUniqueId = dto.globalUniqueId;
+
+    // Pricing fields
+    if (dto.regularPrice !== undefined) product.regularPrice = dto.regularPrice;
+    if (dto.salePrice !== undefined) product.salePrice = dto.salePrice;
+    if (dto.dateOnSaleFrom !== undefined) product.dateOnSaleFrom = dto.dateOnSaleFrom ? new Date(dto.dateOnSaleFrom) : null;
+    if (dto.dateOnSaleFromGmt !== undefined) product.dateOnSaleFromGmt = dto.dateOnSaleFromGmt ? new Date(dto.dateOnSaleFromGmt) : null;
+    if (dto.dateOnSaleTo !== undefined) product.dateOnSaleTo = dto.dateOnSaleTo ? new Date(dto.dateOnSaleTo) : null;
+    if (dto.dateOnSaleToGmt !== undefined) product.dateOnSaleToGmt = dto.dateOnSaleToGmt ? new Date(dto.dateOnSaleToGmt) : null;
+
+    // Product type fields
+    if (dto.virtual !== undefined) product.virtual = dto.virtual;
+    if (dto.downloadable !== undefined) product.downloadable = dto.downloadable;
+    if (dto.downloads) product.downloads = dto.downloads;
+    if (dto.downloadLimit !== undefined) product.downloadLimit = dto.downloadLimit;
+    if (dto.downloadExpiry !== undefined) product.downloadExpiry = dto.downloadExpiry;
+    if (dto.externalUrl !== undefined) product.externalUrl = dto.externalUrl;
+    if (dto.buttonText !== undefined) product.buttonText = dto.buttonText;
+
+    // Tax fields
+    if (dto.taxStatus) product.taxStatus = dto.taxStatus;
+    if (dto.taxClass !== undefined) product.taxClass = dto.taxClass;
+
+    // Stock fields
     if (dto.manageStock !== undefined) product.manageStock = dto.manageStock;
     if (dto.stockQuantity !== undefined) product.stockQuantity = dto.stockQuantity;
     if (dto.stockStatus) product.stockStatus = dto.stockStatus;
+    if (dto.backorders) product.backorders = dto.backorders;
     if (dto.lowStockAmount !== undefined) product.lowStockAmount = dto.lowStockAmount;
+    if (dto.soldIndividually !== undefined) product.soldIndividually = dto.soldIndividually;
+
+    // Shipping fields
+    if (dto.weight !== undefined) product.weight = dto.weight;
+    if (dto.dimensions) product.dimensions = dto.dimensions;
+    if (dto.shippingClass !== undefined) product.shippingClass = dto.shippingClass;
+
+    // Related products
+    if (dto.reviewsAllowed !== undefined) product.reviewsAllowed = dto.reviewsAllowed;
+    if (dto.upsellIds) product.upsellIds = dto.upsellIds;
+    if (dto.crossSellIds) product.crossSellIds = dto.crossSellIds;
+    if (dto.parentId !== undefined) product.parentId = dto.parentId;
+    if (dto.purchaseNote !== undefined) product.purchaseNote = dto.purchaseNote;
+
+    // Categories, tags, images
+    if (dto.categories) product.categories = dto.categories.map(id => ({ externalId: id, name: '', slug: '' }));
+    if (dto.tags) product.tags = dto.tags.map(id => ({ externalId: id, name: '', slug: '' }));
+    if (dto.images) {
+      product.images = dto.images.map((img, idx) => ({
+        externalId: img.id,
+        src: img.src || '',
+        name: img.name || '',
+        alt: img.alt || '',
+        position: img.position ?? idx,
+      }));
+    }
+
+    // Attributes
+    if (dto.attributes) {
+      product.attributes = dto.attributes.map(attr => ({
+        externalId: attr.id,
+        name: attr.name,
+        position: attr.position ?? 0,
+        visible: attr.visible ?? true,
+        variation: attr.variation ?? false,
+        options: attr.options || [],
+      }));
+    }
+    if (dto.defaultAttributes) {
+      product.defaultAttributes = dto.defaultAttributes.map(attr => ({
+        externalId: attr.id,
+        name: attr.name,
+        option: attr.option,
+      }));
+    }
+
+    // Other fields
+    if (dto.groupedProducts) product.groupedProducts = dto.groupedProducts;
+    if (dto.menuOrder !== undefined) product.menuOrder = dto.menuOrder;
+    if (dto.metaData) {
+      product.metaData = dto.metaData.map(m => ({
+        externalId: m.id,
+        key: m.key,
+        value: m.value,
+      }));
+    }
 
     // Mark for sync if not pushing immediately
     product.pendingSync = !pushToWoo;
@@ -809,18 +1003,90 @@ export class ProductService {
     };
 
     try {
-      await this.wooCommerceService.updateProduct(credentials, product.externalId, {
+      const wooUpdateData: any = {
         name: product.name,
+        slug: product.slug,
+        type: product.type,
+        status: product.status,
+        featured: product.featured,
+        catalog_visibility: product.catalogVisibility,
         description: product.description,
         short_description: product.shortDescription,
-        regular_price: product.regularPrice,
-        sale_price: product.salePrice,
         sku: product.sku,
-        status: product.status,
+        regular_price: product.regularPrice,
+        sale_price: product.salePrice || '',
         manage_stock: product.manageStock,
         stock_quantity: product.stockQuantity,
         stock_status: product.stockStatus,
-      });
+      };
+
+      // Add optional fields if they have values
+      if (product.globalUniqueId) wooUpdateData.global_unique_id = product.globalUniqueId;
+      if (product.dateOnSaleFrom) wooUpdateData.date_on_sale_from = product.dateOnSaleFrom.toISOString();
+      if (product.dateOnSaleFromGmt) wooUpdateData.date_on_sale_from_gmt = product.dateOnSaleFromGmt.toISOString();
+      if (product.dateOnSaleTo) wooUpdateData.date_on_sale_to = product.dateOnSaleTo.toISOString();
+      if (product.dateOnSaleToGmt) wooUpdateData.date_on_sale_to_gmt = product.dateOnSaleToGmt.toISOString();
+      if (product.virtual !== undefined) wooUpdateData.virtual = product.virtual;
+      if (product.downloadable !== undefined) wooUpdateData.downloadable = product.downloadable;
+      if (product.downloads?.length) wooUpdateData.downloads = product.downloads;
+      if (product.downloadLimit !== undefined) wooUpdateData.download_limit = product.downloadLimit;
+      if (product.downloadExpiry !== undefined) wooUpdateData.download_expiry = product.downloadExpiry;
+      if (product.externalUrl) wooUpdateData.external_url = product.externalUrl;
+      if (product.buttonText) wooUpdateData.button_text = product.buttonText;
+      if (product.taxStatus) wooUpdateData.tax_status = product.taxStatus;
+      if (product.taxClass !== undefined) wooUpdateData.tax_class = product.taxClass;
+      if (product.backorders) wooUpdateData.backorders = product.backorders;
+      if (product.soldIndividually !== undefined) wooUpdateData.sold_individually = product.soldIndividually;
+      if (product.weight) wooUpdateData.weight = product.weight;
+      if (product.dimensions) wooUpdateData.dimensions = product.dimensions;
+      if (product.shippingClass) wooUpdateData.shipping_class = product.shippingClass;
+      if (product.reviewsAllowed !== undefined) wooUpdateData.reviews_allowed = product.reviewsAllowed;
+      if (product.upsellIds?.length) wooUpdateData.upsell_ids = product.upsellIds;
+      if (product.crossSellIds?.length) wooUpdateData.cross_sell_ids = product.crossSellIds;
+      if (product.parentId) wooUpdateData.parent_id = product.parentId;
+      if (product.purchaseNote) wooUpdateData.purchase_note = product.purchaseNote;
+      if (product.categories?.length) {
+        wooUpdateData.categories = product.categories.map(c => ({ id: c.externalId }));
+      }
+      if (product.tags?.length) {
+        wooUpdateData.tags = product.tags.map(t => ({ id: t.externalId }));
+      }
+      if (product.images?.length) {
+        wooUpdateData.images = product.images.map(img => ({
+          id: img.externalId,
+          src: img.src,
+          name: img.name,
+          alt: img.alt,
+        }));
+      }
+      if (product.attributes?.length) {
+        wooUpdateData.attributes = product.attributes.map(a => ({
+          id: a.externalId,
+          name: a.name,
+          position: a.position,
+          visible: a.visible,
+          variation: a.variation,
+          options: a.options,
+        }));
+      }
+      if (product.defaultAttributes?.length) {
+        wooUpdateData.default_attributes = product.defaultAttributes.map(a => ({
+          id: a.externalId,
+          name: a.name,
+          option: a.option,
+        }));
+      }
+      if (product.groupedProducts?.length) wooUpdateData.grouped_products = product.groupedProducts;
+      if (product.menuOrder !== undefined) wooUpdateData.menu_order = product.menuOrder;
+      if (product.metaData?.length) {
+        wooUpdateData.meta_data = product.metaData.map(m => ({
+          id: m.externalId,
+          key: m.key,
+          value: m.value,
+        }));
+      }
+
+      await this.wooCommerceService.updateProduct(credentials, product.externalId, wooUpdateData);
 
       product.pendingSync = false;
       product.lastSyncedAt = new Date();
@@ -872,10 +1138,10 @@ export class ProductService {
       externalId: wooProduct.id,
     });
 
-    const productData = {
+    const productData: any = {
       storeId: new Types.ObjectId(storeId),
       externalId: wooProduct.id,
-      sku: wooProduct.sku,
+      sku: wooProduct.sku || '',
       name: wooProduct.name,
       slug: wooProduct.slug,
       permalink: wooProduct.permalink,
@@ -885,35 +1151,92 @@ export class ProductService {
       catalogVisibility: wooProduct.catalog_visibility,
       description: wooProduct.description,
       shortDescription: wooProduct.short_description,
+      globalUniqueId: (wooProduct as any).global_unique_id || '',
       price: wooProduct.price,
       regularPrice: wooProduct.regular_price,
       salePrice: wooProduct.sale_price,
+      dateOnSaleFrom: wooProduct.date_on_sale_from ? new Date(wooProduct.date_on_sale_from) : null,
+      dateOnSaleFromGmt: wooProduct.date_on_sale_from_gmt ? new Date(wooProduct.date_on_sale_from_gmt) : null,
+      dateOnSaleTo: wooProduct.date_on_sale_to ? new Date(wooProduct.date_on_sale_to) : null,
+      dateOnSaleToGmt: wooProduct.date_on_sale_to_gmt ? new Date(wooProduct.date_on_sale_to_gmt) : null,
+      priceHtml: wooProduct.price_html || '',
       onSale: wooProduct.on_sale,
       purchasable: wooProduct.purchasable,
       totalSales: wooProduct.total_sales,
       virtual: wooProduct.virtual,
       downloadable: wooProduct.downloadable,
+      downloads: wooProduct.downloads || [],
+      downloadLimit: wooProduct.download_limit ?? -1,
+      downloadExpiry: wooProduct.download_expiry ?? -1,
+      externalUrl: wooProduct.external_url || '',
+      buttonText: wooProduct.button_text || '',
+      taxStatus: wooProduct.tax_status || 'taxable',
+      taxClass: wooProduct.tax_class || '',
       manageStock: wooProduct.manage_stock,
       stockQuantity: wooProduct.stock_quantity,
       stockStatus: wooProduct.stock_status,
+      backorders: wooProduct.backorders || 'no',
+      backordersAllowed: wooProduct.backorders_allowed ?? false,
+      backordered: wooProduct.backordered ?? false,
+      soldIndividually: wooProduct.sold_individually ?? false,
       lowStockAmount: wooProduct.low_stock_amount,
       weight: wooProduct.weight,
       dimensions: wooProduct.dimensions,
-      categories: wooProduct.categories,
-      tags: wooProduct.tags,
-      images: wooProduct.images.map((img, idx) => ({
+      shippingRequired: wooProduct.shipping_required ?? true,
+      shippingTaxable: wooProduct.shipping_taxable ?? true,
+      shippingClass: wooProduct.shipping_class || '',
+      shippingClassId: wooProduct.shipping_class_id || 0,
+      reviewsAllowed: wooProduct.reviews_allowed ?? true,
+      averageRating: parseFloat(wooProduct.average_rating || '0'),
+      ratingCount: wooProduct.rating_count || 0,
+      relatedIds: wooProduct.related_ids || [],
+      upsellIds: wooProduct.upsell_ids || [],
+      crossSellIds: wooProduct.cross_sell_ids || [],
+      categories: wooProduct.categories?.map((c: any) => ({
+        externalId: c.id,
+        name: c.name,
+        slug: c.slug,
+      })) || [],
+      tags: wooProduct.tags?.map((t: any) => ({
+        externalId: t.id,
+        name: t.name,
+        slug: t.slug,
+      })) || [],
+      images: wooProduct.images?.map((img: any, idx: number) => ({
         externalId: img.id,
         src: img.src,
-        name: img.name,
-        alt: img.alt,
+        name: img.name || '',
+        alt: img.alt || '',
         position: idx,
-      })),
-      attributes: wooProduct.attributes,
-      variationIds: wooProduct.variations,
+      })) || [],
+      attributes: wooProduct.attributes?.map((a: any) => ({
+        externalId: a.id,
+        name: a.name,
+        position: a.position,
+        visible: a.visible,
+        variation: a.variation,
+        options: a.options || [],
+      })) || [],
+      defaultAttributes: wooProduct.default_attributes?.map((a: any) => ({
+        externalId: a.id,
+        name: a.name,
+        option: a.option,
+      })) || [],
+      variationIds: wooProduct.variations || [],
       variationCount: wooProduct.variations?.length || 0,
+      groupedProducts: wooProduct.grouped_products || [],
+      menuOrder: wooProduct.menu_order || 0,
+      purchaseNote: wooProduct.purchase_note || '',
+      metaData: wooProduct.meta_data?.map((m: any) => ({
+        externalId: m.id,
+        key: m.key,
+        value: m.value,
+      })) || [],
       parentId: wooProduct.parent_id,
-      dateCreatedWoo: new Date(wooProduct.date_created),
-      dateModifiedWoo: new Date(wooProduct.date_modified),
+      dateCreatedWoo: wooProduct.date_created ? new Date(wooProduct.date_created) : null,
+      dateCreatedGmtWoo: wooProduct.date_created_gmt ? new Date(wooProduct.date_created_gmt) : null,
+      dateModifiedWoo: wooProduct.date_modified ? new Date(wooProduct.date_modified) : null,
+      dateModifiedGmtWoo: wooProduct.date_modified_gmt ? new Date(wooProduct.date_modified_gmt) : null,
       lastSyncedAt: new Date(),
       pendingSync: false,
       isDeleted: false,

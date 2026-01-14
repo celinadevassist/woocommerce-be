@@ -1,6 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { ProductType, ProductStatus, StockStatus, CatalogVisibility } from './enum';
+import { ProductType, ProductStatus, StockStatus, CatalogVisibility, TaxStatus, BackorderStatus } from './enum';
 
 // Sub-schema for product images
 @Schema({ _id: false })
@@ -22,6 +22,51 @@ export class ProductImage {
 }
 
 export const ProductImageSchema = SchemaFactory.createForClass(ProductImage);
+
+// Sub-schema for downloadable files
+@Schema({ _id: false })
+export class ProductDownload {
+  @Prop()
+  id?: string;
+
+  @Prop({ required: true })
+  name: string;
+
+  @Prop({ required: true })
+  file: string;
+}
+
+export const ProductDownloadSchema = SchemaFactory.createForClass(ProductDownload);
+
+// Sub-schema for default attributes (for variable products)
+@Schema({ _id: false })
+export class ProductDefaultAttribute {
+  @Prop()
+  externalId?: number;
+
+  @Prop({ required: true })
+  name: string;
+
+  @Prop()
+  option?: string;
+}
+
+export const ProductDefaultAttributeSchema = SchemaFactory.createForClass(ProductDefaultAttribute);
+
+// Sub-schema for meta data
+@Schema({ _id: false })
+export class ProductMetaData {
+  @Prop()
+  externalId?: number;
+
+  @Prop({ required: true })
+  key: string;
+
+  @Prop()
+  value?: string;
+}
+
+export const ProductMetaDataSchema = SchemaFactory.createForClass(ProductMetaData);
 
 // Sub-schema for product categories
 @Schema({ _id: false })
@@ -139,6 +184,23 @@ export class Product extends Document {
   @Prop()
   salePrice?: string;
 
+  // Sale date range
+  @Prop()
+  dateOnSaleFrom?: Date;
+
+  @Prop()
+  dateOnSaleFromGmt?: Date;
+
+  @Prop()
+  dateOnSaleTo?: Date;
+
+  @Prop()
+  dateOnSaleToGmt?: Date;
+
+  // Read-only price fields
+  @Prop()
+  priceHtml?: string;
+
   @Prop({ default: false })
   onSale: boolean;
 
@@ -154,6 +216,30 @@ export class Product extends Document {
   @Prop({ default: false })
   downloadable: boolean;
 
+  // Downloadable product fields
+  @Prop({ type: [ProductDownloadSchema], default: [] })
+  downloads: ProductDownload[];
+
+  @Prop({ default: -1 })
+  downloadLimit: number;
+
+  @Prop({ default: -1 })
+  downloadExpiry: number;
+
+  // External product fields
+  @Prop()
+  externalUrl?: string;
+
+  @Prop()
+  buttonText?: string;
+
+  // Tax fields
+  @Prop({ type: String, enum: Object.values(TaxStatus), default: TaxStatus.TAXABLE })
+  taxStatus: TaxStatus;
+
+  @Prop()
+  taxClass?: string;
+
   @Prop({ default: false })
   manageStock: boolean;
 
@@ -163,6 +249,19 @@ export class Product extends Document {
   @Prop({ type: String, enum: Object.values(StockStatus), default: StockStatus.IN_STOCK })
   stockStatus: StockStatus;
 
+  // Backorder fields
+  @Prop({ type: String, enum: Object.values(BackorderStatus), default: BackorderStatus.NO })
+  backorders: BackorderStatus;
+
+  @Prop({ default: false })
+  backordersAllowed: boolean;
+
+  @Prop({ default: false })
+  backordered: boolean;
+
+  @Prop({ default: false })
+  soldIndividually: boolean;
+
   @Prop()
   lowStockAmount?: number;
 
@@ -171,6 +270,22 @@ export class Product extends Document {
 
   @Prop({ type: ProductDimensionsSchema })
   dimensions?: ProductDimensions;
+
+  // Shipping fields
+  @Prop({ default: true })
+  shippingRequired: boolean;
+
+  @Prop({ default: true })
+  shippingTaxable: boolean;
+
+  @Prop()
+  shippingClass?: string;
+
+  @Prop()
+  shippingClassId?: number;
+
+  @Prop({ default: true })
+  reviewsAllowed: boolean;
 
   @Prop({ type: [ProductCategorySchema], default: [] })
   categories: ProductCategory[];
@@ -184,20 +299,57 @@ export class Product extends Document {
   @Prop({ type: [ProductAttributeSchema], default: [] })
   attributes: ProductAttribute[];
 
+  @Prop({ type: [ProductDefaultAttributeSchema], default: [] })
+  defaultAttributes: ProductDefaultAttribute[];
+
   @Prop({ type: [Number], default: [] })
   variationIds: number[];
 
   @Prop({ default: 0 })
   variationCount: number;
 
+  // Related products
+  @Prop({ type: [Number], default: [] })
+  relatedIds: number[];
+
+  @Prop({ type: [Number], default: [] })
+  upsellIds: number[];
+
+  @Prop({ type: [Number], default: [] })
+  crossSellIds: number[];
+
   @Prop()
   parentId?: number;
+
+  // Grouped products
+  @Prop({ type: [Number], default: [] })
+  groupedProducts: number[];
+
+  @Prop({ default: 0 })
+  menuOrder: number;
+
+  @Prop()
+  purchaseNote?: string;
+
+  // Meta data
+  @Prop({ type: [ProductMetaDataSchema], default: [] })
+  metaData: ProductMetaData[];
+
+  // Global unique identifier (GTIN, UPC, EAN, ISBN)
+  @Prop()
+  globalUniqueId?: string;
 
   @Prop()
   dateCreatedWoo?: Date;
 
   @Prop()
+  dateCreatedGmtWoo?: Date;
+
+  @Prop()
   dateModifiedWoo?: Date;
+
+  @Prop()
+  dateModifiedGmtWoo?: Date;
 
   @Prop()
   lastSyncedAt?: Date;
