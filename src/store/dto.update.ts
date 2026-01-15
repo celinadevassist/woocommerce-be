@@ -32,9 +32,17 @@ export class UpdateCredentialsDto {
 
   @ApiPropertyOptional({ description: 'WooCommerce Consumer Secret' })
   consumerSecret?: string;
+
+  @ApiPropertyOptional({ description: 'WordPress username for media management' })
+  wpUsername?: string;
+
+  @ApiPropertyOptional({ description: 'WordPress application password for media management' })
+  wpAppPassword?: string;
 }
 
 export const UpdateCredentialsSchema = Joi.object().keys({
   consumerKey: Joi.string().optional(),
   consumerSecret: Joi.string().optional(),
-}).or('consumerKey', 'consumerSecret'); // At least one required
+  wpUsername: Joi.string().allow('').optional(),
+  wpAppPassword: Joi.string().allow('').optional(),
+}).or('consumerKey', 'consumerSecret', 'wpUsername', 'wpAppPassword'); // At least one required

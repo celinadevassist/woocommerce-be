@@ -4,6 +4,9 @@ export interface WooCommerceCredentials {
   url: string;
   consumerKey: string;
   consumerSecret: string;
+  // Optional WordPress credentials for media management (REST API)
+  wpUsername?: string;
+  wpAppPassword?: string;
 }
 
 export interface WooStoreInfo {

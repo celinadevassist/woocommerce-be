@@ -1934,6 +1934,9 @@ export class ProductService {
         url: store.url,
         consumerKey: store.credentials.consumerKey,
         consumerSecret: store.credentials.consumerSecret,
+        // Include WordPress credentials if available
+        wpUsername: store.credentials.wpUsername,
+        wpAppPassword: store.credentials.wpAppPassword,
       };
     }
 

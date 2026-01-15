@@ -57,6 +57,8 @@ export class StoreService {
       credentials: {
         consumerKey: dto.consumerKey,
         consumerSecret: dto.consumerSecret,
+        wpUsername: dto.wpUsername,
+        wpAppPassword: dto.wpAppPassword,
       },
       status: StoreStatus.CONNECTING,
       syncStatus: {
@@ -265,8 +267,14 @@ export class StoreService {
     if (dto.consumerKey) store.credentials.consumerKey = dto.consumerKey;
     if (dto.consumerSecret) store.credentials.consumerSecret = dto.consumerSecret;
 
-    // Reset status to connecting after credential update
-    store.status = StoreStatus.CONNECTING;
+    // Update WordPress credentials for media management (allow empty string to clear)
+    if (dto.wpUsername !== undefined) store.credentials.wpUsername = dto.wpUsername || undefined;
+    if (dto.wpAppPassword !== undefined) store.credentials.wpAppPassword = dto.wpAppPassword || undefined;
+
+    // Reset status to connecting after WooCommerce credential update
+    if (dto.consumerKey || dto.consumerSecret) {
+      store.status = StoreStatus.CONNECTING;
+    }
 
     await store.save();
     return this.toInterface(store);

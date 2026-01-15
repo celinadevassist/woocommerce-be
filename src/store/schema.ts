@@ -58,6 +58,14 @@ export class StoreCredentials {
 
   @Prop({ required: true })
   consumerSecret: string;
+
+  // Optional WordPress credentials for media management (REST API)
+  // These are needed to delete images from WordPress Media Library
+  @Prop()
+  wpUsername?: string;
+
+  @Prop()
+  wpAppPassword?: string;
 }
 
 export const StoreCredentialsSchema = SchemaFactory.createForClass(StoreCredentials);

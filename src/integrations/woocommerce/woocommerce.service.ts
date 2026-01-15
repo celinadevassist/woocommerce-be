@@ -744,14 +744,27 @@ export class WooCommerceService implements IPlatformAdapter {
     mediaId: number,
     force: boolean = true,
   ): Promise<any> {
+    // WordPress REST API requires WordPress credentials (username + application password)
+    // These are different from WooCommerce API credentials
+    if (!credentials.wpUsername || !credentials.wpAppPassword) {
+      this.logger.warn(
+        `Cannot delete WordPress media ID ${mediaId}: WordPress credentials not configured. ` +
+        `To enable media deletion, configure wpUsername and wpAppPassword in store settings.`
+      );
+      return null;
+    }
+
     const baseUrl = credentials.url.replace(/\/+$/, '');
     const url = `${baseUrl}/wp-json/wp/v2/media/${mediaId}`;
 
     const config: AxiosRequestConfig = {
-      ...this.getAuthConfig(credentials),
       method: 'DELETE',
       url,
       params: { force },
+      auth: {
+        username: credentials.wpUsername,
+        password: credentials.wpAppPassword,
+      },
     };
 
     try {
@@ -760,7 +773,17 @@ export class WooCommerceService implements IPlatformAdapter {
       this.logger.log(`Successfully deleted WordPress media ID: ${mediaId}`);
       return response.data;
     } catch (error) {
-      this.logger.warn(`Failed to delete WordPress media ID ${mediaId}: ${error.message}`);
+      const statusCode = error.response?.status;
+      if (statusCode === 401) {
+        this.logger.warn(
+          `Failed to delete WordPress media ID ${mediaId}: Authentication failed. ` +
+          `Please verify WordPress credentials (wpUsername and wpAppPassword).`
+        );
+      } else if (statusCode === 404) {
+        this.logger.warn(`WordPress media ID ${mediaId} not found (may already be deleted).`);
+      } else {
+        this.logger.warn(`Failed to delete WordPress media ID ${mediaId}: ${error.message}`);
+      }
       // Don't throw - we don't want to fail the entire operation if media deletion fails
       return null;
     }

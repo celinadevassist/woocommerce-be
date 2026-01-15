@@ -17,6 +17,12 @@ export class CreateStoreDto {
 
   @ApiProperty({ description: 'WooCommerce Consumer Secret' })
   consumerSecret: string;
+
+  @ApiPropertyOptional({ description: 'WordPress username for media management' })
+  wpUsername?: string;
+
+  @ApiPropertyOptional({ description: 'WordPress application password for media management' })
+  wpAppPassword?: string;
 }
 
 export const CreateStoreSchema = Joi.object().keys({
@@ -25,4 +31,6 @@ export const CreateStoreSchema = Joi.object().keys({
   url: Joi.string().uri().required(),
   consumerKey: Joi.string().required(),
   consumerSecret: Joi.string().required(),
+  wpUsername: Joi.string().optional(),
+  wpAppPassword: Joi.string().optional(),
 });
