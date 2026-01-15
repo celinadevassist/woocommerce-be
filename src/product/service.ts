@@ -1872,11 +1872,22 @@ export class ProductService {
 
     await this.verifyStoreAccess(product.storeId.toString(), userId);
 
+    // Create a map of existing images by src URL to preserve externalId
+    const existingImagesMap = new Map<string, number>();
+    product.images.forEach((img) => {
+      if (img.externalId && img.src) {
+        existingImagesMap.set(img.src, img.externalId);
+      }
+    });
+
+    // Update images while preserving externalId for existing ones
     product.images = images.map((img, index) => ({
       src: img.src,
       alt: img.alt || '',
       name: img.name || '',
       position: img.position !== undefined ? img.position : index,
+      // Preserve externalId if this image URL already exists in our database
+      externalId: existingImagesMap.get(img.src),
     }));
 
     product.pendingSync = !pushToWoo;
@@ -1962,17 +1973,25 @@ export class ProductService {
 
     // Update local images with the returned WooCommerce image IDs
     // This ensures newly uploaded images get their externalId stored
-    if (updatedProduct?.images) {
+    if (updatedProduct?.images && Array.isArray(updatedProduct.images)) {
       product.images = product.images.map((localImg, index) => {
         const wooImg = updatedProduct.images[index];
-        if (wooImg && !localImg.externalId && wooImg.id) {
-          localImg.externalId = wooImg.id;
-          // Also update src in case WooCommerce changed the URL
-          if (wooImg.src) {
-            localImg.src = wooImg.src;
-          }
+        if (wooImg && wooImg.id) {
+          return {
+            src: wooImg.src || localImg.src,
+            alt: localImg.alt || '',
+            name: localImg.name || '',
+            position: localImg.position,
+            externalId: wooImg.id,
+          };
         }
-        return localImg;
+        return {
+          src: localImg.src,
+          alt: localImg.alt || '',
+          name: localImg.name || '',
+          position: localImg.position,
+          externalId: localImg.externalId,
+        };
       });
     }
 
