@@ -1858,7 +1858,7 @@ export class ProductService {
   async updateImages(
     id: string,
     userId: string,
-    images: { src: string; alt?: string; name?: string; position?: number }[],
+    images: { src: string; alt?: string; name?: string; position?: number; externalId?: number }[],
     pushToWoo: boolean = true,
   ): Promise<IProduct> {
     const product = await this.productModel.findOne({
@@ -1880,14 +1880,14 @@ export class ProductService {
       }
     });
 
-    // Update images while preserving externalId for existing ones
+    // Update images - use externalId from request, or fall back to existing map
     product.images = images.map((img, index) => ({
       src: img.src,
       alt: img.alt || '',
       name: img.name || '',
       position: img.position !== undefined ? img.position : index,
-      // Preserve externalId if this image URL already exists in our database
-      externalId: existingImagesMap.get(img.src),
+      // Use externalId from request if provided, otherwise try to preserve from existing
+      externalId: img.externalId || existingImagesMap.get(img.src),
     }));
 
     product.pendingSync = !pushToWoo;

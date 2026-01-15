@@ -444,7 +444,7 @@ export class ProductController {
   @ApiQuery({ name: 'pushToWoo', required: false, type: Boolean })
   async updateImages(
     @Param('id') id: string,
-    @Body() body: { images: { src: string; alt?: string; name?: string; position?: number }[] },
+    @Body() body: { images: { src: string; alt?: string; name?: string; position?: number; externalId?: number }[] },
     @Query('pushToWoo') pushToWoo: string,
     @User() user: UserDocument,
   ) {
