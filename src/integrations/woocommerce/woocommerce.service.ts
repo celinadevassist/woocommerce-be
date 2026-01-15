@@ -735,6 +735,37 @@ export class WooCommerceService implements IPlatformAdapter {
     );
   }
 
+  /**
+   * Delete a media item from WordPress Media Library
+   * Uses WordPress REST API (wp/v2) instead of WooCommerce API
+   */
+  async deleteMedia(
+    credentials: WooCommerceCredentials,
+    mediaId: number,
+    force: boolean = true,
+  ): Promise<any> {
+    const baseUrl = credentials.url.replace(/\/+$/, '');
+    const url = `${baseUrl}/wp-json/wp/v2/media/${mediaId}`;
+
+    const config: AxiosRequestConfig = {
+      ...this.getAuthConfig(credentials),
+      method: 'DELETE',
+      url,
+      params: { force },
+    };
+
+    try {
+      this.logger.log(`Deleting WordPress media ID: ${mediaId}`);
+      const response = await firstValueFrom(this.httpService.request(config));
+      this.logger.log(`Successfully deleted WordPress media ID: ${mediaId}`);
+      return response.data;
+    } catch (error) {
+      this.logger.warn(`Failed to delete WordPress media ID ${mediaId}: ${error.message}`);
+      // Don't throw - we don't want to fail the entire operation if media deletion fails
+      return null;
+    }
+  }
+
   // Private helper methods
   private buildApiUrl(credentials: WooCommerceCredentials, endpoint: string): string {
     const baseUrl = credentials.url.replace(/\/+$/, '');

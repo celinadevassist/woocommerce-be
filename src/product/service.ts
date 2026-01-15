@@ -16,6 +16,7 @@ import { StockStatus } from './enum';
 import { Store, StoreDocument } from '../store/schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 import { WooProduct, WooProductVariation } from '../integrations/woocommerce/woocommerce.types';
+import { S3UploadService } from '../modules/s3-upload/s3-upload.service';
 
 @Injectable()
 export class ProductService {
@@ -26,6 +27,7 @@ export class ProductService {
     @InjectModel(ProductVariant.name) private variantModel: Model<ProductVariantDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     private readonly wooCommerceService: WooCommerceService,
+    private readonly s3UploadService: S3UploadService,
   ) {}
 
   /**
@@ -1872,6 +1874,13 @@ export class ProductService {
 
     await this.verifyStoreAccess(product.storeId.toString(), userId);
 
+    // Track existing images for deletion detection
+    const existingImages = [...product.images];
+    const newImageSrcs = new Set(images.map((img) => img.src));
+
+    // Find images that were removed (exist in old but not in new)
+    const removedImages = existingImages.filter((img) => !newImageSrcs.has(img.src));
+
     // Create a map of existing images by src URL to preserve externalId
     const existingImagesMap = new Map<string, number>();
     product.images.forEach((img) => {
@@ -1897,7 +1906,65 @@ export class ProductService {
       await this.syncImagesToWoo(product);
     }
 
+    // Delete removed images from WordPress and S3 (in background, don't block response)
+    if (removedImages.length > 0) {
+      this.deleteRemovedImages(product.storeId.toString(), removedImages).catch((error) => {
+        this.logger.warn(`Failed to delete some removed images: ${error.message}`);
+      });
+    }
+
     return this.toProductInterface(product);
+  }
+
+  /**
+   * Delete images from WordPress Media Library and/or S3
+   */
+  private async deleteRemovedImages(
+    storeId: string,
+    images: { src: string; externalId?: number }[],
+  ): Promise<void> {
+    // Get store credentials for WordPress media deletion
+    const store = await this.storeModel
+      .findById(storeId)
+      .select('+credentials');
+
+    let credentials = null;
+    if (store) {
+      credentials = {
+        url: store.url,
+        consumerKey: store.credentials.consumerKey,
+        consumerSecret: store.credentials.consumerSecret,
+      };
+    }
+
+    for (const img of images) {
+      // Delete from WordPress Media Library if has externalId
+      if (img.externalId && credentials) {
+        try {
+          this.logger.log(`Deleting WordPress media ID: ${img.externalId}`);
+          await this.wooCommerceService.deleteMedia(credentials, img.externalId);
+        } catch (error) {
+          this.logger.warn(`Failed to delete WordPress media ID ${img.externalId}: ${error.message}`);
+        }
+      }
+
+      // Delete from S3 if it's an S3 URL
+      if (img.src && this.isS3Url(img.src)) {
+        try {
+          this.logger.log(`Deleting S3 image: ${img.src}`);
+          await this.s3UploadService.deleteFile(img.src);
+        } catch (error) {
+          this.logger.warn(`Failed to delete S3 image ${img.src}: ${error.message}`);
+        }
+      }
+    }
+  }
+
+  /**
+   * Check if a URL is an S3 URL
+   */
+  private isS3Url(url: string): boolean {
+    return url.includes('.s3.') && url.includes('.amazonaws.com');
   }
 
   async deleteImage(
@@ -1921,6 +1988,9 @@ export class ProductService {
       throw new BadRequestException('Invalid image index');
     }
 
+    // Get the image to be deleted before removing it
+    const deletedImage = { ...product.images[imageIndex] };
+
     product.images.splice(imageIndex, 1);
     product.images.forEach((img, idx) => {
       img.position = idx;
@@ -1932,6 +2002,11 @@ export class ProductService {
     if (pushToWoo) {
       await this.syncImagesToWoo(product);
     }
+
+    // Delete the removed image from WordPress and S3 (in background)
+    this.deleteRemovedImages(product.storeId.toString(), [deletedImage]).catch((error) => {
+      this.logger.warn(`Failed to delete image: ${error.message}`);
+    });
 
     return this.toProductInterface(product);
   }
