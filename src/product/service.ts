@@ -2073,12 +2073,15 @@ export class ProductService {
 
     // Update local images with the returned WooCommerce image IDs
     // This ensures newly uploaded images get their externalId stored
+    // IMPORTANT: Keep the original local src (especially for S3 URLs) so URL matching
+    // continues to work when reordering images
     if (updatedProduct?.images && Array.isArray(updatedProduct.images)) {
       product.images = product.images.map((localImg, index) => {
         const wooImg = updatedProduct.images[index];
         if (wooImg && wooImg.id) {
           return {
-            src: wooImg.src || localImg.src,
+            // Keep original local src to preserve S3 URLs for matching
+            src: localImg.src,
             alt: localImg.alt || '',
             name: localImg.name || '',
             position: localImg.position,
