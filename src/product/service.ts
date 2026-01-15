@@ -1951,10 +1951,26 @@ export class ProductService {
       consumerSecret: store.credentials.consumerSecret,
     };
 
+    // Fetch current product from WooCommerce to get existing image IDs
+    // This ensures we don't re-upload images that already exist in WordPress
+    let wooImageMap = new Map<string, number>();
+    try {
+      const currentWooProduct = await this.wooCommerceService.getProduct(credentials, product.externalId);
+      if (currentWooProduct?.images) {
+        currentWooProduct.images.forEach((img: any) => {
+          if (img.id && img.src) {
+            wooImageMap.set(img.src, img.id);
+          }
+        });
+      }
+    } catch (error) {
+      // If we can't fetch the product, continue without the map
+      console.warn('Could not fetch current WooCommerce product for image ID mapping:', error.message);
+    }
+
     const updatedProduct = await this.wooCommerceService.updateProduct(credentials, product.externalId, {
       images: product.images.map((img) => {
-        // If the image has an externalId (WooCommerce image ID), use it to avoid re-uploading
-        // WooCommerce will reuse the existing media library image when `id` is provided
+        // First check if we have externalId stored locally
         if (img.externalId) {
           return {
             id: img.externalId,
@@ -1962,7 +1978,16 @@ export class ProductService {
             position: img.position,
           };
         }
-        // For new images without externalId, send src so WooCommerce uploads them
+        // Then check if the image exists in WooCommerce (matched by src URL)
+        const wooImageId = wooImageMap.get(img.src);
+        if (wooImageId) {
+          return {
+            id: wooImageId,
+            alt: img.alt,
+            position: img.position,
+          };
+        }
+        // For truly new images, send src so WooCommerce uploads them
         return {
           src: img.src,
           alt: img.alt,
