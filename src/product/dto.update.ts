@@ -284,7 +284,7 @@ export const UpdateProductSchema = Joi.object().keys({
   shortDescription: Joi.string().allow('').optional(),
   sku: Joi.string().allow('').optional(),
   globalUniqueId: Joi.string().allow('').optional(),
-  regularPrice: Joi.string().optional(),
+  regularPrice: Joi.string().allow('').optional(),
   salePrice: Joi.string().allow('').optional(),
   dateOnSaleFrom: Joi.string().allow(null, '').optional(),
   dateOnSaleFromGmt: Joi.string().allow(null, '').optional(),
