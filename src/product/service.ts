@@ -1940,12 +1940,41 @@ export class ProductService {
       consumerSecret: store.credentials.consumerSecret,
     };
 
-    await this.wooCommerceService.updateProduct(credentials, product.externalId, {
-      images: product.images.map((img) => ({
-        src: img.src,
-        alt: img.alt,
-      })),
+    const updatedProduct = await this.wooCommerceService.updateProduct(credentials, product.externalId, {
+      images: product.images.map((img) => {
+        // If the image has an externalId (WooCommerce image ID), use it to avoid re-uploading
+        // WooCommerce will reuse the existing media library image when `id` is provided
+        if (img.externalId) {
+          return {
+            id: img.externalId,
+            alt: img.alt,
+            position: img.position,
+          };
+        }
+        // For new images without externalId, send src so WooCommerce uploads them
+        return {
+          src: img.src,
+          alt: img.alt,
+          position: img.position,
+        };
+      }),
     });
+
+    // Update local images with the returned WooCommerce image IDs
+    // This ensures newly uploaded images get their externalId stored
+    if (updatedProduct?.images) {
+      product.images = product.images.map((localImg, index) => {
+        const wooImg = updatedProduct.images[index];
+        if (wooImg && !localImg.externalId && wooImg.id) {
+          localImg.externalId = wooImg.id;
+          // Also update src in case WooCommerce changed the URL
+          if (wooImg.src) {
+            localImg.src = wooImg.src;
+          }
+        }
+        return localImg;
+      });
+    }
 
     product.pendingSync = false;
     product.lastSyncedAt = new Date();
