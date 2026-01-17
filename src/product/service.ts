@@ -94,7 +94,13 @@ export class ProductService {
       filter.type = query.type;
     }
     if (query.categoryId) {
-      filter['categories.externalId'] = query.categoryId;
+      // Support both externalId (number) and slug (string) for filtering
+      const catId = Number(query.categoryId);
+      if (!isNaN(catId)) {
+        filter['categories.externalId'] = catId;
+      } else {
+        filter['categories.slug'] = query.categoryId;
+      }
     }
     if (query.pendingSync) {
       filter.pendingSync = true;

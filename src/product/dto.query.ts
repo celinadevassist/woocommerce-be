@@ -15,8 +15,8 @@ export class QueryProductDto {
   @ApiPropertyOptional({ description: 'Filter by product type', enum: ProductType })
   type?: ProductType;
 
-  @ApiPropertyOptional({ description: 'Filter by category ID' })
-  categoryId?: number;
+  @ApiPropertyOptional({ description: 'Filter by category ID or slug' })
+  categoryId?: number | string;
 
   @ApiPropertyOptional({ description: 'Search keyword', example: 'shirt' })
   keyword?: string;
@@ -45,7 +45,7 @@ export const QueryProductSchema = Joi.object().keys({
   status: Joi.string().valid(...Object.values(ProductStatus)).optional(),
   stockStatus: Joi.string().valid(...Object.values(StockStatus)).optional(),
   type: Joi.string().valid(...Object.values(ProductType)).optional(),
-  categoryId: Joi.number().optional(),
+  categoryId: Joi.alternatives().try(Joi.number(), Joi.string()).optional(),
   keyword: Joi.string().optional(),
   lowStock: Joi.boolean().optional(),
   pendingSync: Joi.boolean().optional(),
