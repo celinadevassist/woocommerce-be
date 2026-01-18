@@ -11,7 +11,7 @@ interface PublicReviewsOptions {
   featured?: boolean;
   page?: number;
   size?: number;
-  sortBy?: 'createdAt' | 'rating' | 'helpfulCount';
+  sortBy?: 'createdAt' | 'wooCreatedAt' | 'rating' | 'helpfulCount';
   sortOrder?: 'asc' | 'desc';
 }
 
@@ -34,7 +34,7 @@ export class PublicReviewService {
       featured,
       page = 1,
       size = 10,
-      sortBy = 'createdAt',
+      sortBy = 'wooCreatedAt',
       sortOrder = 'desc',
     } = options;
 
@@ -58,8 +58,15 @@ export class PublicReviewService {
       query.isFeatured = true;
     }
 
+    // Sort by wooCreatedAt with fallback to createdAt for manual reviews
     const sort: any = {};
-    sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    if (sortBy === 'wooCreatedAt') {
+      // Use wooCreatedAt primarily, then createdAt as secondary sort for reviews without wooCreatedAt
+      sort.wooCreatedAt = sortOrder === 'asc' ? 1 : -1;
+      sort.createdAt = sortOrder === 'asc' ? 1 : -1;
+    } else {
+      sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
+    }
 
     const skip = (page - 1) * size;
 
