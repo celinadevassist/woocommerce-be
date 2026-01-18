@@ -98,6 +98,7 @@ export class PublicReviewService {
         helpfulCount: review.helpfulCount,
         isFeatured: review.isFeatured,
         createdAt: review.createdAt,
+        wooCreatedAt: review.wooCreatedAt,
         product: product ? {
           _id: product._id,
           name: product.name,
