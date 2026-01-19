@@ -44,6 +44,9 @@ RUN npm cache clean --force && \
 # Copy built application from builder stage
 COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
 
+# Copy plugins assets folder
+COPY --from=builder --chown=nodejs:nodejs /app/plugins-assets ./plugins-assets
+
 # Switch to non-root user
 USER nodejs
 

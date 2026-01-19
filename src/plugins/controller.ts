@@ -11,8 +11,9 @@ export class PluginsController {
   private readonly pluginsDir: string;
 
   constructor() {
-    // Plugins are stored in the project root's wordpress-plugin folder
-    this.pluginsDir = path.join(__dirname, '..', '..', '..', '..', 'wordpress-plugin');
+    // Plugins are stored in the plugins-assets folder at the app root
+    // In compiled code: __dirname = dist/plugins, go up 2 levels to reach app root
+    this.pluginsDir = path.join(__dirname, '..', '..', 'plugins-assets');
   }
 
   @Get()
