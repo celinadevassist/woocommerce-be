@@ -9,15 +9,30 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Product, ProductDocument } from './schema';
 import { ProductVariant, ProductVariantDocument } from './variant.schema';
-import { UpdateProductDto, UpdateStockDto, BulkUpdateProductDto, BulkUpdateVariantDto, CreateProductDto, UpdateVariantDto } from './dto.update';
+import {
+  UpdateProductDto,
+  UpdateStockDto,
+  BulkUpdateProductDto,
+  BulkUpdateVariantDto,
+  CreateProductDto,
+  UpdateVariantDto,
+} from './dto.update';
 import { QueryProductDto } from './dto.query';
-import { IProduct, IProductVariant, IProductWithVariants, IProductResponse } from './interface';
+import {
+  IProduct,
+  IProductVariant,
+  IProductWithVariants,
+  IProductResponse,
+} from './interface';
 import { StockStatus } from './enum';
 import { Store, StoreDocument } from '../store/schema';
 import { Category, CategoryDocument } from '../category/schema';
 import { Tag, TagDocument } from '../tag/schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
-import { WooProduct, WooProductVariation } from '../integrations/woocommerce/woocommerce.types';
+import {
+  WooProduct,
+  WooProductVariation,
+} from '../integrations/woocommerce/woocommerce.types';
 import { S3UploadService } from '../modules/s3-upload/s3-upload.service';
 
 @Injectable()
@@ -26,7 +41,8 @@ export class ProductService {
 
   constructor(
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
-    @InjectModel(ProductVariant.name) private variantModel: Model<ProductVariantDocument>,
+    @InjectModel(ProductVariant.name)
+    private variantModel: Model<ProductVariantDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
     @InjectModel(Tag.name) private tagModel: Model<TagDocument>,
@@ -38,13 +54,15 @@ export class ProductService {
    * Get stores user has access to
    */
   private async getUserStoreIds(userId: string): Promise<Types.ObjectId[]> {
-    const stores = await this.storeModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    }).select('_id');
+    const stores = await this.storeModel
+      .find({
+        isDeleted: false,
+        $or: [
+          { ownerId: new Types.ObjectId(userId) },
+          { 'members.userId': new Types.ObjectId(userId) },
+        ],
+      })
+      .select('_id');
 
     return stores.map((store) => store._id);
   }
@@ -52,7 +70,10 @@ export class ProductService {
   /**
    * Verify user has access to store
    */
-  private async verifyStoreAccess(storeId: string, userId: string): Promise<StoreDocument> {
+  private async verifyStoreAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<StoreDocument> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       isDeleted: false,
@@ -75,7 +96,10 @@ export class ProductService {
   /**
    * Get products with filtering and pagination
    */
-  async findAll(userId: string, query: QueryProductDto): Promise<IProductResponse> {
+  async findAll(
+    userId: string,
+    query: QueryProductDto,
+  ): Promise<IProductResponse> {
     // Get stores user has access to
     const storeIds = await this.getUserStoreIds(userId);
 
@@ -183,7 +207,7 @@ export class ProductService {
   async create(
     userId: string,
     dto: CreateProductDto,
-    pushToWoo: boolean = true,
+    pushToWoo = true,
   ): Promise<IProduct> {
     // Verify user has access to store
     await this.verifyStoreAccess(dto.storeId, userId);
@@ -206,53 +230,67 @@ export class ProductService {
       weight: dto.weight || '',
       categories: dto.categories?.map((id) => ({ id })) || [],
       tags: dto.tags?.map((id) => ({ id })) || [],
-      images: dto.images?.map((img) => ({
-        id: img.id,
-        src: img.src,
-        alt: img.alt || '',
-        name: img.name || '',
-      })) || [],
+      images:
+        dto.images?.map((img) => ({
+          id: img.id,
+          src: img.src,
+          alt: img.alt || '',
+          name: img.name || '',
+        })) || [],
     };
 
     // Add optional fields if provided
     if (dto.slug) wooProductData.slug = dto.slug;
-    if (dto.globalUniqueId) wooProductData.global_unique_id = dto.globalUniqueId;
-    if (dto.dateOnSaleFrom) wooProductData.date_on_sale_from = dto.dateOnSaleFrom;
-    if (dto.dateOnSaleFromGmt) wooProductData.date_on_sale_from_gmt = dto.dateOnSaleFromGmt;
+    if (dto.globalUniqueId)
+      wooProductData.global_unique_id = dto.globalUniqueId;
+    if (dto.dateOnSaleFrom)
+      wooProductData.date_on_sale_from = dto.dateOnSaleFrom;
+    if (dto.dateOnSaleFromGmt)
+      wooProductData.date_on_sale_from_gmt = dto.dateOnSaleFromGmt;
     if (dto.dateOnSaleTo) wooProductData.date_on_sale_to = dto.dateOnSaleTo;
-    if (dto.dateOnSaleToGmt) wooProductData.date_on_sale_to_gmt = dto.dateOnSaleToGmt;
+    if (dto.dateOnSaleToGmt)
+      wooProductData.date_on_sale_to_gmt = dto.dateOnSaleToGmt;
     if (dto.virtual !== undefined) wooProductData.virtual = dto.virtual;
-    if (dto.downloadable !== undefined) wooProductData.downloadable = dto.downloadable;
+    if (dto.downloadable !== undefined)
+      wooProductData.downloadable = dto.downloadable;
     if (dto.downloads?.length) wooProductData.downloads = dto.downloads;
-    if (dto.downloadLimit !== undefined) wooProductData.download_limit = dto.downloadLimit;
-    if (dto.downloadExpiry !== undefined) wooProductData.download_expiry = dto.downloadExpiry;
+    if (dto.downloadLimit !== undefined)
+      wooProductData.download_limit = dto.downloadLimit;
+    if (dto.downloadExpiry !== undefined)
+      wooProductData.download_expiry = dto.downloadExpiry;
     if (dto.externalUrl) wooProductData.external_url = dto.externalUrl;
     if (dto.buttonText) wooProductData.button_text = dto.buttonText;
     if (dto.taxStatus) wooProductData.tax_status = dto.taxStatus;
     if (dto.taxClass) wooProductData.tax_class = dto.taxClass;
     if (dto.backorders) wooProductData.backorders = dto.backorders;
-    if (dto.soldIndividually !== undefined) wooProductData.sold_individually = dto.soldIndividually;
+    if (dto.soldIndividually !== undefined)
+      wooProductData.sold_individually = dto.soldIndividually;
     if (dto.dimensions) wooProductData.dimensions = dto.dimensions;
     if (dto.shippingClass) wooProductData.shipping_class = dto.shippingClass;
-    if (dto.reviewsAllowed !== undefined) wooProductData.reviews_allowed = dto.reviewsAllowed;
+    if (dto.reviewsAllowed !== undefined)
+      wooProductData.reviews_allowed = dto.reviewsAllowed;
     if (dto.upsellIds?.length) wooProductData.upsell_ids = dto.upsellIds;
-    if (dto.crossSellIds?.length) wooProductData.cross_sell_ids = dto.crossSellIds;
+    if (dto.crossSellIds?.length)
+      wooProductData.cross_sell_ids = dto.crossSellIds;
     if (dto.parentId) wooProductData.parent_id = dto.parentId;
     if (dto.purchaseNote) wooProductData.purchase_note = dto.purchaseNote;
-    if (dto.attributes?.length) wooProductData.attributes = dto.attributes.map(attr => ({
-      id: attr.id,
-      name: attr.name,
-      position: attr.position ?? 0,
-      visible: attr.visible ?? true,
-      variation: attr.variation ?? false,
-      options: attr.options || [],
-    }));
-    if (dto.defaultAttributes?.length) wooProductData.default_attributes = dto.defaultAttributes.map(attr => ({
-      id: attr.id,
-      name: attr.name,
-      option: attr.option,
-    }));
-    if (dto.groupedProducts?.length) wooProductData.grouped_products = dto.groupedProducts;
+    if (dto.attributes?.length)
+      wooProductData.attributes = dto.attributes.map((attr) => ({
+        id: attr.id,
+        name: attr.name,
+        position: attr.position ?? 0,
+        visible: attr.visible ?? true,
+        variation: attr.variation ?? false,
+        options: attr.options || [],
+      }));
+    if (dto.defaultAttributes?.length)
+      wooProductData.default_attributes = dto.defaultAttributes.map((attr) => ({
+        id: attr.id,
+        name: attr.name,
+        option: attr.option,
+      }));
+    if (dto.groupedProducts?.length)
+      wooProductData.grouped_products = dto.groupedProducts;
     if (dto.menuOrder !== undefined) wooProductData.menu_order = dto.menuOrder;
     if (dto.metaData?.length) wooProductData.meta_data = dto.metaData;
 
@@ -276,10 +314,18 @@ export class ProductService {
       };
 
       try {
-        wooProduct = await this.wooCommerceService.createProduct(credentials, wooProductData);
+        wooProduct = await this.wooCommerceService.createProduct(
+          credentials,
+          wooProductData,
+        );
       } catch (error) {
-        this.logger.error(`Failed to create product in WooCommerce: ${error.message}`, error.stack);
-        throw new BadRequestException(`Failed to create product in WooCommerce: ${error.message}`);
+        this.logger.error(
+          `Failed to create product in WooCommerce: ${error.message}`,
+          error.stack,
+        );
+        throw new BadRequestException(
+          `Failed to create product in WooCommerce: ${error.message}`,
+        );
       }
     }
 
@@ -293,18 +339,36 @@ export class ProductService {
       type: wooProduct?.type || dto.type || 'simple',
       status: wooProduct?.status || dto.status || 'draft',
       featured: wooProduct?.featured ?? dto.featured ?? false,
-      catalogVisibility: wooProduct?.catalog_visibility || dto.catalogVisibility || 'visible',
+      catalogVisibility:
+        wooProduct?.catalog_visibility || dto.catalogVisibility || 'visible',
       description: wooProduct?.description || dto.description || '',
-      shortDescription: wooProduct?.short_description || dto.shortDescription || '',
+      shortDescription:
+        wooProduct?.short_description || dto.shortDescription || '',
       sku: wooProduct?.sku || dto.sku || '',
       globalUniqueId: wooProduct?.global_unique_id || dto.globalUniqueId || '',
       price: wooProduct?.price || dto.salePrice || dto.regularPrice || '',
       regularPrice: wooProduct?.regular_price || dto.regularPrice || '',
       salePrice: wooProduct?.sale_price || dto.salePrice || '',
-      dateOnSaleFrom: wooProduct?.date_on_sale_from ? new Date(wooProduct.date_on_sale_from) : (dto.dateOnSaleFrom ? new Date(dto.dateOnSaleFrom) : null),
-      dateOnSaleFromGmt: wooProduct?.date_on_sale_from_gmt ? new Date(wooProduct.date_on_sale_from_gmt) : (dto.dateOnSaleFromGmt ? new Date(dto.dateOnSaleFromGmt) : null),
-      dateOnSaleTo: wooProduct?.date_on_sale_to ? new Date(wooProduct.date_on_sale_to) : (dto.dateOnSaleTo ? new Date(dto.dateOnSaleTo) : null),
-      dateOnSaleToGmt: wooProduct?.date_on_sale_to_gmt ? new Date(wooProduct.date_on_sale_to_gmt) : (dto.dateOnSaleToGmt ? new Date(dto.dateOnSaleToGmt) : null),
+      dateOnSaleFrom: wooProduct?.date_on_sale_from
+        ? new Date(wooProduct.date_on_sale_from)
+        : dto.dateOnSaleFrom
+        ? new Date(dto.dateOnSaleFrom)
+        : null,
+      dateOnSaleFromGmt: wooProduct?.date_on_sale_from_gmt
+        ? new Date(wooProduct.date_on_sale_from_gmt)
+        : dto.dateOnSaleFromGmt
+        ? new Date(dto.dateOnSaleFromGmt)
+        : null,
+      dateOnSaleTo: wooProduct?.date_on_sale_to
+        ? new Date(wooProduct.date_on_sale_to)
+        : dto.dateOnSaleTo
+        ? new Date(dto.dateOnSaleTo)
+        : null,
+      dateOnSaleToGmt: wooProduct?.date_on_sale_to_gmt
+        ? new Date(wooProduct.date_on_sale_to_gmt)
+        : dto.dateOnSaleToGmt
+        ? new Date(dto.dateOnSaleToGmt)
+        : null,
       priceHtml: wooProduct?.price_html || '',
       onSale: wooProduct?.on_sale ?? !!dto.salePrice,
       purchasable: wooProduct?.purchasable ?? true,
@@ -324,7 +388,8 @@ export class ProductService {
       backorders: wooProduct?.backorders || dto.backorders || 'no',
       backordersAllowed: wooProduct?.backorders_allowed ?? false,
       backordered: wooProduct?.backordered ?? false,
-      soldIndividually: wooProduct?.sold_individually ?? dto.soldIndividually ?? false,
+      soldIndividually:
+        wooProduct?.sold_individually ?? dto.soldIndividually ?? false,
       lowStockAmount: dto.lowStockAmount,
       weight: wooProduct?.weight || dto.weight || '',
       dimensions: wooProduct?.dimensions || dto.dimensions || {},
@@ -340,52 +405,87 @@ export class ProductService {
       crossSellIds: wooProduct?.cross_sell_ids || dto.crossSellIds || [],
       parentId: wooProduct?.parent_id || dto.parentId || 0,
       purchaseNote: wooProduct?.purchase_note || dto.purchaseNote || '',
-      categories: wooProduct?.categories?.map((c: any) => ({ externalId: c.id, name: c.name, slug: c.slug })) || dto.categories?.map((id) => ({ externalId: id })) || [],
-      tags: wooProduct?.tags?.map((t: any) => ({ externalId: t.id, name: t.name, slug: t.slug })) || dto.tags?.map((id) => ({ externalId: id })) || [],
-      images: wooProduct?.images?.map((img: any, idx: number) => ({
-        externalId: img.id,
-        src: img.src,
-        name: img.name || '',
-        alt: img.alt || '',
-        position: idx,
-      })) || dto.images?.map((img, idx) => ({
-        src: img.src,
-        alt: img.alt || '',
-        name: img.name || '',
-        position: img.position ?? idx,
-      })) || [],
-      attributes: wooProduct?.attributes?.map((a: any) => ({
-        externalId: a.id,
-        name: a.name,
-        position: a.position,
-        visible: a.visible,
-        variation: a.variation,
-        options: a.options || [],
-      })) || dto.attributes?.map(a => ({
-        name: a.name,
-        position: a.position ?? 0,
-        visible: a.visible ?? true,
-        variation: a.variation ?? false,
-        options: a.options || [],
-      })) || [],
-      defaultAttributes: wooProduct?.default_attributes?.map((a: any) => ({
-        externalId: a.id,
-        name: a.name,
-        option: a.option,
-      })) || dto.defaultAttributes || [],
+      categories:
+        wooProduct?.categories?.map((c: any) => ({
+          externalId: c.id,
+          name: c.name,
+          slug: c.slug,
+        })) ||
+        dto.categories?.map((id) => ({ externalId: id })) ||
+        [],
+      tags:
+        wooProduct?.tags?.map((t: any) => ({
+          externalId: t.id,
+          name: t.name,
+          slug: t.slug,
+        })) ||
+        dto.tags?.map((id) => ({ externalId: id })) ||
+        [],
+      images:
+        wooProduct?.images?.map((img: any, idx: number) => ({
+          externalId: img.id,
+          src: img.src,
+          name: img.name || '',
+          alt: img.alt || '',
+          position: idx,
+        })) ||
+        dto.images?.map((img, idx) => ({
+          src: img.src,
+          alt: img.alt || '',
+          name: img.name || '',
+          position: img.position ?? idx,
+        })) ||
+        [],
+      attributes:
+        wooProduct?.attributes?.map((a: any) => ({
+          externalId: a.id,
+          name: a.name,
+          position: a.position,
+          visible: a.visible,
+          variation: a.variation,
+          options: a.options || [],
+        })) ||
+        dto.attributes?.map((a) => ({
+          name: a.name,
+          position: a.position ?? 0,
+          visible: a.visible ?? true,
+          variation: a.variation ?? false,
+          options: a.options || [],
+        })) ||
+        [],
+      defaultAttributes:
+        wooProduct?.default_attributes?.map((a: any) => ({
+          externalId: a.id,
+          name: a.name,
+          option: a.option,
+        })) ||
+        dto.defaultAttributes ||
+        [],
       variationIds: wooProduct?.variations || [],
       variationCount: wooProduct?.variations?.length || 0,
-      groupedProducts: wooProduct?.grouped_products || dto.groupedProducts || [],
+      groupedProducts:
+        wooProduct?.grouped_products || dto.groupedProducts || [],
       menuOrder: wooProduct?.menu_order ?? dto.menuOrder ?? 0,
-      metaData: wooProduct?.meta_data?.map((m: any) => ({
-        externalId: m.id,
-        key: m.key,
-        value: m.value,
-      })) || dto.metaData || [],
-      dateCreatedWoo: wooProduct?.date_created ? new Date(wooProduct.date_created) : null,
-      dateCreatedGmtWoo: wooProduct?.date_created_gmt ? new Date(wooProduct.date_created_gmt) : null,
-      dateModifiedWoo: wooProduct?.date_modified ? new Date(wooProduct.date_modified) : null,
-      dateModifiedGmtWoo: wooProduct?.date_modified_gmt ? new Date(wooProduct.date_modified_gmt) : null,
+      metaData:
+        wooProduct?.meta_data?.map((m: any) => ({
+          externalId: m.id,
+          key: m.key,
+          value: m.value,
+        })) ||
+        dto.metaData ||
+        [],
+      dateCreatedWoo: wooProduct?.date_created
+        ? new Date(wooProduct.date_created)
+        : null,
+      dateCreatedGmtWoo: wooProduct?.date_created_gmt
+        ? new Date(wooProduct.date_created_gmt)
+        : null,
+      dateModifiedWoo: wooProduct?.date_modified
+        ? new Date(wooProduct.date_modified)
+        : null,
+      dateModifiedGmtWoo: wooProduct?.date_modified_gmt
+        ? new Date(wooProduct.date_modified_gmt)
+        : null,
       pendingSync: !pushToWoo,
       lastSyncedAt: pushToWoo ? new Date() : undefined,
       isDeleted: false,
@@ -393,7 +493,11 @@ export class ProductService {
 
     const product = await this.productModel.create(productData);
 
-    this.logger.log(`Created product ${product._id} (WooCommerce ID: ${wooProduct?.id || 'not synced'})`);
+    this.logger.log(
+      `Created product ${product._id} (WooCommerce ID: ${
+        wooProduct?.id || 'not synced'
+      })`,
+    );
 
     return this.toProductInterface(product);
   }
@@ -405,7 +509,7 @@ export class ProductService {
     id: string,
     userId: string,
     dto: UpdateProductDto,
-    pushToWoo: boolean = true,
+    pushToWoo = true,
   ): Promise<IProduct> {
     const product = await this.productModel.findOne({
       _id: new Types.ObjectId(id),
@@ -424,26 +528,43 @@ export class ProductService {
     if (dto.type) product.type = dto.type;
     if (dto.status) product.status = dto.status;
     if (dto.featured !== undefined) product.featured = dto.featured;
-    if (dto.catalogVisibility) product.catalogVisibility = dto.catalogVisibility;
+    if (dto.catalogVisibility)
+      product.catalogVisibility = dto.catalogVisibility;
     if (dto.description !== undefined) product.description = dto.description;
-    if (dto.shortDescription !== undefined) product.shortDescription = dto.shortDescription;
+    if (dto.shortDescription !== undefined)
+      product.shortDescription = dto.shortDescription;
     if (dto.sku !== undefined) product.sku = dto.sku;
-    if (dto.globalUniqueId !== undefined) product.globalUniqueId = dto.globalUniqueId;
+    if (dto.globalUniqueId !== undefined)
+      product.globalUniqueId = dto.globalUniqueId;
 
     // Pricing fields
     if (dto.regularPrice !== undefined) product.regularPrice = dto.regularPrice;
     if (dto.salePrice !== undefined) product.salePrice = dto.salePrice;
-    if (dto.dateOnSaleFrom !== undefined) product.dateOnSaleFrom = dto.dateOnSaleFrom ? new Date(dto.dateOnSaleFrom) : null;
-    if (dto.dateOnSaleFromGmt !== undefined) product.dateOnSaleFromGmt = dto.dateOnSaleFromGmt ? new Date(dto.dateOnSaleFromGmt) : null;
-    if (dto.dateOnSaleTo !== undefined) product.dateOnSaleTo = dto.dateOnSaleTo ? new Date(dto.dateOnSaleTo) : null;
-    if (dto.dateOnSaleToGmt !== undefined) product.dateOnSaleToGmt = dto.dateOnSaleToGmt ? new Date(dto.dateOnSaleToGmt) : null;
+    if (dto.dateOnSaleFrom !== undefined)
+      product.dateOnSaleFrom = dto.dateOnSaleFrom
+        ? new Date(dto.dateOnSaleFrom)
+        : null;
+    if (dto.dateOnSaleFromGmt !== undefined)
+      product.dateOnSaleFromGmt = dto.dateOnSaleFromGmt
+        ? new Date(dto.dateOnSaleFromGmt)
+        : null;
+    if (dto.dateOnSaleTo !== undefined)
+      product.dateOnSaleTo = dto.dateOnSaleTo
+        ? new Date(dto.dateOnSaleTo)
+        : null;
+    if (dto.dateOnSaleToGmt !== undefined)
+      product.dateOnSaleToGmt = dto.dateOnSaleToGmt
+        ? new Date(dto.dateOnSaleToGmt)
+        : null;
 
     // Product type fields
     if (dto.virtual !== undefined) product.virtual = dto.virtual;
     if (dto.downloadable !== undefined) product.downloadable = dto.downloadable;
     if (dto.downloads) product.downloads = dto.downloads;
-    if (dto.downloadLimit !== undefined) product.downloadLimit = dto.downloadLimit;
-    if (dto.downloadExpiry !== undefined) product.downloadExpiry = dto.downloadExpiry;
+    if (dto.downloadLimit !== undefined)
+      product.downloadLimit = dto.downloadLimit;
+    if (dto.downloadExpiry !== undefined)
+      product.downloadExpiry = dto.downloadExpiry;
     if (dto.externalUrl !== undefined) product.externalUrl = dto.externalUrl;
     if (dto.buttonText !== undefined) product.buttonText = dto.buttonText;
 
@@ -453,19 +574,24 @@ export class ProductService {
 
     // Stock fields
     if (dto.manageStock !== undefined) product.manageStock = dto.manageStock;
-    if (dto.stockQuantity !== undefined) product.stockQuantity = dto.stockQuantity;
+    if (dto.stockQuantity !== undefined)
+      product.stockQuantity = dto.stockQuantity;
     if (dto.stockStatus) product.stockStatus = dto.stockStatus;
     if (dto.backorders) product.backorders = dto.backorders;
-    if (dto.lowStockAmount !== undefined) product.lowStockAmount = dto.lowStockAmount;
-    if (dto.soldIndividually !== undefined) product.soldIndividually = dto.soldIndividually;
+    if (dto.lowStockAmount !== undefined)
+      product.lowStockAmount = dto.lowStockAmount;
+    if (dto.soldIndividually !== undefined)
+      product.soldIndividually = dto.soldIndividually;
 
     // Shipping fields
     if (dto.weight !== undefined) product.weight = dto.weight;
     if (dto.dimensions) product.dimensions = dto.dimensions;
-    if (dto.shippingClass !== undefined) product.shippingClass = dto.shippingClass;
+    if (dto.shippingClass !== undefined)
+      product.shippingClass = dto.shippingClass;
 
     // Related products
-    if (dto.reviewsAllowed !== undefined) product.reviewsAllowed = dto.reviewsAllowed;
+    if (dto.reviewsAllowed !== undefined)
+      product.reviewsAllowed = dto.reviewsAllowed;
     if (dto.upsellIds) product.upsellIds = dto.upsellIds;
     if (dto.crossSellIds) product.crossSellIds = dto.crossSellIds;
     if (dto.parentId !== undefined) product.parentId = dto.parentId;
@@ -473,26 +599,34 @@ export class ProductService {
 
     // Categories, tags, images - look up actual names and slugs from database
     if (dto.categories) {
-      const categoryDocs = await this.categoryModel.find({
-        storeId: product.storeId,
-        externalId: { $in: dto.categories },
-        isDeleted: false,
-      }).select('externalId name slug');
-      const categoryMap = new Map(categoryDocs.map(c => [c.externalId, { name: c.name, slug: c.slug }]));
-      product.categories = dto.categories.map(id => ({
+      const categoryDocs = await this.categoryModel
+        .find({
+          storeId: product.storeId,
+          externalId: { $in: dto.categories },
+          isDeleted: false,
+        })
+        .select('externalId name slug');
+      const categoryMap = new Map(
+        categoryDocs.map((c) => [c.externalId, { name: c.name, slug: c.slug }]),
+      );
+      product.categories = dto.categories.map((id) => ({
         externalId: id,
         name: categoryMap.get(id)?.name || '',
         slug: categoryMap.get(id)?.slug || '',
       }));
     }
     if (dto.tags) {
-      const tagDocs = await this.tagModel.find({
-        storeId: product.storeId,
-        externalId: { $in: dto.tags },
-        isDeleted: false,
-      }).select('externalId name slug');
-      const tagMap = new Map(tagDocs.map(t => [t.externalId, { name: t.name, slug: t.slug }]));
-      product.tags = dto.tags.map(id => ({
+      const tagDocs = await this.tagModel
+        .find({
+          storeId: product.storeId,
+          externalId: { $in: dto.tags },
+          isDeleted: false,
+        })
+        .select('externalId name slug');
+      const tagMap = new Map(
+        tagDocs.map((t) => [t.externalId, { name: t.name, slug: t.slug }]),
+      );
+      product.tags = dto.tags.map((id) => ({
         externalId: id,
         name: tagMap.get(id)?.name || '',
         slug: tagMap.get(id)?.slug || '',
@@ -510,7 +644,7 @@ export class ProductService {
 
     // Attributes
     if (dto.attributes) {
-      product.attributes = dto.attributes.map(attr => ({
+      product.attributes = dto.attributes.map((attr) => ({
         externalId: attr.id,
         name: attr.name,
         position: attr.position ?? 0,
@@ -520,7 +654,7 @@ export class ProductService {
       }));
     }
     if (dto.defaultAttributes) {
-      product.defaultAttributes = dto.defaultAttributes.map(attr => ({
+      product.defaultAttributes = dto.defaultAttributes.map((attr) => ({
         externalId: attr.id,
         name: attr.name,
         option: attr.option,
@@ -531,7 +665,7 @@ export class ProductService {
     if (dto.groupedProducts) product.groupedProducts = dto.groupedProducts;
     if (dto.menuOrder !== undefined) product.menuOrder = dto.menuOrder;
     if (dto.metaData) {
-      product.metaData = dto.metaData.map(m => ({
+      product.metaData = dto.metaData.map((m) => ({
         externalId: m.id,
         key: m.key,
         value: m.value,
@@ -558,7 +692,7 @@ export class ProductService {
     id: string,
     userId: string,
     dto: UpdateStockDto,
-    pushToWoo: boolean = true,
+    pushToWoo = true,
   ): Promise<IProduct> {
     const product = await this.productModel.findOne({
       _id: new Types.ObjectId(id),
@@ -578,7 +712,10 @@ export class ProductService {
     // Update stock status based on quantity
     if (dto.quantity === 0) {
       product.stockStatus = StockStatus.OUT_OF_STOCK;
-    } else if (product.lowStockAmount && dto.quantity <= product.lowStockAmount) {
+    } else if (
+      product.lowStockAmount &&
+      dto.quantity <= product.lowStockAmount
+    ) {
       product.stockStatus = StockStatus.IN_STOCK; // Still in stock, but low
     } else {
       product.stockStatus = StockStatus.IN_STOCK;
@@ -601,8 +738,12 @@ export class ProductService {
   async bulkUpdate(
     userId: string,
     dto: BulkUpdateProductDto,
-    pushToWoo: boolean = true,
-  ): Promise<{ updated: number; failed: number; results: { id: string; success: boolean; error?: string }[] }> {
+    pushToWoo = true,
+  ): Promise<{
+    updated: number;
+    failed: number;
+    results: { id: string; success: boolean; error?: string }[];
+  }> {
     const results: { id: string; success: boolean; error?: string }[] = [];
     let updated = 0;
     let failed = 0;
@@ -615,7 +756,11 @@ export class ProductService {
         });
 
         if (!product) {
-          results.push({ id: productId, success: false, error: 'Product not found' });
+          results.push({
+            id: productId,
+            success: false,
+            error: 'Product not found',
+          });
           failed++;
           continue;
         }
@@ -661,7 +806,10 @@ export class ProductService {
           if (dto.priceAdjustment.type === 'increase') {
             product.regularPrice = (currentPrice + adjustment).toFixed(2);
           } else {
-            product.regularPrice = Math.max(0, currentPrice - adjustment).toFixed(2);
+            product.regularPrice = Math.max(
+              0,
+              currentPrice - adjustment,
+            ).toFixed(2);
           }
         }
 
@@ -672,7 +820,9 @@ export class ProductService {
           try {
             await this.syncProductToWoo(product);
           } catch (syncError) {
-            this.logger.warn(`Failed to sync product ${productId} to WooCommerce: ${syncError.message}`);
+            this.logger.warn(
+              `Failed to sync product ${productId} to WooCommerce: ${syncError.message}`,
+            );
           }
         }
 
@@ -693,8 +843,12 @@ export class ProductService {
   async bulkUpdateVariants(
     userId: string,
     dto: BulkUpdateVariantDto,
-    pushToWoo: boolean = true,
-  ): Promise<{ updated: number; failed: number; results: { id: string; success: boolean; error?: string }[] }> {
+    pushToWoo = true,
+  ): Promise<{
+    updated: number;
+    failed: number;
+    results: { id: string; success: boolean; error?: string }[];
+  }> {
     const results: { id: string; success: boolean; error?: string }[] = [];
     let updated = 0;
     let failed = 0;
@@ -707,7 +861,11 @@ export class ProductService {
         });
 
         if (!variant) {
-          results.push({ id: variantId, success: false, error: 'Variant not found' });
+          results.push({
+            id: variantId,
+            success: false,
+            error: 'Variant not found',
+          });
           failed++;
           continue;
         }
@@ -749,7 +907,10 @@ export class ProductService {
           if (dto.priceAdjustment.type === 'increase') {
             variant.regularPrice = (currentPrice + adjustment).toFixed(2);
           } else {
-            variant.regularPrice = Math.max(0, currentPrice - adjustment).toFixed(2);
+            variant.regularPrice = Math.max(
+              0,
+              currentPrice - adjustment,
+            ).toFixed(2);
           }
         }
 
@@ -760,7 +921,9 @@ export class ProductService {
           try {
             await this.syncVariantToWoo(variant);
           } catch (syncError) {
-            this.logger.warn(`Failed to sync variant ${variantId} to WooCommerce: ${syncError.message}`);
+            this.logger.warn(
+              `Failed to sync variant ${variantId} to WooCommerce: ${syncError.message}`,
+            );
           }
         }
 
@@ -782,7 +945,7 @@ export class ProductService {
     variantId: string,
     userId: string,
     dto: UpdateVariantDto,
-    pushToWoo: boolean = true,
+    pushToWoo = true,
   ): Promise<IProductVariant> {
     const variant = await this.variantModel.findOne({
       _id: new Types.ObjectId(variantId),
@@ -839,7 +1002,7 @@ export class ProductService {
       variant.description = dto.description;
     }
     if (dto.image !== undefined) {
-      variant.image = dto.image;
+      variant.image = dto.image ? { ...dto.image, position: 0 } : null;
     }
 
     variant.pendingSync = !pushToWoo;
@@ -859,7 +1022,7 @@ export class ProductService {
   async deleteVariant(
     variantId: string,
     userId: string,
-    deleteFromWoo: boolean = true,
+    deleteFromWoo = true,
   ): Promise<{ success: boolean; message: string }> {
     const variant = await this.variantModel.findOne({
       _id: new Types.ObjectId(variantId),
@@ -880,20 +1043,24 @@ export class ProductService {
 
     // Delete from WooCommerce first
     if (deleteFromWoo && variant.externalId && product.externalId) {
-      const store = await this.storeModel.findById(variant.storeId);
-      if (store?.woocommerce?.url && store?.woocommerce?.consumerKey && store?.woocommerce?.consumerSecret) {
+      const store = await this.storeModel
+        .findById(variant.storeId)
+        .select('+credentials');
+      if (store?.url && store?.credentials?.consumerKey && store?.credentials?.consumerSecret) {
         try {
           await this.wooCommerceService.deleteVariation(
             {
-              url: store.woocommerce.url,
-              consumerKey: store.woocommerce.consumerKey,
-              consumerSecret: store.woocommerce.consumerSecret,
+              url: store.url,
+              consumerKey: store.credentials.consumerKey,
+              consumerSecret: store.credentials.consumerSecret,
             },
             product.externalId,
             variant.externalId,
           );
         } catch (error) {
-          this.logger.error(`Failed to delete variant from WooCommerce: ${error.message}`);
+          this.logger.error(
+            `Failed to delete variant from WooCommerce: ${error.message}`,
+          );
           // Continue with local deletion even if WooCommerce fails
         }
       }
@@ -908,7 +1075,7 @@ export class ProductService {
       productId: product._id,
       isDeleted: false,
     });
-    product.variationsCount = remainingVariantsCount;
+    product.variationCount = remainingVariantsCount;
     await product.save();
 
     return { success: true, message: 'Variant deleted successfully' };
@@ -917,7 +1084,10 @@ export class ProductService {
   /**
    * Get variant by ID
    */
-  async findVariantById(variantId: string, userId: string): Promise<IProductVariant> {
+  async findVariantById(
+    variantId: string,
+    userId: string,
+  ): Promise<IProductVariant> {
     const variant = await this.variantModel.findOne({
       _id: new Types.ObjectId(variantId),
       isDeleted: false,
@@ -962,7 +1132,10 @@ export class ProductService {
       status: variant.status as 'publish' | 'pending' | 'draft' | 'private',
       manage_stock: variant.manageStock,
       stock_quantity: variant.stockQuantity,
-      stock_status: variant.stockStatus as 'instock' | 'outofstock' | 'onbackorder',
+      stock_status: variant.stockStatus as
+        | 'instock'
+        | 'outofstock'
+        | 'onbackorder',
     };
 
     // Include image if it exists
@@ -970,7 +1143,12 @@ export class ProductService {
       updateData.image = { src: variant.image.src };
     }
 
-    await this.wooCommerceService.updateVariation(credentials, product.externalId, variant.externalId, updateData);
+    await this.wooCommerceService.updateVariation(
+      credentials,
+      product.externalId,
+      variant.externalId,
+      updateData,
+    );
 
     variant.pendingSync = false;
     variant.lastSyncedAt = new Date();
@@ -1086,7 +1264,10 @@ export class ProductService {
       filter.storeId = new Types.ObjectId(storeId);
     }
 
-    const products = await this.productModel.find(filter).sort({ stockQuantity: 1 }).limit(100);
+    const products = await this.productModel
+      .find(filter)
+      .sort({ stockQuantity: 1 })
+      .limit(100);
 
     return products.map((p) => this.toProductInterface(p));
   }
@@ -1128,38 +1309,59 @@ export class ProductService {
       };
 
       // Add optional fields if they have values
-      if (product.globalUniqueId) wooUpdateData.global_unique_id = product.globalUniqueId;
-      if (product.dateOnSaleFrom) wooUpdateData.date_on_sale_from = product.dateOnSaleFrom.toISOString();
-      if (product.dateOnSaleFromGmt) wooUpdateData.date_on_sale_from_gmt = product.dateOnSaleFromGmt.toISOString();
-      if (product.dateOnSaleTo) wooUpdateData.date_on_sale_to = product.dateOnSaleTo.toISOString();
-      if (product.dateOnSaleToGmt) wooUpdateData.date_on_sale_to_gmt = product.dateOnSaleToGmt.toISOString();
-      if (product.virtual !== undefined) wooUpdateData.virtual = product.virtual;
-      if (product.downloadable !== undefined) wooUpdateData.downloadable = product.downloadable;
-      if (product.downloads?.length) wooUpdateData.downloads = product.downloads;
-      if (product.downloadLimit !== undefined) wooUpdateData.download_limit = product.downloadLimit;
-      if (product.downloadExpiry !== undefined) wooUpdateData.download_expiry = product.downloadExpiry;
+      if (product.globalUniqueId)
+        wooUpdateData.global_unique_id = product.globalUniqueId;
+      if (product.dateOnSaleFrom)
+        wooUpdateData.date_on_sale_from = product.dateOnSaleFrom.toISOString();
+      if (product.dateOnSaleFromGmt)
+        wooUpdateData.date_on_sale_from_gmt =
+          product.dateOnSaleFromGmt.toISOString();
+      if (product.dateOnSaleTo)
+        wooUpdateData.date_on_sale_to = product.dateOnSaleTo.toISOString();
+      if (product.dateOnSaleToGmt)
+        wooUpdateData.date_on_sale_to_gmt =
+          product.dateOnSaleToGmt.toISOString();
+      if (product.virtual !== undefined)
+        wooUpdateData.virtual = product.virtual;
+      if (product.downloadable !== undefined)
+        wooUpdateData.downloadable = product.downloadable;
+      if (product.downloads?.length)
+        wooUpdateData.downloads = product.downloads;
+      if (product.downloadLimit !== undefined)
+        wooUpdateData.download_limit = product.downloadLimit;
+      if (product.downloadExpiry !== undefined)
+        wooUpdateData.download_expiry = product.downloadExpiry;
       if (product.externalUrl) wooUpdateData.external_url = product.externalUrl;
       if (product.buttonText) wooUpdateData.button_text = product.buttonText;
       if (product.taxStatus) wooUpdateData.tax_status = product.taxStatus;
-      if (product.taxClass !== undefined) wooUpdateData.tax_class = product.taxClass;
+      if (product.taxClass !== undefined)
+        wooUpdateData.tax_class = product.taxClass;
       if (product.backorders) wooUpdateData.backorders = product.backorders;
-      if (product.soldIndividually !== undefined) wooUpdateData.sold_individually = product.soldIndividually;
+      if (product.soldIndividually !== undefined)
+        wooUpdateData.sold_individually = product.soldIndividually;
       if (product.weight) wooUpdateData.weight = product.weight;
       if (product.dimensions) wooUpdateData.dimensions = product.dimensions;
-      if (product.shippingClass) wooUpdateData.shipping_class = product.shippingClass;
-      if (product.reviewsAllowed !== undefined) wooUpdateData.reviews_allowed = product.reviewsAllowed;
-      if (product.upsellIds?.length) wooUpdateData.upsell_ids = product.upsellIds;
-      if (product.crossSellIds?.length) wooUpdateData.cross_sell_ids = product.crossSellIds;
+      if (product.shippingClass)
+        wooUpdateData.shipping_class = product.shippingClass;
+      if (product.reviewsAllowed !== undefined)
+        wooUpdateData.reviews_allowed = product.reviewsAllowed;
+      if (product.upsellIds?.length)
+        wooUpdateData.upsell_ids = product.upsellIds;
+      if (product.crossSellIds?.length)
+        wooUpdateData.cross_sell_ids = product.crossSellIds;
       if (product.parentId) wooUpdateData.parent_id = product.parentId;
-      if (product.purchaseNote) wooUpdateData.purchase_note = product.purchaseNote;
+      if (product.purchaseNote)
+        wooUpdateData.purchase_note = product.purchaseNote;
       if (product.categories?.length) {
-        wooUpdateData.categories = product.categories.map(c => ({ id: c.externalId }));
+        wooUpdateData.categories = product.categories.map((c) => ({
+          id: c.externalId,
+        }));
       }
       if (product.tags?.length) {
-        wooUpdateData.tags = product.tags.map(t => ({ id: t.externalId }));
+        wooUpdateData.tags = product.tags.map((t) => ({ id: t.externalId }));
       }
       if (product.images?.length) {
-        wooUpdateData.images = product.images.map(img => ({
+        wooUpdateData.images = product.images.map((img) => ({
           id: img.externalId,
           src: img.src,
           name: img.name,
@@ -1167,7 +1369,7 @@ export class ProductService {
         }));
       }
       if (product.attributes?.length) {
-        wooUpdateData.attributes = product.attributes.map(a => ({
+        wooUpdateData.attributes = product.attributes.map((a) => ({
           id: a.externalId,
           name: a.name,
           position: a.position,
@@ -1177,30 +1379,43 @@ export class ProductService {
         }));
       }
       if (product.defaultAttributes?.length) {
-        wooUpdateData.default_attributes = product.defaultAttributes.map(a => ({
-          id: a.externalId,
-          name: a.name,
-          option: a.option,
-        }));
+        wooUpdateData.default_attributes = product.defaultAttributes.map(
+          (a) => ({
+            id: a.externalId,
+            name: a.name,
+            option: a.option,
+          }),
+        );
       }
-      if (product.groupedProducts?.length) wooUpdateData.grouped_products = product.groupedProducts;
-      if (product.menuOrder !== undefined) wooUpdateData.menu_order = product.menuOrder;
+      if (product.groupedProducts?.length)
+        wooUpdateData.grouped_products = product.groupedProducts;
+      if (product.menuOrder !== undefined)
+        wooUpdateData.menu_order = product.menuOrder;
       if (product.metaData?.length) {
-        wooUpdateData.meta_data = product.metaData.map(m => ({
+        wooUpdateData.meta_data = product.metaData.map((m) => ({
           id: m.externalId,
           key: m.key,
           value: m.value,
         }));
       }
 
-      await this.wooCommerceService.updateProduct(credentials, product.externalId, wooUpdateData);
+      await this.wooCommerceService.updateProduct(
+        credentials,
+        product.externalId,
+        wooUpdateData,
+      );
 
       product.pendingSync = false;
       product.lastSyncedAt = new Date();
       await product.save();
     } catch (error) {
-      this.logger.error(`Failed to sync product to WooCommerce: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to sync product to WooCommerce: ${error.message}`);
+      this.logger.error(
+        `Failed to sync product to WooCommerce: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to sync product to WooCommerce: ${error.message}`,
+      );
     }
   }
 
@@ -1262,10 +1477,18 @@ export class ProductService {
       price: wooProduct.price,
       regularPrice: wooProduct.regular_price,
       salePrice: wooProduct.sale_price,
-      dateOnSaleFrom: wooProduct.date_on_sale_from ? new Date(wooProduct.date_on_sale_from) : null,
-      dateOnSaleFromGmt: wooProduct.date_on_sale_from_gmt ? new Date(wooProduct.date_on_sale_from_gmt) : null,
-      dateOnSaleTo: wooProduct.date_on_sale_to ? new Date(wooProduct.date_on_sale_to) : null,
-      dateOnSaleToGmt: wooProduct.date_on_sale_to_gmt ? new Date(wooProduct.date_on_sale_to_gmt) : null,
+      dateOnSaleFrom: wooProduct.date_on_sale_from
+        ? new Date(wooProduct.date_on_sale_from)
+        : null,
+      dateOnSaleFromGmt: wooProduct.date_on_sale_from_gmt
+        ? new Date(wooProduct.date_on_sale_from_gmt)
+        : null,
+      dateOnSaleTo: wooProduct.date_on_sale_to
+        ? new Date(wooProduct.date_on_sale_to)
+        : null,
+      dateOnSaleToGmt: wooProduct.date_on_sale_to_gmt
+        ? new Date(wooProduct.date_on_sale_to_gmt)
+        : null,
       priceHtml: wooProduct.price_html || '',
       onSale: wooProduct.on_sale,
       purchasable: wooProduct.purchasable,
@@ -1299,51 +1522,65 @@ export class ProductService {
       relatedIds: wooProduct.related_ids || [],
       upsellIds: wooProduct.upsell_ids || [],
       crossSellIds: wooProduct.cross_sell_ids || [],
-      categories: wooProduct.categories?.map((c: any) => ({
-        externalId: c.id,
-        name: c.name,
-        slug: c.slug,
-      })) || [],
-      tags: wooProduct.tags?.map((t: any) => ({
-        externalId: t.id,
-        name: t.name,
-        slug: t.slug,
-      })) || [],
-      images: wooProduct.images?.map((img: any, idx: number) => ({
-        externalId: img.id,
-        src: img.src,
-        name: img.name || '',
-        alt: img.alt || '',
-        position: idx,
-      })) || [],
-      attributes: wooProduct.attributes?.map((a: any) => ({
-        externalId: a.id,
-        name: a.name,
-        position: a.position,
-        visible: a.visible,
-        variation: a.variation,
-        options: a.options || [],
-      })) || [],
-      defaultAttributes: wooProduct.default_attributes?.map((a: any) => ({
-        externalId: a.id,
-        name: a.name,
-        option: a.option,
-      })) || [],
+      categories:
+        wooProduct.categories?.map((c: any) => ({
+          externalId: c.id,
+          name: c.name,
+          slug: c.slug,
+        })) || [],
+      tags:
+        wooProduct.tags?.map((t: any) => ({
+          externalId: t.id,
+          name: t.name,
+          slug: t.slug,
+        })) || [],
+      images:
+        wooProduct.images?.map((img: any, idx: number) => ({
+          externalId: img.id,
+          src: img.src,
+          name: img.name || '',
+          alt: img.alt || '',
+          position: idx,
+        })) || [],
+      attributes:
+        wooProduct.attributes?.map((a: any) => ({
+          externalId: a.id,
+          name: a.name,
+          position: a.position,
+          visible: a.visible,
+          variation: a.variation,
+          options: a.options || [],
+        })) || [],
+      defaultAttributes:
+        wooProduct.default_attributes?.map((a: any) => ({
+          externalId: a.id,
+          name: a.name,
+          option: a.option,
+        })) || [],
       variationIds: wooProduct.variations || [],
       variationCount: wooProduct.variations?.length || 0,
       groupedProducts: wooProduct.grouped_products || [],
       menuOrder: wooProduct.menu_order || 0,
       purchaseNote: wooProduct.purchase_note || '',
-      metaData: wooProduct.meta_data?.map((m: any) => ({
-        externalId: m.id,
-        key: m.key,
-        value: m.value,
-      })) || [],
+      metaData:
+        wooProduct.meta_data?.map((m: any) => ({
+          externalId: m.id,
+          key: m.key,
+          value: m.value,
+        })) || [],
       parentId: wooProduct.parent_id,
-      dateCreatedWoo: wooProduct.date_created ? new Date(wooProduct.date_created) : null,
-      dateCreatedGmtWoo: wooProduct.date_created_gmt ? new Date(wooProduct.date_created_gmt) : null,
-      dateModifiedWoo: wooProduct.date_modified ? new Date(wooProduct.date_modified) : null,
-      dateModifiedGmtWoo: wooProduct.date_modified_gmt ? new Date(wooProduct.date_modified_gmt) : null,
+      dateCreatedWoo: wooProduct.date_created
+        ? new Date(wooProduct.date_created)
+        : null,
+      dateCreatedGmtWoo: wooProduct.date_created_gmt
+        ? new Date(wooProduct.date_created_gmt)
+        : null,
+      dateModifiedWoo: wooProduct.date_modified
+        ? new Date(wooProduct.date_modified)
+        : null,
+      dateModifiedGmtWoo: wooProduct.date_modified_gmt
+        ? new Date(wooProduct.date_modified_gmt)
+        : null,
       lastSyncedAt: new Date(),
       pendingSync: false,
       isDeleted: false,
@@ -1489,7 +1726,9 @@ export class ProductService {
         product.stockStatus || '',
         product.stockQuantity ?? '',
         (product.categories || []).map((c: any) => c.name).join('; '),
-        (product.shortDescription || '').replace(/<[^>]+>/g, '').substring(0, 200),
+        (product.shortDescription || '')
+          .replace(/<[^>]+>/g, '')
+          .substring(0, 200),
         product.dateCreatedWoo
           ? new Date(product.dateCreatedWoo).toISOString().split('T')[0]
           : '',
@@ -1505,10 +1744,12 @@ export class ProductService {
     };
 
     const BOM = '\uFEFF';
-    const csvContent = BOM + [
-      headers.map(escapeValue).join(','),
-      ...rows.map((row) => row.map(escapeValue).join(',')),
-    ].join('\n');
+    const csvContent =
+      BOM +
+      [
+        headers.map(escapeValue).join(','),
+        ...rows.map((row) => row.map(escapeValue).join(',')),
+      ].join('\n');
 
     return csvContent;
   }
@@ -1520,15 +1761,54 @@ export class ProductService {
     userId: string,
     storeId?: string,
   ): Promise<{
-    overview: { totalProducts: number; activeProducts: number; draftProducts: number; outOfStock: number; lowStock: number };
-    stockDistribution: { inStock: number; outOfStock: number; onBackorder: number; lowStock: number };
-    categoryBreakdown: { categoryName: string; productCount: number; avgPrice: number }[];
+    overview: {
+      totalProducts: number;
+      activeProducts: number;
+      draftProducts: number;
+      outOfStock: number;
+      lowStock: number;
+    };
+    stockDistribution: {
+      inStock: number;
+      outOfStock: number;
+      onBackorder: number;
+      lowStock: number;
+    };
+    categoryBreakdown: {
+      categoryName: string;
+      productCount: number;
+      avgPrice: number;
+    }[];
     priceRanges: { range: string; count: number }[];
-    topRatedProducts: { productId: string; name: string; avgRating: number; reviewCount: number; image?: string }[];
-    recentlyAdded: { productId: string; name: string; dateAdded: Date; status: string; image?: string }[];
-    stockAlerts: { productId: string; name: string; sku: string; stockQuantity: number; threshold: number; image?: string }[];
+    topRatedProducts: {
+      productId: string;
+      name: string;
+      avgRating: number;
+      reviewCount: number;
+      image?: string;
+    }[];
+    recentlyAdded: {
+      productId: string;
+      name: string;
+      dateAdded: Date;
+      status: string;
+      image?: string;
+    }[];
+    stockAlerts: {
+      productId: string;
+      name: string;
+      sku: string;
+      stockQuantity: number;
+      threshold: number;
+      image?: string;
+    }[];
     typeDistribution: { type: string; count: number }[];
-    priceStats: { minPrice: number; maxPrice: number; avgPrice: number; totalValue: number };
+    priceStats: {
+      minPrice: number;
+      maxPrice: number;
+      avgPrice: number;
+      totalValue: number;
+    };
   }> {
     const storeIds = await this.getUserStoreIds(userId);
 
@@ -1551,17 +1831,28 @@ export class ProductService {
       this.productModel.countDocuments(filter),
       this.productModel.countDocuments({ ...filter, status: 'publish' }),
       this.productModel.countDocuments({ ...filter, status: 'draft' }),
-      this.productModel.countDocuments({ ...filter, stockStatus: StockStatus.OUT_OF_STOCK }),
+      this.productModel.countDocuments({
+        ...filter,
+        stockStatus: StockStatus.OUT_OF_STOCK,
+      }),
       this.productModel.countDocuments({
         ...filter,
         manageStock: true,
-        $expr: { $lte: ['$stockQuantity', { $ifNull: ['$lowStockAmount', 10] }] },
+        $expr: {
+          $lte: ['$stockQuantity', { $ifNull: ['$lowStockAmount', 10] }],
+        },
       }),
     ]);
 
     const [inStock, onBackorder] = await Promise.all([
-      this.productModel.countDocuments({ ...filter, stockStatus: StockStatus.IN_STOCK }),
-      this.productModel.countDocuments({ ...filter, stockStatus: StockStatus.ON_BACKORDER }),
+      this.productModel.countDocuments({
+        ...filter,
+        stockStatus: StockStatus.IN_STOCK,
+      }),
+      this.productModel.countDocuments({
+        ...filter,
+        stockStatus: StockStatus.ON_BACKORDER,
+      }),
     ]);
 
     const categoryAgg = await this.productModel.aggregate([
@@ -1628,7 +1919,7 @@ export class ProductService {
       '500': '$500 - $1000',
       '1000': '$1000 - $5000',
       '5000': '$5000+',
-      'Other': 'Other',
+      Other: 'Other',
     };
 
     const formattedPriceRanges = priceRanges.map((p) => ({
@@ -1653,7 +1944,9 @@ export class ProductService {
         ...filter,
         manageStock: true,
         stockQuantity: { $ne: null },
-        $expr: { $lte: ['$stockQuantity', { $ifNull: ['$lowStockAmount', 10] }] },
+        $expr: {
+          $lte: ['$stockQuantity', { $ifNull: ['$lowStockAmount', 10] }],
+        },
       })
       .sort({ stockQuantity: 1 })
       .limit(10)
@@ -1691,7 +1984,12 @@ export class ProductService {
       },
     ]);
 
-    const stats = priceStats[0] || { minPrice: 0, maxPrice: 0, avgPrice: 0, totalValue: 0 };
+    const stats = priceStats[0] || {
+      minPrice: 0,
+      maxPrice: 0,
+      avgPrice: 0,
+      totalValue: 0,
+    };
 
     return {
       overview: {
@@ -1813,12 +2111,18 @@ export class ProductService {
       // Convert price string to number for comparison
       if (query.minPrice !== undefined) {
         filter.$expr.$and.push({
-          $gte: [{ $toDouble: { $ifNull: ['$price', '$regularPrice'] } }, query.minPrice],
+          $gte: [
+            { $toDouble: { $ifNull: ['$price', '$regularPrice'] } },
+            query.minPrice,
+          ],
         });
       }
       if (query.maxPrice !== undefined) {
         filter.$expr.$and.push({
-          $lte: [{ $toDouble: { $ifNull: ['$price', '$regularPrice'] } }, query.maxPrice],
+          $lte: [
+            { $toDouble: { $ifNull: ['$price', '$regularPrice'] } },
+            query.maxPrice,
+          ],
         });
       }
     }
@@ -1855,10 +2159,14 @@ export class ProductService {
       this.variantModel.countDocuments(filter),
     ]);
 
-    const productIds = [...new Set(variants.map((v) => v.productId.toString()))];
-    const products = await this.productModel.find({
-      _id: { $in: productIds.map((id) => new Types.ObjectId(id)) },
-    }).select('_id name');
+    const productIds = [
+      ...new Set(variants.map((v) => v.productId.toString())),
+    ];
+    const products = await this.productModel
+      .find({
+        _id: { $in: productIds.map((id) => new Types.ObjectId(id)) },
+      })
+      .select('_id name');
 
     const productNameMap = new Map<string, string>();
     products.forEach((p) => {
@@ -1965,8 +2273,14 @@ export class ProductService {
   async updateImages(
     id: string,
     userId: string,
-    images: { src: string; alt?: string; name?: string; position?: number; externalId?: number }[],
-    pushToWoo: boolean = true,
+    images: {
+      src: string;
+      alt?: string;
+      name?: string;
+      position?: number;
+      externalId?: number;
+    }[],
+    pushToWoo = true,
   ): Promise<IProduct> {
     const product = await this.productModel.findOne({
       _id: new Types.ObjectId(id),
@@ -1984,7 +2298,9 @@ export class ProductService {
     const newImageSrcs = new Set(images.map((img) => img.src));
 
     // Find images that were removed (exist in old but not in new)
-    const removedImages = existingImages.filter((img) => !newImageSrcs.has(img.src));
+    const removedImages = existingImages.filter(
+      (img) => !newImageSrcs.has(img.src),
+    );
 
     // Create a map of existing images by src URL to preserve externalId
     const existingImagesMap = new Map<string, number>();
@@ -2013,9 +2329,13 @@ export class ProductService {
 
     // Delete removed images from WordPress and S3 (in background, don't block response)
     if (removedImages.length > 0) {
-      this.deleteRemovedImages(product.storeId.toString(), removedImages).catch((error) => {
-        this.logger.warn(`Failed to delete some removed images: ${error.message}`);
-      });
+      this.deleteRemovedImages(product.storeId.toString(), removedImages).catch(
+        (error) => {
+          this.logger.warn(
+            `Failed to delete some removed images: ${error.message}`,
+          );
+        },
+      );
     }
 
     return this.toProductInterface(product);
@@ -2050,9 +2370,14 @@ export class ProductService {
       if (img.externalId && credentials) {
         try {
           this.logger.log(`Deleting WordPress media ID: ${img.externalId}`);
-          await this.wooCommerceService.deleteMedia(credentials, img.externalId);
+          await this.wooCommerceService.deleteMedia(
+            credentials,
+            img.externalId,
+          );
         } catch (error) {
-          this.logger.warn(`Failed to delete WordPress media ID ${img.externalId}: ${error.message}`);
+          this.logger.warn(
+            `Failed to delete WordPress media ID ${img.externalId}: ${error.message}`,
+          );
         }
       }
 
@@ -2062,7 +2387,9 @@ export class ProductService {
           this.logger.log(`Deleting S3 image: ${img.src}`);
           await this.s3UploadService.deleteFile(img.src);
         } catch (error) {
-          this.logger.warn(`Failed to delete S3 image ${img.src}: ${error.message}`);
+          this.logger.warn(
+            `Failed to delete S3 image ${img.src}: ${error.message}`,
+          );
         }
       }
     }
@@ -2079,7 +2406,7 @@ export class ProductService {
     id: string,
     userId: string,
     imageIndex: number,
-    pushToWoo: boolean = true,
+    pushToWoo = true,
   ): Promise<IProduct> {
     const product = await this.productModel.findOne({
       _id: new Types.ObjectId(id),
@@ -2112,9 +2439,11 @@ export class ProductService {
     }
 
     // Delete the removed image from WordPress and S3 (in background)
-    this.deleteRemovedImages(product.storeId.toString(), [deletedImage]).catch((error) => {
-      this.logger.warn(`Failed to delete image: ${error.message}`);
-    });
+    this.deleteRemovedImages(product.storeId.toString(), [deletedImage]).catch(
+      (error) => {
+        this.logger.warn(`Failed to delete image: ${error.message}`);
+      },
+    );
 
     return this.toProductInterface(product);
   }
@@ -2136,9 +2465,12 @@ export class ProductService {
 
     // Fetch current product from WooCommerce to get existing image IDs
     // This ensures we don't re-upload images that already exist in WordPress
-    let wooImageMap = new Map<string, number>();
+    const wooImageMap = new Map<string, number>();
     try {
-      const currentWooProduct = await this.wooCommerceService.getProduct(credentials, product.externalId);
+      const currentWooProduct = await this.wooCommerceService.getProduct(
+        credentials,
+        product.externalId,
+      );
       if (currentWooProduct?.images) {
         currentWooProduct.images.forEach((img: any) => {
           if (img.id && img.src) {
@@ -2148,36 +2480,43 @@ export class ProductService {
       }
     } catch (error) {
       // If we can't fetch the product, continue without the map
-      console.warn('Could not fetch current WooCommerce product for image ID mapping:', error.message);
+      console.warn(
+        'Could not fetch current WooCommerce product for image ID mapping:',
+        error.message,
+      );
     }
 
-    const updatedProduct = await this.wooCommerceService.updateProduct(credentials, product.externalId, {
-      images: product.images.map((img) => {
-        // First check if we have externalId stored locally
-        if (img.externalId) {
+    const updatedProduct = await this.wooCommerceService.updateProduct(
+      credentials,
+      product.externalId,
+      {
+        images: product.images.map((img) => {
+          // First check if we have externalId stored locally
+          if (img.externalId) {
+            return {
+              id: img.externalId,
+              alt: img.alt,
+              position: img.position,
+            };
+          }
+          // Then check if the image exists in WooCommerce (matched by src URL)
+          const wooImageId = wooImageMap.get(img.src);
+          if (wooImageId) {
+            return {
+              id: wooImageId,
+              alt: img.alt,
+              position: img.position,
+            };
+          }
+          // For truly new images, send src so WooCommerce uploads them
           return {
-            id: img.externalId,
+            src: img.src,
             alt: img.alt,
             position: img.position,
           };
-        }
-        // Then check if the image exists in WooCommerce (matched by src URL)
-        const wooImageId = wooImageMap.get(img.src);
-        if (wooImageId) {
-          return {
-            id: wooImageId,
-            alt: img.alt,
-            position: img.position,
-          };
-        }
-        // For truly new images, send src so WooCommerce uploads them
-        return {
-          src: img.src,
-          alt: img.alt,
-          position: img.position,
-        };
-      }),
-    });
+        }),
+      },
+    );
 
     // Update local images with the returned WooCommerce image IDs
     // This ensures newly uploaded images get their externalId stored
@@ -2240,12 +2579,17 @@ export class ProductService {
       consumerSecret: store.credentials.consumerSecret,
     };
 
-    const lines = csvContent.split('\n').map((line) => line.trim()).filter((line) => line);
+    const lines = csvContent
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line);
     if (lines.length < 2) {
       throw new BadRequestException('CSV file is empty or has no data rows');
     }
 
-    const headers = this.parseCsvLine(lines[0]).map((h) => h.toLowerCase().trim());
+    const headers = this.parseCsvLine(lines[0]).map((h) =>
+      h.toLowerCase().trim(),
+    );
     const dataRows = lines.slice(1);
 
     const results = {
@@ -2278,8 +2622,11 @@ export class ProductService {
         const status = getColumn(row, 'status') || 'publish';
         const regularPrice = getColumn(row, 'regular price');
         const salePrice = getColumn(row, 'sale price');
-        const manageStock = ['yes', 'true', '1'].includes(getColumn(row, 'manage stock').toLowerCase());
-        const stockQuantity = parseInt(getColumn(row, 'stock quantity'), 10) || 0;
+        const manageStock = ['yes', 'true', '1'].includes(
+          getColumn(row, 'manage stock').toLowerCase(),
+        );
+        const stockQuantity =
+          parseInt(getColumn(row, 'stock quantity'), 10) || 0;
         const description = getColumn(row, 'description');
         const shortDescription = getColumn(row, 'short description');
 
@@ -2314,12 +2661,14 @@ export class ProductService {
           );
           results.updated++;
         } else {
-          wooProduct = await this.wooCommerceService.createProduct(credentials, productData);
+          wooProduct = await this.wooCommerceService.createProduct(
+            credentials,
+            productData,
+          );
           results.created++;
         }
 
         await this.upsertProductFromWoo(wooProduct, store);
-
       } catch (error) {
         this.logger.error(`Import error row ${rowNumber}: ${error.message}`);
         results.errors.push({ row: rowNumber, error: error.message });
@@ -2358,7 +2707,10 @@ export class ProductService {
     return result;
   }
 
-  private async upsertProductFromWoo(wooProduct: WooProduct, store: StoreDocument): Promise<void> {
+  private async upsertProductFromWoo(
+    wooProduct: WooProduct,
+    store: StoreDocument,
+  ): Promise<void> {
     const productData = {
       storeId: store._id,
       externalId: wooProduct.id,
@@ -2386,36 +2738,44 @@ export class ProductService {
       lowStockAmount: wooProduct.low_stock_amount,
       weight: wooProduct.weight,
       dimensions: wooProduct.dimensions,
-      categories: wooProduct.categories?.map((cat) => ({
-        externalId: cat.id,
-        name: cat.name,
-        slug: cat.slug,
-      })) || [],
-      tags: wooProduct.tags?.map((tag) => ({
-        externalId: tag.id,
-        name: tag.name,
-        slug: tag.slug,
-      })) || [],
-      images: wooProduct.images?.map((img, idx) => ({
-        externalId: img.id,
-        src: img.src,
-        name: img.name,
-        alt: img.alt,
-        position: idx,
-      })) || [],
-      attributes: wooProduct.attributes?.map((attr) => ({
-        externalId: attr.id,
-        name: attr.name,
-        position: attr.position,
-        visible: attr.visible,
-        variation: attr.variation,
-        options: attr.options,
-      })) || [],
+      categories:
+        wooProduct.categories?.map((cat) => ({
+          externalId: cat.id,
+          name: cat.name,
+          slug: cat.slug,
+        })) || [],
+      tags:
+        wooProduct.tags?.map((tag) => ({
+          externalId: tag.id,
+          name: tag.name,
+          slug: tag.slug,
+        })) || [],
+      images:
+        wooProduct.images?.map((img, idx) => ({
+          externalId: img.id,
+          src: img.src,
+          name: img.name,
+          alt: img.alt,
+          position: idx,
+        })) || [],
+      attributes:
+        wooProduct.attributes?.map((attr) => ({
+          externalId: attr.id,
+          name: attr.name,
+          position: attr.position,
+          visible: attr.visible,
+          variation: attr.variation,
+          options: attr.options,
+        })) || [],
       variationIds: wooProduct.variations || [],
       variationCount: wooProduct.variations?.length || 0,
       parentId: wooProduct.parent_id,
-      dateCreatedWoo: wooProduct.date_created ? new Date(wooProduct.date_created) : undefined,
-      dateModifiedWoo: wooProduct.date_modified ? new Date(wooProduct.date_modified) : undefined,
+      dateCreatedWoo: wooProduct.date_created
+        ? new Date(wooProduct.date_created)
+        : undefined,
+      dateModifiedWoo: wooProduct.date_modified
+        ? new Date(wooProduct.date_modified)
+        : undefined,
       lastSyncedAt: new Date(),
       pendingSync: false,
       isDeleted: false,
@@ -2454,14 +2814,20 @@ export class ProductService {
 
     // Check if product is variable type
     if (product.type !== 'variable') {
-      throw new BadRequestException('Only variable products can have variations');
+      throw new BadRequestException(
+        'Only variable products can have variations',
+      );
     }
 
     // Get attributes that are used for variations
-    const variationAttributes = product.attributes.filter(attr => attr.variation && attr.options?.length > 0);
+    const variationAttributes = product.attributes.filter(
+      (attr) => attr.variation && attr.options?.length > 0,
+    );
 
     if (variationAttributes.length === 0) {
-      throw new BadRequestException('Product has no attributes configured for variations');
+      throw new BadRequestException(
+        'Product has no attributes configured for variations',
+      );
     }
 
     // Generate all combinations (cartesian product)
@@ -2469,14 +2835,18 @@ export class ProductService {
       if (arrays.length === 0) return [[]];
       const [first, ...rest] = arrays;
       const restCombinations = generateCombinations(rest);
-      return first.flatMap(item => restCombinations.map(combo => [item, ...combo]));
+      return first.flatMap((item) =>
+        restCombinations.map((combo) => [item, ...combo]),
+      );
     };
 
-    const optionArrays = variationAttributes.map(attr => attr.options);
+    const optionArrays = variationAttributes.map((attr) => attr.options);
     const combinations = generateCombinations(optionArrays);
 
     // Get store credentials
-    const store = await this.storeModel.findById(product.storeId).select('+credentials');
+    const store = await this.storeModel
+      .findById(product.storeId)
+      .select('+credentials');
     if (!store) {
       throw new NotFoundException('Store not found');
     }
@@ -2525,16 +2895,19 @@ export class ProductService {
             stockQuantity: wooVariation.stock_quantity,
             stockStatus: wooVariation.stock_status || 'instock',
             manageStock: wooVariation.manage_stock || false,
-            attributes: wooVariation.attributes?.map(a => ({
-              name: a.name,
-              option: a.option,
-            })) || [],
-            image: wooVariation.image ? {
-              externalId: wooVariation.image.id,
-              src: wooVariation.image.src,
-              name: wooVariation.image.name || '',
-              alt: wooVariation.image.alt || '',
-            } : undefined,
+            attributes:
+              wooVariation.attributes?.map((a) => ({
+                name: a.name,
+                option: a.option,
+              })) || [],
+            image: wooVariation.image
+              ? {
+                  externalId: wooVariation.image.id,
+                  src: wooVariation.image.src,
+                  name: wooVariation.image.name || '',
+                  alt: wooVariation.image.alt || '',
+                }
+              : undefined,
             lastSyncedAt: new Date(),
             isDeleted: false,
           },
@@ -2543,7 +2916,10 @@ export class ProductService {
       }
 
       // Update product's variation count
-      product.variationIds = [...(product.variationIds || []), ...createdVariations.map(v => v.id)];
+      product.variationIds = [
+        ...(product.variationIds || []),
+        ...createdVariations.map((v) => v.id),
+      ];
       product.variationCount = product.variationIds.length;
       await product.save();
 
@@ -2552,8 +2928,13 @@ export class ProductService {
         variations: createdVariations,
       };
     } catch (error) {
-      this.logger.error(`Failed to generate variations: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to generate variations: ${error.message}`);
+      this.logger.error(
+        `Failed to generate variations: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to generate variations: ${error.message}`,
+      );
     }
   }
 }
