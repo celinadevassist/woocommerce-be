@@ -248,6 +248,72 @@ export class WooCommerceService implements IPlatformAdapter {
   }
 
   /**
+   * Create a variation for a variable product
+   */
+  async createVariation(
+    credentials: WooCommerceCredentials,
+    productId: number,
+    data: {
+      regular_price?: string;
+      sale_price?: string;
+      sku?: string;
+      stock_quantity?: number;
+      stock_status?: string;
+      manage_stock?: boolean;
+      attributes: Array<{ id?: number; name: string; option: string }>;
+      image?: { id?: number; src?: string };
+    },
+  ): Promise<WooProductVariation> {
+    return this.request<WooProductVariation>(
+      credentials,
+      'POST',
+      `products/${productId}/variations`,
+      undefined,
+      data,
+    );
+  }
+
+  /**
+   * Batch create variations for a variable product
+   */
+  async batchCreateVariations(
+    credentials: WooCommerceCredentials,
+    productId: number,
+    variations: Array<{
+      regular_price?: string;
+      sku?: string;
+      stock_status?: string;
+      manage_stock?: boolean;
+      attributes: Array<{ name: string; option: string }>;
+    }>,
+  ): Promise<{ create: WooProductVariation[] }> {
+    return this.request<{ create: WooProductVariation[] }>(
+      credentials,
+      'POST',
+      `products/${productId}/variations/batch`,
+      undefined,
+      { create: variations },
+    );
+  }
+
+  /**
+   * Delete a variation from a variable product
+   */
+  async deleteVariation(
+    credentials: WooCommerceCredentials,
+    productId: number,
+    variationId: number,
+    force: boolean = true,
+  ): Promise<WooProductVariation> {
+    return this.request<WooProductVariation>(
+      credentials,
+      'DELETE',
+      `products/${productId}/variations/${variationId}`,
+      { force },
+    );
+  }
+
+  /**
    * Get orders with pagination
    * @param modifiedAfter - ISO8601 date string to fetch only orders modified after this date (delta sync)
    */

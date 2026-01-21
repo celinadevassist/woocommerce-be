@@ -838,6 +838,9 @@ export class ProductService {
     if (dto.description !== undefined) {
       variant.description = dto.description;
     }
+    if (dto.image !== undefined) {
+      variant.image = dto.image;
+    }
 
     variant.pendingSync = !pushToWoo;
     await variant.save();
@@ -848,6 +851,67 @@ export class ProductService {
     }
 
     return this.toVariantInterface(variant);
+  }
+
+  /**
+   * Delete a variant
+   */
+  async deleteVariant(
+    variantId: string,
+    userId: string,
+    deleteFromWoo: boolean = true,
+  ): Promise<{ success: boolean; message: string }> {
+    const variant = await this.variantModel.findOne({
+      _id: new Types.ObjectId(variantId),
+      isDeleted: false,
+    });
+
+    if (!variant) {
+      throw new NotFoundException('Variant not found');
+    }
+
+    await this.verifyStoreAccess(variant.storeId.toString(), userId);
+
+    // Get the parent product for WooCommerce sync
+    const product = await this.productModel.findById(variant.productId);
+    if (!product) {
+      throw new NotFoundException('Parent product not found');
+    }
+
+    // Delete from WooCommerce first
+    if (deleteFromWoo && variant.externalId && product.externalId) {
+      const store = await this.storeModel.findById(variant.storeId);
+      if (store?.woocommerce?.url && store?.woocommerce?.consumerKey && store?.woocommerce?.consumerSecret) {
+        try {
+          await this.wooCommerceService.deleteVariation(
+            {
+              url: store.woocommerce.url,
+              consumerKey: store.woocommerce.consumerKey,
+              consumerSecret: store.woocommerce.consumerSecret,
+            },
+            product.externalId,
+            variant.externalId,
+          );
+        } catch (error) {
+          this.logger.error(`Failed to delete variant from WooCommerce: ${error.message}`);
+          // Continue with local deletion even if WooCommerce fails
+        }
+      }
+    }
+
+    // Soft delete the variant locally
+    variant.isDeleted = true;
+    await variant.save();
+
+    // Update parent product variation count
+    const remainingVariantsCount = await this.variantModel.countDocuments({
+      productId: product._id,
+      isDeleted: false,
+    });
+    product.variationsCount = remainingVariantsCount;
+    await product.save();
+
+    return { success: true, message: 'Variant deleted successfully' };
   }
 
   /**
@@ -891,7 +955,7 @@ export class ProductService {
       consumerSecret: store.credentials.consumerSecret,
     };
 
-    await this.wooCommerceService.updateVariation(credentials, product.externalId, variant.externalId, {
+    const updateData: any = {
       regular_price: variant.regularPrice,
       sale_price: variant.salePrice,
       sku: variant.sku,
@@ -899,7 +963,14 @@ export class ProductService {
       manage_stock: variant.manageStock,
       stock_quantity: variant.stockQuantity,
       stock_status: variant.stockStatus as 'instock' | 'outofstock' | 'onbackorder',
-    });
+    };
+
+    // Include image if it exists
+    if (variant.image?.src) {
+      updateData.image = { src: variant.image.src };
+    }
+
+    await this.wooCommerceService.updateVariation(credentials, product.externalId, variant.externalId, updateData);
 
     variant.pendingSync = false;
     variant.lastSyncedAt = new Date();
@@ -2355,5 +2426,134 @@ export class ProductService {
       productData,
       { upsert: true, new: true },
     );
+  }
+
+  /**
+   * Generate variations for a variable product from attribute combinations
+   */
+  async generateVariations(
+    productId: string,
+    userId: string,
+    options: {
+      regularPrice?: string;
+      sku?: string;
+    } = {},
+  ): Promise<{ created: number; variations: any[] }> {
+    // Get the product
+    const product = await this.productModel.findOne({
+      _id: new Types.ObjectId(productId),
+      isDeleted: false,
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    // Verify user access
+    await this.verifyStoreAccess(product.storeId.toString(), userId);
+
+    // Check if product is variable type
+    if (product.type !== 'variable') {
+      throw new BadRequestException('Only variable products can have variations');
+    }
+
+    // Get attributes that are used for variations
+    const variationAttributes = product.attributes.filter(attr => attr.variation && attr.options?.length > 0);
+
+    if (variationAttributes.length === 0) {
+      throw new BadRequestException('Product has no attributes configured for variations');
+    }
+
+    // Generate all combinations (cartesian product)
+    const generateCombinations = (arrays: string[][]): string[][] => {
+      if (arrays.length === 0) return [[]];
+      const [first, ...rest] = arrays;
+      const restCombinations = generateCombinations(rest);
+      return first.flatMap(item => restCombinations.map(combo => [item, ...combo]));
+    };
+
+    const optionArrays = variationAttributes.map(attr => attr.options);
+    const combinations = generateCombinations(optionArrays);
+
+    // Get store credentials
+    const store = await this.storeModel.findById(product.storeId).select('+credentials');
+    if (!store) {
+      throw new NotFoundException('Store not found');
+    }
+
+    const credentials = {
+      url: store.url,
+      consumerKey: store.credentials.consumerKey,
+      consumerSecret: store.credentials.consumerSecret,
+    };
+
+    // Create variations in WooCommerce
+    const variationsToCreate = combinations.map((combo, index) => ({
+      regular_price: options.regularPrice || '',
+      sku: options.sku ? `${options.sku}-${index + 1}` : '',
+      stock_status: 'instock',
+      manage_stock: false,
+      attributes: variationAttributes.map((attr, i) => ({
+        name: attr.name,
+        option: combo[i],
+      })),
+    }));
+
+    try {
+      // Use batch create for efficiency
+      const result = await this.wooCommerceService.batchCreateVariations(
+        credentials,
+        product.externalId,
+        variationsToCreate,
+      );
+
+      // Sync the created variations to local database
+      const createdVariations = result.create || [];
+
+      for (const wooVariation of createdVariations) {
+        await this.variantModel.findOneAndUpdate(
+          { storeId: product.storeId, externalId: wooVariation.id },
+          {
+            storeId: product.storeId,
+            productId: product._id,
+            parentExternalId: product.externalId,
+            externalId: wooVariation.id,
+            sku: wooVariation.sku || '',
+            price: wooVariation.price || '',
+            regularPrice: wooVariation.regular_price || '',
+            salePrice: wooVariation.sale_price || '',
+            stockQuantity: wooVariation.stock_quantity,
+            stockStatus: wooVariation.stock_status || 'instock',
+            manageStock: wooVariation.manage_stock || false,
+            attributes: wooVariation.attributes?.map(a => ({
+              name: a.name,
+              option: a.option,
+            })) || [],
+            image: wooVariation.image ? {
+              externalId: wooVariation.image.id,
+              src: wooVariation.image.src,
+              name: wooVariation.image.name || '',
+              alt: wooVariation.image.alt || '',
+            } : undefined,
+            lastSyncedAt: new Date(),
+            isDeleted: false,
+          },
+          { upsert: true, new: true },
+        );
+      }
+
+      // Update product's variation count
+      product.variationIds = [...(product.variationIds || []), ...createdVariations.map(v => v.id)];
+      product.variationCount = product.variationIds.length;
+      await product.save();
+
+      return {
+        created: createdVariations.length,
+        variations: createdVariations,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to generate variations: ${error.message}`, error.stack);
+      throw new BadRequestException(`Failed to generate variations: ${error.message}`);
+    }
   }
 }

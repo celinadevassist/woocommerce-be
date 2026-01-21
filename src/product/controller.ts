@@ -259,6 +259,26 @@ export class ProductController {
     return await this.productService.updateVariant(variantId, user._id.toString(), dto, shouldPush);
   }
 
+  @Delete('variants/:variantId')
+  @ApiOperation({ summary: 'Delete a variant' })
+  @ApiResponse({ status: 200, description: 'Variant deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Variant not found' })
+  @ApiQuery({ name: 'deleteFromWoo', required: false, type: Boolean, description: 'Delete from WooCommerce (default: true)' })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async deleteVariant(
+    @Param('variantId') variantId: string,
+    @Query('deleteFromWoo') deleteFromWoo: string,
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    const shouldDelete = deleteFromWoo !== 'false';
+    return await this.productService.deleteVariant(variantId, user._id.toString(), shouldDelete);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get product by ID with variants' })
   @ApiResponse({ status: 200, description: 'Product retrieved successfully' })
@@ -399,6 +419,23 @@ export class ProductController {
       body.storeId,
       body.filters,
     );
+  }
+
+  @Post(':id/generate-variations')
+  @ApiOperation({ summary: 'Generate variations from attribute combinations' })
+  @ApiResponse({ status: 201, description: 'Variations generated successfully' })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async generateVariations(
+    @Param('id') id: string,
+    @Body() body: { regularPrice?: string; sku?: string },
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    return await this.productService.generateVariations(id, user._id.toString(), body);
   }
 
   // ==================== IMAGE MANAGEMENT ====================
