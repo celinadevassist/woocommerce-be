@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -417,12 +418,19 @@ export class AttributeService {
     }
 
     // Create in WooCommerce first
-    const wooTerm = await this.wooCommerceService.createAttributeTerm(credentials, attribute.wooId, {
-      name: data.name,
-      slug: data.slug,
-      description: data.description,
-      menu_order: data.menuOrder,
-    });
+    let wooTerm;
+    try {
+      wooTerm = await this.wooCommerceService.createAttributeTerm(credentials, attribute.wooId, {
+        name: data.name,
+        slug: data.slug || undefined,
+        description: data.description,
+        menu_order: data.menuOrder,
+      });
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to create term in WooCommerce';
+      this.logger.error(`Failed to create attribute term in WooCommerce: ${errorMessage}`);
+      throw new BadRequestException(errorMessage);
+    }
 
     // Create in MongoDB
     const term = await this.termModel.create({
@@ -481,12 +489,19 @@ export class AttributeService {
     }
 
     // Update in WooCommerce first
-    const wooTerm = await this.wooCommerceService.updateAttributeTerm(credentials, attribute.wooId, term.wooId, {
-      name: data.name,
-      slug: data.slug,
-      description: data.description,
-      menu_order: data.menuOrder,
-    });
+    let wooTerm;
+    try {
+      wooTerm = await this.wooCommerceService.updateAttributeTerm(credentials, attribute.wooId, term.wooId, {
+        name: data.name,
+        slug: data.slug || undefined,
+        description: data.description,
+        menu_order: data.menuOrder,
+      });
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to update term in WooCommerce';
+      this.logger.error(`Failed to update attribute term in WooCommerce: ${errorMessage}`);
+      throw new BadRequestException(errorMessage);
+    }
 
     // Update in MongoDB
     term.name = wooTerm.name;
@@ -540,7 +555,13 @@ export class AttributeService {
     }
 
     // Delete from WooCommerce first
-    await this.wooCommerceService.deleteAttributeTerm(credentials, attribute.wooId, term.wooId, true);
+    try {
+      await this.wooCommerceService.deleteAttributeTerm(credentials, attribute.wooId, term.wooId, true);
+    } catch (error) {
+      const errorMessage = error.response?.data?.message || error.message || 'Failed to delete term in WooCommerce';
+      this.logger.error(`Failed to delete attribute term in WooCommerce: ${errorMessage}`);
+      throw new BadRequestException(errorMessage);
+    }
 
     // Soft delete in MongoDB
     term.isDeleted = true;

@@ -74,7 +74,7 @@ export class ProductCategory {
   @Prop()
   externalId: number;
 
-  @Prop({ required: true })
+  @Prop({ default: '' })
   name: string;
 
   @Prop()
@@ -89,7 +89,7 @@ export class ProductTag {
   @Prop()
   externalId: number;
 
-  @Prop({ required: true })
+  @Prop({ default: '' })
   name: string;
 
   @Prop()

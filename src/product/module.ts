@@ -6,6 +6,8 @@ import { ProductService } from './service';
 import { Product, ProductSchema } from './schema';
 import { ProductVariant, ProductVariantSchema } from './variant.schema';
 import { Store, StoreSchema } from '../store/schema';
+import { Category, CategorySchema } from '../category/schema';
+import { Tag, TagSchema } from '../tag/schema';
 import { WooCommerceModule } from '../integrations/woocommerce/woocommerce.module';
 import { S3UploadModule } from '../modules/s3-upload/s3-upload.module';
 
@@ -16,6 +18,8 @@ import { S3UploadModule } from '../modules/s3-upload/s3-upload.module';
       { name: Product.name, schema: ProductSchema },
       { name: ProductVariant.name, schema: ProductVariantSchema },
       { name: Store.name, schema: StoreSchema },
+      { name: Category.name, schema: CategorySchema },
+      { name: Tag.name, schema: TagSchema },
     ]),
     WooCommerceModule,
     S3UploadModule,

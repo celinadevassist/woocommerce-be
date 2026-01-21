@@ -14,6 +14,8 @@ import { QueryProductDto } from './dto.query';
 import { IProduct, IProductVariant, IProductWithVariants, IProductResponse } from './interface';
 import { StockStatus } from './enum';
 import { Store, StoreDocument } from '../store/schema';
+import { Category, CategoryDocument } from '../category/schema';
+import { Tag, TagDocument } from '../tag/schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 import { WooProduct, WooProductVariation } from '../integrations/woocommerce/woocommerce.types';
 import { S3UploadService } from '../modules/s3-upload/s3-upload.service';
@@ -26,6 +28,8 @@ export class ProductService {
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     @InjectModel(ProductVariant.name) private variantModel: Model<ProductVariantDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
+    @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
+    @InjectModel(Tag.name) private tagModel: Model<TagDocument>,
     private readonly wooCommerceService: WooCommerceService,
     private readonly s3UploadService: S3UploadService,
   ) {}
@@ -467,9 +471,33 @@ export class ProductService {
     if (dto.parentId !== undefined) product.parentId = dto.parentId;
     if (dto.purchaseNote !== undefined) product.purchaseNote = dto.purchaseNote;
 
-    // Categories, tags, images
-    if (dto.categories) product.categories = dto.categories.map(id => ({ externalId: id, name: '', slug: '' }));
-    if (dto.tags) product.tags = dto.tags.map(id => ({ externalId: id, name: '', slug: '' }));
+    // Categories, tags, images - look up actual names and slugs from database
+    if (dto.categories) {
+      const categoryDocs = await this.categoryModel.find({
+        storeId: product.storeId,
+        externalId: { $in: dto.categories },
+        isDeleted: false,
+      }).select('externalId name slug');
+      const categoryMap = new Map(categoryDocs.map(c => [c.externalId, { name: c.name, slug: c.slug }]));
+      product.categories = dto.categories.map(id => ({
+        externalId: id,
+        name: categoryMap.get(id)?.name || '',
+        slug: categoryMap.get(id)?.slug || '',
+      }));
+    }
+    if (dto.tags) {
+      const tagDocs = await this.tagModel.find({
+        storeId: product.storeId,
+        externalId: { $in: dto.tags },
+        isDeleted: false,
+      }).select('externalId name slug');
+      const tagMap = new Map(tagDocs.map(t => [t.externalId, { name: t.name, slug: t.slug }]));
+      product.tags = dto.tags.map(id => ({
+        externalId: id,
+        name: tagMap.get(id)?.name || '',
+        slug: tagMap.get(id)?.slug || '',
+      }));
+    }
     if (dto.images) {
       product.images = dto.images.map((img, idx) => ({
         externalId: img.id,
