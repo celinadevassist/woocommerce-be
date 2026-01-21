@@ -39,7 +39,8 @@ export class CustomerAddress {
   email?: string;
 }
 
-export const CustomerAddressSchema = SchemaFactory.createForClass(CustomerAddress);
+export const CustomerAddressSchema =
+  SchemaFactory.createForClass(CustomerAddress);
 
 // Customer stats sub-schema
 @Schema({ _id: false })
@@ -87,7 +88,12 @@ export class Customer extends Document {
   externalId: number;
 
   // Store reference
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   // Basic info - email is optional (customer can be identified by phone only)
@@ -117,13 +123,25 @@ export class Customer extends Document {
   shipping?: CustomerAddress;
 
   // Status & classification
-  @Prop({ type: String, enum: Object.values(CustomerStatus), default: CustomerStatus.ACTIVE })
+  @Prop({
+    type: String,
+    enum: Object.values(CustomerStatus),
+    default: CustomerStatus.ACTIVE,
+  })
   status: CustomerStatus;
 
-  @Prop({ type: String, enum: Object.values(CustomerSource), default: CustomerSource.WOOCOMMERCE })
+  @Prop({
+    type: String,
+    enum: Object.values(CustomerSource),
+    default: CustomerSource.WOOCOMMERCE,
+  })
   source: CustomerSource;
 
-  @Prop({ type: String, enum: Object.values(CustomerTier), default: CustomerTier.REGULAR })
+  @Prop({
+    type: String,
+    enum: Object.values(CustomerTier),
+    default: CustomerTier.REGULAR,
+  })
   tier: CustomerTier;
 
   // Stats (computed from orders)
@@ -171,17 +189,23 @@ export const CustomerSchema = SchemaFactory.createForClass(Customer);
 // Unique index for WooCommerce customers (externalId > 0), allows multiple guests with externalId = 0
 CustomerSchema.index(
   { storeId: 1, externalId: 1 },
-  { unique: true, partialFilterExpression: { externalId: { $gt: 0 } } }
+  { unique: true, partialFilterExpression: { externalId: { $gt: 0 } } },
 );
 // Unique index for customers by email within a store (only when email exists and is not empty)
 CustomerSchema.index(
   { storeId: 1, email: 1 },
-  { unique: true, partialFilterExpression: { email: { $exists: true, $nin: [null, ''] } } }
+  {
+    unique: true,
+    partialFilterExpression: { email: { $exists: true, $nin: [null, ''] } },
+  },
 );
 // Unique index for primary phone within a store (only when phone exists and is not empty)
 CustomerSchema.index(
   { storeId: 1, phone: 1 },
-  { unique: true, partialFilterExpression: { phone: { $exists: true, $nin: [null, ''] } } }
+  {
+    unique: true,
+    partialFilterExpression: { phone: { $exists: true, $nin: [null, ''] } },
+  },
 );
 CustomerSchema.index({ storeId: 1, createdAt: -1 });
 CustomerSchema.index({ status: 1, tier: 1 });

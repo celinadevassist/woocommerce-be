@@ -1,37 +1,40 @@
 import * as mongoose from 'mongoose';
 
-const schema = new mongoose.Schema({
+const schema = new mongoose.Schema(
+  {
     searchTerm: {
-        type: String,
-        required: true,
-        index: true
+      type: String,
+      required: true,
+      index: true,
     },
     endpoint: {
-        type: String,
-        required: true,
-        index: true,
-        // No enum restriction - allows any module to track searches
-        // Common values: 'projects', 'image-prompts', 'sessions', 'articles', 'questions', 'tools', 'quotes', etc.
+      type: String,
+      required: true,
+      index: true,
+      // No enum restriction - allows any module to track searches
+      // Common values: 'projects', 'image-prompts', 'sessions', 'articles', 'questions', 'tools', 'quotes', etc.
     },
     resultCount: {
-        type: Number,
-        default: 0
+      type: Number,
+      default: 0,
     },
     userId: {
-        type: String,
-        required: false
+      type: String,
+      required: false,
     },
     metadata: {
-        userAgent: { type: String },
-        ip: { type: String },
-        language: { type: String }
+      userAgent: { type: String },
+      ip: { type: String },
+      language: { type: String },
     },
-    createdAt: { type: Date, default: () => new Date() }
-}, {
+    createdAt: { type: Date, default: () => new Date() },
+  },
+  {
     versionKey: false,
     autoIndex: true,
-    collection: 'searchQueries'
-});
+    collection: 'searchQueries',
+  },
+);
 
 // Indexes for analytics and performance
 schema.index({ searchTerm: 1, createdAt: -1 });

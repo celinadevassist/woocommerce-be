@@ -2,7 +2,10 @@ import { Module, forwardRef } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { PassportModule } from '@nestjs/passport';
 import { Review, ReviewSchema } from './schema';
-import { ResponseTemplate, ResponseTemplateSchema } from './response-template.schema';
+import {
+  ResponseTemplate,
+  ResponseTemplateSchema,
+} from './response-template.schema';
 import { ReviewController } from './controller';
 import { PublicReviewController } from './public.controller';
 import { ReviewService } from './service';

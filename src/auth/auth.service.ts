@@ -1,4 +1,12 @@
-import { ConflictException, Injectable, Inject, forwardRef, InternalServerErrorException, UnauthorizedException, Logger } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Inject,
+  forwardRef,
+  InternalServerErrorException,
+  UnauthorizedException,
+  Logger,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
@@ -26,13 +34,19 @@ export class AuthService {
     private smsService: SMSService,
     private emailService: EmailService,
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
-    @Inject(forwardRef(() => ImageService)) private readonly imageService: ImageService,
-    @Inject(forwardRef(() => MailrelayService)) private readonly mailrelayService: MailrelayService,
-    @Inject(forwardRef(() => MailerService)) private readonly mailerService: MailerService,
+    @Inject(forwardRef(() => ImageService))
+    private readonly imageService: ImageService,
+    @Inject(forwardRef(() => MailrelayService))
+    private readonly mailrelayService: MailrelayService,
+    @Inject(forwardRef(() => MailerService))
+    private readonly mailerService: MailerService,
     private configService: ConfigService,
   ) {
     // Determine which email provider to use
-    this.emailProvider = this.configService.get<string>('EMAIL_PROVIDER', 'smtp') as 'mailrelay' | 'smtp';
+    this.emailProvider = this.configService.get<string>(
+      'EMAIL_PROVIDER',
+      'smtp',
+    ) as 'mailrelay' | 'smtp';
     this.logger.log(`📧 Email Provider: ${this.emailProvider.toUpperCase()}`);
   }
 
@@ -82,29 +96,32 @@ export class AuthService {
         await this.mailerService.sendVerificationEmail(
           exist.email,
           user.emailVerificationToken,
-          exist.firstName || exist.email
+          exist.firstName || exist.email,
         );
 
         // Also send welcome email
         await this.mailerService.sendWelcomeEmail(
           exist.email,
-          exist.firstName || exist.email
+          exist.firstName || exist.email,
         );
       } else {
         await this.mailrelayService.sendVerificationEmail(
           exist.email,
           user.emailVerificationToken,
-          exist.firstName || exist.email
+          exist.firstName || exist.email,
         );
 
         // Also send welcome email
         await this.mailrelayService.sendWelcomeEmail(
           exist.email,
-          exist.firstName || exist.email
+          exist.firstName || exist.email,
         );
       }
     } catch (error) {
-      this.logger.error(`Failed to send verification email to ${exist.email}:`, error);
+      this.logger.error(
+        `Failed to send verification email to ${exist.email}:`,
+        error,
+      );
     }
 
     // let profileImage = await this.imageService.create_update({ userId: exist._id }, { userId: exist._id, type: "profile", imageUrl: image });
@@ -137,29 +154,35 @@ export class AuthService {
     // }
 
     return {
-      token, user: getUserAttreputes(exist.toObject())
+      token,
+      user: getUserAttreputes(exist.toObject()),
     };
   }
 
-  async signin(userDTO, lang): Promise<{ token: string, user: any }> {
+  async signin(userDTO, lang): Promise<{ token: string; user: any }> {
     const user = userDTO;
-    let exist: any = {}
+    let exist: any = {};
     // Normalize email to lowercase for case-insensitive matching
     const normalizedEmail = user.email?.toLowerCase()?.trim();
-    exist = await this.userModel.findOne({ email: normalizedEmail }).select('+password +hashKey')
-
+    exist = await this.userModel
+      .findOne({ email: normalizedEmail })
+      .select('+password +hashKey');
 
     if (!exist) {
       generateBussinessError('email_not_exist', lang, 401);
     }
     if (!exist.password) {
-      generateBussinessError('Click On Forget Your Password, And Create New Password To Your Account', lang, 401);
+      generateBussinessError(
+        'Click On Forget Your Password, And Create New Password To Your Account',
+        lang,
+        401,
+      );
     }
     // if (exist.status === 'NEW') {
     //   generateBussinessError('phone_need_verification', lang, 409);
     // }
 
-    if (!await this.validatePassword(exist, user.password)) {
+    if (!(await this.validatePassword(exist, user.password))) {
       generateBussinessError('wrong_password', lang, 401);
     }
     const token = await this.retrieveToken(exist._id, exist.mobile, exist.role);
@@ -206,7 +229,7 @@ export class AuthService {
     // exist = await this.userModel.aggregate(pipeLine);
 
     // await this.smsService.sendSMS([{ mobile: "01273215942", message: "Repeated User" }])
-    return { token, user: getUserAttreputes(exist) }
+    return { token, user: getUserAttreputes(exist) };
   }
 
   async forgetPassword(email: string, lang): Promise<{ message: any }> {
@@ -225,7 +248,9 @@ export class AuthService {
     const resetToken = nanoid(32);
     const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-    this.logger.log(`   Generated reset token: ${resetToken.substring(0, 10)}...`);
+    this.logger.log(
+      `   Generated reset token: ${resetToken.substring(0, 10)}...`,
+    );
     this.logger.log(`   Token expires at: ${resetExpires.toISOString()}`);
 
     // Save reset token to user
@@ -234,17 +259,19 @@ export class AuthService {
       {
         $set: {
           resetPasswordToken: resetToken,
-          resetPasswordExpires: resetExpires
-        }
+          resetPasswordExpires: resetExpires,
+        },
       },
-      { new: true }
+      { new: true },
     );
 
     this.logger.log(`   Reset token saved to database`);
 
     // Send password reset email
     try {
-      this.logger.log(`   Calling ${this.emailProvider.toUpperCase()} service to send password reset email...`);
+      this.logger.log(
+        `   Calling ${this.emailProvider.toUpperCase()} service to send password reset email...`,
+      );
 
       let emailSent: boolean;
       if (this.emailProvider === 'smtp') {
@@ -252,37 +279,47 @@ export class AuthService {
         emailSent = await this.mailerService.sendPasswordResetEmail(
           exist.email,
           resetToken,
-          exist.firstName || exist.email
+          exist.firstName || exist.email,
         );
       } else {
         this.logger.log('   Using Mailrelay API email service');
         emailSent = await this.mailrelayService.sendPasswordResetEmail(
           exist.email,
           resetToken,
-          exist.firstName || exist.email
+          exist.firstName || exist.email,
         );
       }
 
-      this.logger.log(`   Email send result: ${emailSent ? '✅ Success' : '❌ Failed'}`);
+      this.logger.log(
+        `   Email send result: ${emailSent ? '✅ Success' : '❌ Failed'}`,
+      );
 
       return {
-        message: lang === 'en'
-          ? 'Password reset instructions have been sent to your email'
-          : lang === 'ar'
+        message:
+          lang === 'en'
+            ? 'Password reset instructions have been sent to your email'
+            : lang === 'ar'
             ? 'تم إرسال تعليمات إعادة تعيين كلمة المرور إلى بريدك الإلكتروني'
-            : 'Password reset email sent'
+            : 'Password reset email sent',
       };
     } catch (error) {
-      this.logger.error(`❌ Failed to send password reset email to ${exist.email}:`, error);
+      this.logger.error(
+        `❌ Failed to send password reset email to ${exist.email}:`,
+        error,
+      );
       this.logger.error(`   Error details: ${JSON.stringify(error)}`);
       generateBussinessError('email_send_failed', lang, 500);
     }
   }
 
-  async resetPasswordWithToken(token: string, newPassword: string, lang): Promise<{ message: any }> {
+  async resetPasswordWithToken(
+    token: string,
+    newPassword: string,
+    lang,
+  ): Promise<{ message: any }> {
     const exist = await this.userModel.findOne({
       resetPasswordToken: token,
-      resetPasswordExpires: { $gt: new Date() }
+      resetPasswordExpires: { $gt: new Date() },
     });
 
     if (!exist) {
@@ -300,25 +337,26 @@ export class AuthService {
           password,
           hashKey,
           resetPasswordToken: undefined,
-          resetPasswordExpires: undefined
-        }
+          resetPasswordExpires: undefined,
+        },
       },
-      { new: true }
+      { new: true },
     );
 
     return {
-      message: lang === 'en'
-        ? 'Password updated successfully'
-        : lang === 'ar'
+      message:
+        lang === 'en'
+          ? 'Password updated successfully'
+          : lang === 'ar'
           ? 'تم تحديث كلمة المرور بنجاح'
-          : 'Password updated'
+          : 'Password updated',
     };
   }
 
   async verifyEmail(token: string, lang): Promise<{ message: any }> {
     const exist = await this.userModel.findOne({
       emailVerificationToken: token,
-      emailVerificationExpires: { $gt: new Date() }
+      emailVerificationExpires: { $gt: new Date() },
     });
 
     if (!exist) {
@@ -331,22 +369,26 @@ export class AuthService {
         $set: {
           emailVerified: true,
           emailVerificationToken: undefined,
-          emailVerificationExpires: undefined
-        }
+          emailVerificationExpires: undefined,
+        },
       },
-      { new: true }
+      { new: true },
     );
 
     return {
-      message: lang === 'en'
-        ? 'Email verified successfully'
-        : lang === 'ar'
+      message:
+        lang === 'en'
+          ? 'Email verified successfully'
+          : lang === 'ar'
           ? 'تم التحقق من البريد الإلكتروني بنجاح'
-          : 'Email verified'
+          : 'Email verified',
     };
   }
 
-  async resendVerificationEmail(userId: string, lang): Promise<{ message: any }> {
+  async resendVerificationEmail(
+    userId: string,
+    lang,
+  ): Promise<{ message: any }> {
     const exist = await this.userModel.findById(userId);
 
     if (!exist) {
@@ -355,11 +397,12 @@ export class AuthService {
 
     if (exist.emailVerified) {
       return {
-        message: lang === 'en'
-          ? 'Email is already verified'
-          : lang === 'ar'
+        message:
+          lang === 'en'
+            ? 'Email is already verified'
+            : lang === 'ar'
             ? 'تم التحقق من البريد الإلكتروني بالفعل'
-            : 'Email already verified'
+            : 'Email already verified',
       };
     }
 
@@ -373,10 +416,10 @@ export class AuthService {
       {
         $set: {
           emailVerificationToken: verificationToken,
-          emailVerificationExpires: verificationExpires
-        }
+          emailVerificationExpires: verificationExpires,
+        },
       },
-      { new: true }
+      { new: true },
     );
 
     // Send verification email
@@ -384,18 +427,22 @@ export class AuthService {
       await this.mailrelayService.sendVerificationEmail(
         exist.email,
         verificationToken,
-        exist.firstName || exist.email
+        exist.firstName || exist.email,
       );
 
       return {
-        message: lang === 'en'
-          ? 'Verification email has been resent'
-          : lang === 'ar'
+        message:
+          lang === 'en'
+            ? 'Verification email has been resent'
+            : lang === 'ar'
             ? 'تم إعادة إرسال بريد التحقق'
-            : 'Verification email resent'
+            : 'Verification email resent',
       };
     } catch (error) {
-      this.logger.error(`Failed to resend verification email to ${exist.email}:`, error);
+      this.logger.error(
+        `Failed to resend verification email to ${exist.email}:`,
+        error,
+      );
       generateBussinessError('email_send_failed', lang, 500);
     }
   }
@@ -408,9 +455,13 @@ export class AuthService {
 
     exist.password = await this.encryptPassword(randomPassword, exist.hashKey);
 
-    await this.userModel.findOneAndUpdate({ _id: exist._id }, { $set: exist }, { new: true });
+    await this.userModel.findOneAndUpdate(
+      { _id: exist._id },
+      { $set: exist },
+      { new: true },
+    );
     // const otbSent = await this.smsService.sendOTP(exist.mobile, randomPassword);
-    return randomPassword
+    return randomPassword;
   }
 
   async changePassword(data, creator, lang): Promise<{ message: any }> {
@@ -420,9 +471,18 @@ export class AuthService {
     }
     const hashKey = await bcrypt.genSalt();
     const password = await this.encryptPassword(data.newPassword, hashKey);
-    await this.userModel.findOneAndUpdate({ _id: exist._id }, { $set: { password, hashKey } }, { new: true })
+    await this.userModel.findOneAndUpdate(
+      { _id: exist._id },
+      { $set: { password, hashKey } },
+      { new: true },
+    );
     return {
-      message: lang === 'en' ? `Password updated successfully` : lang === 'ar' ? `تم تغير كلمة المرور` : '',
+      message:
+        lang === 'en'
+          ? `Password updated successfully`
+          : lang === 'ar'
+          ? `تم تغير كلمة المرور`
+          : '',
     };
   }
 
@@ -445,7 +505,6 @@ export class AuthService {
 
   //   const hashKey = await bcrypt.genSalt();
   //   const password = await this.encryptPassword(userDTO.newPassword, hashKey);
-
 
   //   exist = await this.userModel.findOneAndUpdate(
   //     { mobile: userDTO.mobile, resetPasswordToken: userDTO.otp },
@@ -488,7 +547,6 @@ export class AuthService {
 
   // }
 
-
   // ----------------------------------------------------------------------------------//
 
   async findUserExistance(id): Promise<UserDocument> {
@@ -497,7 +555,7 @@ export class AuthService {
 
   async findUserByEmail(email: string): Promise<UserDocument> {
     const normalizedEmail = email?.toLowerCase()?.trim();
-    return await this.userModel.findOne({ email: normalizedEmail })
+    return await this.userModel.findOne({ email: normalizedEmail });
   }
 
   async encryptPassword(password: string, key: string): Promise<string> {
@@ -510,10 +568,13 @@ export class AuthService {
       if (!token) {
         return false;
       }
-      const payload: any = verify(token, process.env.JWT_SECRET || config.jwt.secret);
+      const payload: any = verify(
+        token,
+        process.env.JWT_SECRET || config.jwt.secret,
+      );
       const user = await this.findUserExistance(payload.customer.id);
       if (!user) {
-        return false
+        return false;
       }
       return user;
     } catch (err) {
@@ -539,15 +600,28 @@ export class AuthService {
   }
 
   async validatePassword(user: UserDocument, password): Promise<boolean> {
-    const requestedPassword = await this.encryptPassword(password, user.hashKey);
-    return requestedPassword === user.password || await this.validateAndUpdateNewPassword(user, requestedPassword);
+    const requestedPassword = await this.encryptPassword(
+      password,
+      user.hashKey,
+    );
+    return (
+      requestedPassword === user.password ||
+      (await this.validateAndUpdateNewPassword(user, requestedPassword))
+    );
   }
 
-  async validateAndUpdateNewPassword(user, requestedPassword): Promise<boolean> {
+  async validateAndUpdateNewPassword(
+    user,
+    requestedPassword,
+  ): Promise<boolean> {
     if (requestedPassword === user.newPassword) {
       user.password = user.newPassword;
       delete user.newPassword;
-      this.userModel.findOneAndUpdate({ _id: user._id }, { $set: user }, { new: true });
+      this.userModel.findOneAndUpdate(
+        { _id: user._id },
+        { $set: user },
+        { new: true },
+      );
     }
     return requestedPassword === user.newPassword;
   }

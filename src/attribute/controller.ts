@@ -11,7 +11,13 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { AttributeService } from './service';
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
 import { User } from '../decorators/user.decorator';
@@ -37,7 +43,10 @@ export class AttributeController {
     @Param('storeId') storeId: string,
     @User() user: UserDocument,
   ) {
-    const result = await this.attributeService.syncFromWooCommerce(user._id.toString(), storeId);
+    const result = await this.attributeService.syncFromWooCommerce(
+      user._id.toString(),
+      storeId,
+    );
     return {
       message: 'Attributes synced successfully',
       ...result,
@@ -46,7 +55,10 @@ export class AttributeController {
 
   @Get()
   @ApiOperation({ summary: 'Get all attributes for a store' })
-  @ApiResponse({ status: 200, description: 'Attributes retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Attributes retrieved successfully',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @ApiQuery({ name: 'includeTerms', required: false, type: Boolean })
   @UsePipes(
@@ -60,9 +72,15 @@ export class AttributeController {
     @User() user: UserDocument,
   ) {
     if (includeTerms === 'true') {
-      return await this.attributeService.getAttributesWithTerms(user._id.toString(), storeId);
+      return await this.attributeService.getAttributesWithTerms(
+        user._id.toString(),
+        storeId,
+      );
     }
-    return await this.attributeService.getAttributes(user._id.toString(), storeId);
+    return await this.attributeService.getAttributes(
+      user._id.toString(),
+      storeId,
+    );
   }
 
   @Get(':attributeId')
@@ -97,10 +115,21 @@ export class AttributeController {
   )
   async createAttribute(
     @Query('storeId') storeId: string,
-    @Body() body: { name: string; slug?: string; type?: string; orderBy?: string; hasArchives?: boolean },
+    @Body()
+    body: {
+      name: string;
+      slug?: string;
+      type?: string;
+      orderBy?: string;
+      hasArchives?: boolean;
+    },
     @User() user: UserDocument,
   ) {
-    return await this.attributeService.createAttribute(user._id.toString(), storeId, body);
+    return await this.attributeService.createAttribute(
+      user._id.toString(),
+      storeId,
+      body,
+    );
   }
 
   @Patch(':attributeId')
@@ -115,7 +144,14 @@ export class AttributeController {
   async updateAttribute(
     @Param('attributeId') attributeId: string,
     @Query('storeId') storeId: string,
-    @Body() body: { name?: string; slug?: string; type?: string; orderBy?: string; hasArchives?: boolean },
+    @Body()
+    body: {
+      name?: string;
+      slug?: string;
+      type?: string;
+      orderBy?: string;
+      hasArchives?: boolean;
+    },
     @User() user: UserDocument,
   ) {
     return await this.attributeService.updateAttribute(
@@ -183,7 +219,13 @@ export class AttributeController {
   async createTerm(
     @Param('attributeId') attributeId: string,
     @Query('storeId') storeId: string,
-    @Body() body: { name: string; slug?: string; description?: string; menuOrder?: number },
+    @Body()
+    body: {
+      name: string;
+      slug?: string;
+      description?: string;
+      menuOrder?: number;
+    },
     @User() user: UserDocument,
   ) {
     return await this.attributeService.createTerm(
@@ -207,7 +249,13 @@ export class AttributeController {
     @Param('attributeId') attributeId: string,
     @Param('termId') termId: string,
     @Query('storeId') storeId: string,
-    @Body() body: { name?: string; slug?: string; description?: string; menuOrder?: number },
+    @Body()
+    body: {
+      name?: string;
+      slug?: string;
+      description?: string;
+      menuOrder?: number;
+    },
     @User() user: UserDocument,
   ) {
     return await this.attributeService.updateTerm(

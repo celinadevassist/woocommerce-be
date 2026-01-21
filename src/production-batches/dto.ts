@@ -27,7 +27,9 @@ export class CreateProductionBatchDto {
 
 export const CreateProductionBatchSchema = Joi.object({
   skuId: Joi.string().required(),
-  type: Joi.string().valid(...Object.values(ProductionBatchType)).optional(),
+  type: Joi.string()
+    .valid(...Object.values(ProductionBatchType))
+    .optional(),
   plannedQuantity: Joi.number().integer().positive().required(),
   consumedMaterials: Joi.array().items(ConsumedMaterialSchema).optional(),
   laborCost: Joi.number().min(0).optional(),
@@ -53,7 +55,9 @@ export class UpdateProductionBatchDto {
 }
 
 export const UpdateProductionBatchSchema = Joi.object({
-  type: Joi.string().valid(...Object.values(ProductionBatchType)).optional(),
+  type: Joi.string()
+    .valid(...Object.values(ProductionBatchType))
+    .optional(),
   plannedQuantity: Joi.number().integer().positive().optional(),
   consumedMaterials: Joi.array().items(ConsumedMaterialSchema).optional(),
   laborCost: Joi.number().min(0).optional(),
@@ -80,18 +84,20 @@ export class CompleteProductionDto {
     actualQuantity: number;
   }[];
   notes?: string;
-  rfidCodes?: string[];  // Optional manual RFID codes (must match completedQuantity)
+  rfidCodes?: string[]; // Optional manual RFID codes (must match completedQuantity)
 }
 
 export const CompleteProductionSchema = Joi.object({
   completedQuantity: Joi.number().integer().min(0).required(),
   defectQuantity: Joi.number().integer().min(0).optional(),
-  actualMaterials: Joi.array().items(
-    Joi.object({
-      materialId: Joi.string().required(),
-      actualQuantity: Joi.number().min(0).required(),
-    })
-  ).optional(),
+  actualMaterials: Joi.array()
+    .items(
+      Joi.object({
+        materialId: Joi.string().required(),
+        actualQuantity: Joi.number().min(0).required(),
+      }),
+    )
+    .optional(),
   notes: Joi.string().allow('').optional(),
   rfidCodes: Joi.array().items(Joi.string()).optional(),
 });
@@ -121,8 +127,12 @@ export class QueryProductionBatchDto {
 export const QueryProductionBatchSchema = Joi.object({
   storeId: Joi.string().optional(),
   skuId: Joi.string().optional(),
-  status: Joi.string().valid(...Object.values(ProductionBatchStatus)).optional(),
-  type: Joi.string().valid(...Object.values(ProductionBatchType)).optional(),
+  status: Joi.string()
+    .valid(...Object.values(ProductionBatchStatus))
+    .optional(),
+  type: Joi.string()
+    .valid(...Object.values(ProductionBatchType))
+    .optional(),
   startDate: Joi.date().optional(),
   endDate: Joi.date().optional(),
   keyword: Joi.string().allow('').optional(),

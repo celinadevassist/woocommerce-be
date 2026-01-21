@@ -13,10 +13,30 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { OrderService } from './service';
 import { QueryOrderDto, QueryOrderSchema } from './dto.query';
-import { UpdateOrderDto, UpdateOrderSchema, AddTrackingDto, AddTrackingSchema, AddOrderNoteDto, AddOrderNoteSchema, BulkUpdateStatusDto, BulkUpdateStatusSchema, CreateRefundDto, CreateRefundSchema, BatchOrdersDto, BatchOrdersSchema, BatchCreateOrderItemDto, BatchCreateOrderItemSchema } from './dto.update';
+import {
+  UpdateOrderDto,
+  UpdateOrderSchema,
+  AddTrackingDto,
+  AddTrackingSchema,
+  AddOrderNoteDto,
+  AddOrderNoteSchema,
+  BulkUpdateStatusDto,
+  BulkUpdateStatusSchema,
+  CreateRefundDto,
+  CreateRefundSchema,
+  BatchOrdersDto,
+  BatchOrdersSchema,
+  BatchCreateOrderItemDto,
+  BatchCreateOrderItemSchema,
+} from './dto.update';
 import { IOrder, IOrderResponse, IOrderStats } from './interface';
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
 import { User } from '../decorators/user.decorator';
@@ -33,7 +53,12 @@ export class OrderController {
   @Get()
   @ApiOperation({ summary: 'Get all orders' })
   @ApiResponse({ status: 200, description: 'Returns paginated orders' })
-  @UsePipes(new JoiValidationPipe({ query: QueryOrderSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      query: QueryOrderSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async findAll(
     @User('_id') userId: string,
     @Query() query: QueryOrderDto,
@@ -61,24 +86,41 @@ export class OrderController {
   @Get('export')
   @ApiOperation({ summary: 'Export orders to CSV' })
   @ApiResponse({ status: 200, description: 'Returns CSV file' })
-  @UsePipes(new JoiValidationPipe({ query: QueryOrderSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      query: QueryOrderSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async exportCsv(
     @User('_id') userId: string,
     @Query() query: QueryOrderDto,
     @Res() res: Response,
   ): Promise<void> {
     const csv = await this.orderService.exportToCsv(userId, query);
-    const filename = `orders-export-${new Date().toISOString().split('T')[0]}.csv`;
+    const filename = `orders-export-${
+      new Date().toISOString().split('T')[0]
+    }.csv`;
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(
+        filename,
+      )}`,
+    );
     res.send(csv);
   }
 
   @Post('bulk-status')
   @ApiOperation({ summary: 'Bulk update order status' })
   @ApiResponse({ status: 200, description: 'Orders updated' })
-  @UsePipes(new JoiValidationPipe({ body: BulkUpdateStatusSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: BulkUpdateStatusSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async bulkUpdateStatus(
     @User('_id') userId: string,
     @Body() dto: BulkUpdateStatusDto,
@@ -97,20 +139,29 @@ export class OrderController {
   // ========================
 
   @Post('woo/batch')
-  @ApiOperation({ summary: 'Batch create, update, and delete orders in WooCommerce' })
+  @ApiOperation({
+    summary: 'Batch create, update, and delete orders in WooCommerce',
+  })
   @ApiResponse({ status: 200, description: 'Batch operation completed' })
-  @UsePipes(new JoiValidationPipe({ body: BatchOrdersSchema, param: { lang: LanguageSchema } }))
-  async batchOrders(
-    @User('_id') userId: string,
-    @Body() dto: BatchOrdersDto,
-  ) {
+  @UsePipes(
+    new JoiValidationPipe({
+      body: BatchOrdersSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async batchOrders(@User('_id') userId: string, @Body() dto: BatchOrdersDto) {
     return this.orderService.batchOrders(userId, dto);
   }
 
   @Post('woo/create')
   @ApiOperation({ summary: 'Create a single order in WooCommerce' })
   @ApiResponse({ status: 201, description: 'Order created in WooCommerce' })
-  @UsePipes(new JoiValidationPipe({ body: BatchCreateOrderItemSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: BatchCreateOrderItemSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async createWooOrder(
     @User('_id') userId: string,
     @Query('storeId') storeId: string,
@@ -120,13 +171,16 @@ export class OrderController {
   }
 
   @Patch('woo/:wooOrderId')
-  @ApiOperation({ summary: 'Update an order in WooCommerce with full field support' })
+  @ApiOperation({
+    summary: 'Update an order in WooCommerce with full field support',
+  })
   @ApiResponse({ status: 200, description: 'Order updated in WooCommerce' })
   async updateWooOrder(
     @User('_id') userId: string,
     @Query('storeId') storeId: string,
     @Param('wooOrderId') wooOrderId: number,
-    @Body() updateData: {
+    @Body()
+    updateData: {
       status?: string;
       billing?: any;
       shipping?: any;
@@ -138,7 +192,12 @@ export class OrderController {
       meta_data?: Array<{ key: string; value: string }>;
     },
   ) {
-    return this.orderService.updateWooOrder(userId, storeId, Number(wooOrderId), updateData);
+    return this.orderService.updateWooOrder(
+      userId,
+      storeId,
+      Number(wooOrderId),
+      updateData,
+    );
   }
 
   @Delete('woo/:wooOrderId')
@@ -150,7 +209,12 @@ export class OrderController {
     @Param('wooOrderId') wooOrderId: number,
     @Query('force') force?: boolean,
   ) {
-    return this.orderService.deleteWooOrder(userId, storeId, Number(wooOrderId), force === true);
+    return this.orderService.deleteWooOrder(
+      userId,
+      storeId,
+      Number(wooOrderId),
+      force === true,
+    );
   }
 
   @Post('woo/bulk-delete')
@@ -162,7 +226,12 @@ export class OrderController {
     @Body('orderIds') wooOrderIds: number[],
     @Query('force') force?: boolean,
   ) {
-    return this.orderService.bulkDeleteWooOrders(userId, storeId, wooOrderIds, force === true);
+    return this.orderService.bulkDeleteWooOrders(
+      userId,
+      storeId,
+      wooOrderIds,
+      force === true,
+    );
   }
 
   // ========================
@@ -184,7 +253,12 @@ export class OrderController {
   @ApiOperation({ summary: 'Update order internal fields' })
   @ApiResponse({ status: 200, description: 'Order updated' })
   @ApiResponse({ status: 404, description: 'Order not found' })
-  @UsePipes(new JoiValidationPipe({ body: UpdateOrderSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: UpdateOrderSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async update(
     @Param('id') id: string,
     @User('_id') userId: string,
@@ -197,7 +271,12 @@ export class OrderController {
   @ApiOperation({ summary: 'Add tracking info to order' })
   @ApiResponse({ status: 200, description: 'Tracking added' })
   @ApiResponse({ status: 404, description: 'Order not found' })
-  @UsePipes(new JoiValidationPipe({ body: AddTrackingSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: AddTrackingSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async addTracking(
     @Param('id') id: string,
     @User('_id') userId: string,
@@ -210,15 +289,21 @@ export class OrderController {
   @ApiOperation({ summary: 'Add note to order' })
   @ApiResponse({ status: 200, description: 'Note added' })
   @ApiResponse({ status: 404, description: 'Order not found' })
-  @UsePipes(new JoiValidationPipe({ body: AddOrderNoteSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: AddOrderNoteSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async addNote(
     @Param('id') id: string,
     @User() user: UserDocument,
     @Body() dto: AddOrderNoteDto,
   ): Promise<IOrder> {
-    const userName = user.firstName && user.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user.email;
+    const userName =
+      user.firstName && user.lastName
+        ? `${user.firstName} ${user.lastName}`
+        : user.email;
     return this.orderService.addNote(id, user._id.toString(), userName, dto);
   }
 
@@ -238,10 +323,7 @@ export class OrderController {
   @ApiOperation({ summary: 'Get order print data (packing slip)' })
   @ApiResponse({ status: 200, description: 'Returns order print data' })
   @ApiResponse({ status: 404, description: 'Order not found' })
-  async getPrintData(
-    @Param('id') id: string,
-    @User('_id') userId: string,
-  ) {
+  async getPrintData(@Param('id') id: string, @User('_id') userId: string) {
     return this.orderService.getPrintData(id, userId);
   }
 
@@ -249,7 +331,12 @@ export class OrderController {
   @ApiOperation({ summary: 'Create a refund for an order' })
   @ApiResponse({ status: 200, description: 'Refund created' })
   @ApiResponse({ status: 404, description: 'Order not found' })
-  @UsePipes(new JoiValidationPipe({ body: CreateRefundSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: CreateRefundSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async createRefund(
     @Param('id') id: string,
     @User('_id') userId: string,
@@ -262,10 +349,7 @@ export class OrderController {
   @ApiOperation({ summary: 'Get refunds for an order' })
   @ApiResponse({ status: 200, description: 'Returns order refunds' })
   @ApiResponse({ status: 404, description: 'Order not found' })
-  async getRefunds(
-    @Param('id') id: string,
-    @User('_id') userId: string,
-  ) {
+  async getRefunds(@Param('id') id: string, @User('_id') userId: string) {
     return this.orderService.getRefunds(id, userId);
   }
 

@@ -16,7 +16,12 @@ export class Email extends Document {
   email: string;
 
   // Store reference
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   // Current owner
@@ -34,7 +39,11 @@ export class Email extends Document {
   verifiedBy?: string; // User ID or 'system'
 
   // Status
-  @Prop({ type: String, enum: Object.values(EmailStatus), default: EmailStatus.ACTIVE })
+  @Prop({
+    type: String,
+    enum: Object.values(EmailStatus),
+    default: EmailStatus.ACTIVE,
+  })
   status: EmailStatus;
 
   // Marketing opt-in/out
@@ -83,12 +92,14 @@ export class Email extends Document {
 
   // History of owners (for tracking transfers)
   @Prop({
-    type: [{
-      customerId: { type: MongooseSchema.Types.ObjectId, ref: 'Customer' },
-      assignedAt: { type: Date, default: Date.now },
-      removedAt: Date,
-      source: String,
-    }],
+    type: [
+      {
+        customerId: { type: MongooseSchema.Types.ObjectId, ref: 'Customer' },
+        assignedAt: { type: Date, default: Date.now },
+        removedAt: Date,
+        source: String,
+      },
+    ],
     default: [],
   })
   ownerHistory: {

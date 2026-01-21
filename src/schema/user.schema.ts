@@ -40,7 +40,6 @@ export class User extends Document {
   @Prop()
   lastActive: Date;
 
-
   @Prop()
   bio?: string;
 
@@ -52,8 +51,6 @@ export class User extends Document {
 
   @Prop({ default: true })
   visibleToCommunity: boolean;
-
-
 
   @Prop({ default: 'user' })
   role: string;

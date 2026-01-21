@@ -23,21 +23,22 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       status = exception.getStatus();
       const errorResponse = exception.getResponse();
-      message = typeof errorResponse === 'string' 
-        ? errorResponse 
-        : (errorResponse as any).message || message;
+      message =
+        typeof errorResponse === 'string'
+          ? errorResponse
+          : (errorResponse as any).message || message;
     } else if (exception instanceof Error) {
       message = exception.message;
-      
+
       // Log the full error with stack trace
       this.logger.error(
         `Error on ${request.method} ${request.url}`,
-        exception.stack
+        exception.stack,
       );
     }
 
     this.logger.error(
-      `${request.method} ${request.url} - Status: ${status} - Error: ${message}`
+      `${request.method} ${request.url} - Status: ${status} - Error: ${message}`,
     );
 
     response.status(status).json({

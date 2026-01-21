@@ -1,4 +1,11 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { HttpService } from '@nestjs/axios';
@@ -20,9 +27,14 @@ export class StoreSettingsService {
   /**
    * Get store and verify user access (includes credentials)
    */
-  private async getStoreWithAccess(storeId: string, userId: string): Promise<StoreDocument> {
+  private async getStoreWithAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<StoreDocument> {
     // Include credentials since they're select: false by default
-    const store = await this.storeModel.findById(storeId).select('+credentials');
+    const store = await this.storeModel
+      .findById(storeId)
+      .select('+credentials');
 
     if (!store) {
       throw new NotFoundException('Store not found');
@@ -31,7 +43,9 @@ export class StoreSettingsService {
     // Check if user is owner or a member
     const isOwner = store.ownerId?.toString() === userId;
     const isMember = store.members?.some(
-      (m) => m.userId?.toString() === userId && ['admin', 'manager'].includes(m.role),
+      (m) =>
+        m.userId?.toString() === userId &&
+        ['admin', 'manager'].includes(m.role),
     );
 
     if (!isOwner && !isMember) {
@@ -46,7 +60,9 @@ export class StoreSettingsService {
    */
   private getCredentials(store: StoreDocument): WooCommerceCredentials {
     if (!store.credentials) {
-      throw new NotFoundException('Store credentials not found. Please reconnect the store.');
+      throw new NotFoundException(
+        'Store credentials not found. Please reconnect the store.',
+      );
     }
     return {
       url: store.url,
@@ -58,7 +74,10 @@ export class StoreSettingsService {
   /**
    * Build API URL for CartFlow Bridge plugin
    */
-  private buildPluginApiUrl(credentials: WooCommerceCredentials, endpoint: string): string {
+  private buildPluginApiUrl(
+    credentials: WooCommerceCredentials,
+    endpoint: string,
+  ): string {
     const baseUrl = credentials.url.replace(/\/+$/, '');
     return `${baseUrl}/wp-json/${this.pluginApiVersion}/${endpoint}`;
   }
@@ -66,7 +85,9 @@ export class StoreSettingsService {
   /**
    * Get auth config for WooCommerce API
    */
-  private getAuthConfig(credentials: WooCommerceCredentials): AxiosRequestConfig {
+  private getAuthConfig(
+    credentials: WooCommerceCredentials,
+  ): AxiosRequestConfig {
     return {
       auth: {
         username: credentials.consumerKey,
@@ -96,14 +117,28 @@ export class StoreSettingsService {
     try {
       this.logger.log(`[StoreSettings] ${method} ${url}`);
       this.logger.log(`[StoreSettings] Store URL: ${credentials.url}`);
-      this.logger.log(`[StoreSettings] Consumer Key (first 10 chars): ${credentials.consumerKey?.substring(0, 10)}...`);
-      const response = await firstValueFrom(this.httpService.request<T>(config));
+      this.logger.log(
+        `[StoreSettings] Consumer Key (first 10 chars): ${credentials.consumerKey?.substring(
+          0,
+          10,
+        )}...`,
+      );
+      const response = await firstValueFrom(
+        this.httpService.request<T>(config),
+      );
       this.logger.log(`[StoreSettings] Response status: ${response.status}`);
       return response.data;
     } catch (error) {
-      this.logger.error(`[StoreSettings] Plugin API error: ${method} ${endpoint}`);
-      this.logger.error(`[StoreSettings] Error status: ${error.response?.status}`);
-      this.logger.error(`[StoreSettings] Error data:`, JSON.stringify(error.response?.data || error.message));
+      this.logger.error(
+        `[StoreSettings] Plugin API error: ${method} ${endpoint}`,
+      );
+      this.logger.error(
+        `[StoreSettings] Error status: ${error.response?.status}`,
+      );
+      this.logger.error(
+        `[StoreSettings] Error data:`,
+        JSON.stringify(error.response?.data || error.message),
+      );
 
       // Check if it's a 404 - plugin not installed
       if (error.response?.status === 404) {
@@ -151,12 +186,19 @@ export class StoreSettingsService {
   /**
    * Check if CartFlow Bridge plugin is installed
    */
-  async checkPluginStatus(storeId: string, userId: string): Promise<{ installed: boolean; version?: string; message: string }> {
+  async checkPluginStatus(
+    storeId: string,
+    userId: string,
+  ): Promise<{ installed: boolean; version?: string; message: string }> {
     const store = await this.getStoreWithAccess(storeId, userId);
     const credentials = this.getCredentials(store);
 
     try {
-      const systemInfo = await this.pluginRequest<any>(credentials, 'GET', 'system/info');
+      const systemInfo = await this.pluginRequest<any>(
+        credentials,
+        'GET',
+        'system/info',
+      );
       return {
         installed: true,
         version: systemInfo.cartflow_bridge_version || '1.0.0',
@@ -166,7 +208,8 @@ export class StoreSettingsService {
       if (error instanceof NotFoundException) {
         return {
           installed: false,
-          message: 'CartFlow Bridge plugin is not installed. Please download and install it from the Plugins page.',
+          message:
+            'CartFlow Bridge plugin is not installed. Please download and install it from the Plugins page.',
         };
       }
       throw error;
@@ -187,7 +230,11 @@ export class StoreSettingsService {
   /**
    * Update WordPress general settings
    */
-  async updateGeneralSettings(storeId: string, userId: string, data: Record<string, any>): Promise<any> {
+  async updateGeneralSettings(
+    storeId: string,
+    userId: string,
+    data: Record<string, any>,
+  ): Promise<any> {
     const store = await this.getStoreWithAccess(storeId, userId);
     const credentials = this.getCredentials(store);
     return this.pluginRequest(credentials, 'POST', 'settings/general', data);
@@ -207,7 +254,11 @@ export class StoreSettingsService {
   /**
    * Update WordPress reading settings
    */
-  async updateReadingSettings(storeId: string, userId: string, data: Record<string, any>): Promise<any> {
+  async updateReadingSettings(
+    storeId: string,
+    userId: string,
+    data: Record<string, any>,
+  ): Promise<any> {
     const store = await this.getStoreWithAccess(storeId, userId);
     const credentials = this.getCredentials(store);
     return this.pluginRequest(credentials, 'POST', 'settings/reading', data);
@@ -227,10 +278,19 @@ export class StoreSettingsService {
   /**
    * Update WooCommerce settings
    */
-  async updateWooCommerceSettings(storeId: string, userId: string, data: Record<string, any>): Promise<any> {
+  async updateWooCommerceSettings(
+    storeId: string,
+    userId: string,
+    data: Record<string, any>,
+  ): Promise<any> {
     const store = await this.getStoreWithAccess(storeId, userId);
     const credentials = this.getCredentials(store);
-    return this.pluginRequest(credentials, 'POST', 'settings/woocommerce', data);
+    return this.pluginRequest(
+      credentials,
+      'POST',
+      'settings/woocommerce',
+      data,
+    );
   }
 
   // ============== SYSTEM INFO ==============

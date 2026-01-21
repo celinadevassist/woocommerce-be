@@ -8,18 +8,38 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Review, ReviewDocument } from './schema';
-import { ResponseTemplate, ResponseTemplateDocument } from './response-template.schema';
+import {
+  ResponseTemplate,
+  ResponseTemplateDocument,
+} from './response-template.schema';
 import { UpdateReviewDto, ReplyReviewDto } from './dto.update';
 import { QueryReviewDto } from './dto.query';
 import { CreateReviewDto } from './dto.create';
-import { CreateResponseTemplateDto, UpdateResponseTemplateDto, IResponseTemplate } from './response-template.dto';
-import { IReview, IReviewResponse, IReviewStats, IReviewPhoto } from './interface';
-import { ReviewStatus, ReviewSource, ReviewType, ModerationStatus } from './enum';
+import {
+  CreateResponseTemplateDto,
+  UpdateResponseTemplateDto,
+  IResponseTemplate,
+} from './response-template.dto';
+import {
+  IReview,
+  IReviewResponse,
+  IReviewStats,
+  IReviewPhoto,
+} from './interface';
+import {
+  ReviewStatus,
+  ReviewSource,
+  ReviewType,
+  ModerationStatus,
+} from './enum';
 import { Product, ProductDocument } from '../product/schema';
 import { Store, StoreDocument } from '../store/schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 import { WooProductReview } from '../integrations/woocommerce/woocommerce.types';
-import { S3UploadService, UploadedFile } from '../modules/s3-upload/s3-upload.service';
+import {
+  S3UploadService,
+  UploadedFile,
+} from '../modules/s3-upload/s3-upload.service';
 
 @Injectable()
 export class ReviewService {
@@ -29,7 +49,8 @@ export class ReviewService {
     @InjectModel(Review.name) private reviewModel: Model<ReviewDocument>,
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
-    @InjectModel(ResponseTemplate.name) private responseTemplateModel: Model<ResponseTemplateDocument>,
+    @InjectModel(ResponseTemplate.name)
+    private responseTemplateModel: Model<ResponseTemplateDocument>,
     private readonly wooCommerceService: WooCommerceService,
     private readonly s3UploadService: S3UploadService,
   ) {}
@@ -38,20 +59,25 @@ export class ReviewService {
    * Get all store IDs the user has access to (owner or member)
    */
   private async getUserStoreIds(userId: string): Promise<Types.ObjectId[]> {
-    const stores = await this.storeModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    }).select('_id');
+    const stores = await this.storeModel
+      .find({
+        isDeleted: false,
+        $or: [
+          { ownerId: new Types.ObjectId(userId) },
+          { 'members.userId': new Types.ObjectId(userId) },
+        ],
+      })
+      .select('_id');
     return stores.map((store) => store._id);
   }
 
   /**
    * Verify user has access to a specific store
    */
-  private async verifyStoreAccess(storeId: string, userId: string): Promise<StoreDocument> {
+  private async verifyStoreAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<StoreDocument> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       isDeleted: false,
@@ -74,7 +100,10 @@ export class ReviewService {
   /**
    * Get reviews with filtering and pagination
    */
-  async findAll(userId: string, query: QueryReviewDto): Promise<IReviewResponse> {
+  async findAll(
+    userId: string,
+    query: QueryReviewDto,
+  ): Promise<IReviewResponse> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
@@ -108,7 +137,11 @@ export class ReviewService {
           { reply: { $ne: '' } },
         ];
       } else {
-        filter.$or = [{ reply: { $exists: false } }, { reply: null }, { reply: '' }];
+        filter.$or = [
+          { reply: { $exists: false } },
+          { reply: null },
+          { reply: '' },
+        ];
       }
     }
     if (query.isFlagged !== undefined) {
@@ -159,15 +192,22 @@ export class ReviewService {
     ]);
 
     // Fetch product info for reviews
-    const productIds = [...new Set(reviews.map((r) => r.localProductId?.toString()).filter(Boolean))];
-    const products = productIds.length > 0
-      ? await this.productModel.find({ _id: { $in: productIds } })
-      : [];
+    const productIds = [
+      ...new Set(
+        reviews.map((r) => r.localProductId?.toString()).filter(Boolean),
+      ),
+    ];
+    const products =
+      productIds.length > 0
+        ? await this.productModel.find({ _id: { $in: productIds } })
+        : [];
     const productMap = new Map(products.map((p) => [p._id.toString(), p]));
 
     return {
       reviews: reviews.map((r) => {
-        const product = r.localProductId ? productMap.get(r.localProductId.toString()) : null;
+        const product = r.localProductId
+          ? productMap.get(r.localProductId.toString())
+          : null;
         return this.toInterface(r, product);
       }),
       pagination: {
@@ -205,7 +245,11 @@ export class ReviewService {
    * Update review (status, flags, notes)
    * Optionally syncs status changes back to WooCommerce
    */
-  async update(id: string, userId: string, dto: UpdateReviewDto): Promise<IReview> {
+  async update(
+    id: string,
+    userId: string,
+    dto: UpdateReviewDto,
+  ): Promise<IReview> {
     const review = await this.reviewModel.findOne({
       _id: new Types.ObjectId(id),
       isDeleted: false,
@@ -223,7 +267,8 @@ export class ReviewService {
     // Update fields
     if (dto.status) review.status = dto.status;
     if (dto.tags) review.tags = dto.tags;
-    if (dto.internalNotes !== undefined) review.internalNotes = dto.internalNotes;
+    if (dto.internalNotes !== undefined)
+      review.internalNotes = dto.internalNotes;
     if (dto.isFlagged !== undefined) review.isFlagged = dto.isFlagged;
     if (dto.flagReason !== undefined) review.flagReason = dto.flagReason;
 
@@ -233,18 +278,24 @@ export class ReviewService {
     if (statusChanged && dto.syncToStore !== false && review.externalId) {
       try {
         await this.syncReviewStatusToWoo(review);
-        this.logger.log(`Review ${review.externalId} status synced to WooCommerce: ${dto.status}`);
+        this.logger.log(
+          `Review ${review.externalId} status synced to WooCommerce: ${dto.status}`,
+        );
       } catch (error) {
-        this.logger.error(`Failed to sync review status to WooCommerce: ${error.message}`);
+        this.logger.error(
+          `Failed to sync review status to WooCommerce: ${error.message}`,
+        );
         // Don't throw - local update succeeded, just log the sync failure
       }
     }
 
     // Sync product rating when review status changes (affects which reviews are counted)
     if (statusChanged && review.localProductId) {
-      await this.syncProductRating(review.localProductId.toString()).catch((err) => {
-        this.logger.error(`Failed to sync product rating: ${err.message}`);
-      });
+      await this.syncProductRating(review.localProductId.toString()).catch(
+        (err) => {
+          this.logger.error(`Failed to sync product rating: ${err.message}`);
+        },
+      );
     }
 
     return this.toInterface(review);
@@ -273,7 +324,11 @@ export class ReviewService {
   /**
    * Reply to a review
    */
-  async reply(id: string, userId: string, dto: ReplyReviewDto): Promise<IReview> {
+  async reply(
+    id: string,
+    userId: string,
+    dto: ReplyReviewDto,
+  ): Promise<IReview> {
     const review = await this.reviewModel.findOne({
       _id: new Types.ObjectId(id),
       isDeleted: false,
@@ -296,7 +351,10 @@ export class ReviewService {
   /**
    * Get new reviews count (reviews from the last 24 hours that are pending)
    */
-  async getNewReviewsCount(userId: string, storeId?: string): Promise<{ count: number; reviews: IReview[] }> {
+  async getNewReviewsCount(
+    userId: string,
+    storeId?: string,
+  ): Promise<{ count: number; reviews: IReview[] }> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
@@ -317,10 +375,15 @@ export class ReviewService {
       .limit(10);
 
     // Get product info
-    const productIds = [...new Set(reviews.map((r) => r.localProductId?.toString()).filter(Boolean))];
-    const products = productIds.length > 0
-      ? await this.productModel.find({ _id: { $in: productIds } })
-      : [];
+    const productIds = [
+      ...new Set(
+        reviews.map((r) => r.localProductId?.toString()).filter(Boolean),
+      ),
+    ];
+    const products =
+      productIds.length > 0
+        ? await this.productModel.find({ _id: { $in: productIds } })
+        : [];
     const productMap = new Map(products.map((p) => [p._id.toString(), p]));
 
     const count = await this.reviewModel.countDocuments(filter);
@@ -328,7 +391,9 @@ export class ReviewService {
     return {
       count,
       reviews: reviews.map((r) => {
-        const product = r.localProductId ? productMap.get(r.localProductId.toString()) : null;
+        const product = r.localProductId
+          ? productMap.get(r.localProductId.toString())
+          : null;
         return this.toInterface(r, product);
       }),
     };
@@ -364,7 +429,7 @@ export class ReviewService {
       this.reviewModel.countDocuments({
         ...filter,
         reply: { $exists: true },
-        $and: [{ reply: { $ne: null } }, { reply: { $ne: '' } }]
+        $and: [{ reply: { $ne: null } }, { reply: { $ne: '' } }],
       }),
       this.reviewModel.aggregate([
         { $match: filter },
@@ -398,7 +463,11 @@ export class ReviewService {
   /**
    * Get reviews for a specific product
    */
-  async getProductReviews(productId: string, page: number = 1, size: number = 10): Promise<IReviewResponse> {
+  async getProductReviews(
+    productId: string,
+    page = 1,
+    size = 10,
+  ): Promise<IReviewResponse> {
     const filter = {
       localProductId: new Types.ObjectId(productId),
       status: ReviewStatus.APPROVED,
@@ -408,7 +477,11 @@ export class ReviewService {
     const skip = (page - 1) * size;
 
     const [reviews, total] = await Promise.all([
-      this.reviewModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(size),
+      this.reviewModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(size),
       this.reviewModel.countDocuments(filter),
     ]);
 
@@ -441,10 +514,33 @@ export class ReviewService {
     storeId?: string,
     period: 'week' | 'month' | 'quarter' | 'year' = 'month',
   ): Promise<{
-    trends: { date: string; count: number; avgRating: number; positiveCount: number; negativeCount: number }[];
-    ratingTrends: { date: string; rating1: number; rating2: number; rating3: number; rating4: number; rating5: number }[];
-    responseMetrics: { totalReviews: number; repliedCount: number; responseRate: number; avgResponseTime: number | null };
-    topProducts: { productId: string; productName: string; reviewCount: number; avgRating: number }[];
+    trends: {
+      date: string;
+      count: number;
+      avgRating: number;
+      positiveCount: number;
+      negativeCount: number;
+    }[];
+    ratingTrends: {
+      date: string;
+      rating1: number;
+      rating2: number;
+      rating3: number;
+      rating4: number;
+      rating5: number;
+    }[];
+    responseMetrics: {
+      totalReviews: number;
+      repliedCount: number;
+      responseRate: number;
+      avgResponseTime: number | null;
+    };
+    topProducts: {
+      productId: string;
+      productName: string;
+      reviewCount: number;
+      avgRating: number;
+    }[];
     sentimentBreakdown: { positive: number; neutral: number; negative: number };
     reviewsByDayOfWeek: { day: string; count: number }[];
     verificationStats: { verified: number; unverified: number };
@@ -491,7 +587,9 @@ export class ReviewService {
       { $match: dateFilter },
       {
         $group: {
-          _id: { $dateToString: { format: groupFormat, date: '$wooCreatedAt' } },
+          _id: {
+            $dateToString: { format: groupFormat, date: '$wooCreatedAt' },
+          },
           count: { $sum: 1 },
           avgRating: { $avg: '$rating' },
           positiveCount: { $sum: { $cond: [{ $gte: ['$rating', 4] }, 1, 0] } },
@@ -506,7 +604,9 @@ export class ReviewService {
       { $match: dateFilter },
       {
         $group: {
-          _id: { $dateToString: { format: groupFormat, date: '$wooCreatedAt' } },
+          _id: {
+            $dateToString: { format: groupFormat, date: '$wooCreatedAt' },
+          },
           rating1: { $sum: { $cond: [{ $eq: ['$rating', 1] }, 1, 0] } },
           rating2: { $sum: { $cond: [{ $eq: ['$rating', 2] }, 1, 0] } },
           rating3: { $sum: { $cond: [{ $eq: ['$rating', 3] }, 1, 0] } },
@@ -518,41 +618,45 @@ export class ReviewService {
     ]);
 
     // 3. Response metrics
-    const [totalReviews, repliedCount, avgResponseTimeResult] = await Promise.all([
-      this.reviewModel.countDocuments(filter),
-      this.reviewModel.countDocuments({
-        ...filter,
-        reply: { $exists: true, $nin: [null, ''] },
-      }),
-      this.reviewModel.aggregate([
-        {
-          $match: {
-            ...filter,
-            reply: { $exists: true, $nin: [null, ''] },
-            repliedAt: { $exists: true },
-            wooCreatedAt: { $exists: true },
+    const [totalReviews, repliedCount, avgResponseTimeResult] =
+      await Promise.all([
+        this.reviewModel.countDocuments(filter),
+        this.reviewModel.countDocuments({
+          ...filter,
+          reply: { $exists: true, $nin: [null, ''] },
+        }),
+        this.reviewModel.aggregate([
+          {
+            $match: {
+              ...filter,
+              reply: { $exists: true, $nin: [null, ''] },
+              repliedAt: { $exists: true },
+              wooCreatedAt: { $exists: true },
+            },
           },
-        },
-        {
-          $project: {
-            responseTime: { $subtract: ['$repliedAt', '$wooCreatedAt'] },
+          {
+            $project: {
+              responseTime: { $subtract: ['$repliedAt', '$wooCreatedAt'] },
+            },
           },
-        },
-        {
-          $group: {
-            _id: null,
-            avgResponseTime: { $avg: '$responseTime' },
+          {
+            $group: {
+              _id: null,
+              avgResponseTime: { $avg: '$responseTime' },
+            },
           },
-        },
-      ]),
-    ]);
+        ]),
+      ]);
 
     const responseMetrics = {
       totalReviews,
       repliedCount,
-      responseRate: totalReviews > 0 ? Math.round((repliedCount / totalReviews) * 100) : 0,
+      responseRate:
+        totalReviews > 0 ? Math.round((repliedCount / totalReviews) * 100) : 0,
       avgResponseTime: avgResponseTimeResult[0]?.avgResponseTime
-        ? Math.round(avgResponseTimeResult[0].avgResponseTime / (1000 * 60 * 60)) // Hours
+        ? Math.round(
+            avgResponseTimeResult[0].avgResponseTime / (1000 * 60 * 60),
+          ) // Hours
         : null,
     };
 
@@ -571,9 +675,10 @@ export class ReviewService {
     ]);
 
     const productIds = topProductsAgg.map((p) => p._id).filter(Boolean);
-    const products = productIds.length > 0
-      ? await this.productModel.find({ _id: { $in: productIds } })
-      : [];
+    const products =
+      productIds.length > 0
+        ? await this.productModel.find({ _id: { $in: productIds } })
+        : [];
     const productMap = new Map(products.map((p) => [p._id.toString(), p.name]));
 
     const topProducts = topProductsAgg
@@ -598,7 +703,11 @@ export class ReviewService {
       },
     ]);
 
-    const sentimentBreakdown = sentimentAgg[0] || { positive: 0, neutral: 0, negative: 0 };
+    const sentimentBreakdown = sentimentAgg[0] || {
+      positive: 0,
+      neutral: 0,
+      negative: 0,
+    };
 
     // 6. Reviews by day of week
     const dayOfWeekAgg = await this.reviewModel.aggregate([
@@ -688,10 +797,15 @@ export class ReviewService {
       .limit(10000); // Max 10k reviews
 
     // Get product names
-    const productIds = [...new Set(reviews.map((r) => r.localProductId?.toString()).filter(Boolean))];
-    const products = productIds.length > 0
-      ? await this.productModel.find({ _id: { $in: productIds } })
-      : [];
+    const productIds = [
+      ...new Set(
+        reviews.map((r) => r.localProductId?.toString()).filter(Boolean),
+      ),
+    ];
+    const products =
+      productIds.length > 0
+        ? await this.productModel.find({ _id: { $in: productIds } })
+        : [];
     const productMap = new Map(products.map((p) => [p._id.toString(), p.name]));
 
     // CSV Header
@@ -740,10 +854,12 @@ export class ReviewService {
 
     // Build CSV with UTF-8 BOM for Arabic text support
     const BOM = '\uFEFF';
-    const csvContent = BOM + [
-      headers.map(escapeValue).join(','),
-      ...rows.map((row) => row.map(escapeValue).join(',')),
-    ].join('\n');
+    const csvContent =
+      BOM +
+      [
+        headers.map(escapeValue).join(','),
+        ...rows.map((row) => row.map(escapeValue).join(',')),
+      ].join('\n');
 
     return csvContent;
   }
@@ -830,7 +946,11 @@ export class ReviewService {
   /**
    * Get all response templates for user's stores
    */
-  async getResponseTemplates(userId: string, storeId?: string, category?: string): Promise<IResponseTemplate[]> {
+  async getResponseTemplates(
+    userId: string,
+    storeId?: string,
+    category?: string,
+  ): Promise<IResponseTemplate[]> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
@@ -938,7 +1058,9 @@ export class ReviewService {
   /**
    * Sync average rating from reviews to a specific product
    */
-  async syncProductRating(productId: string): Promise<{ averageRating: number; ratingCount: number }> {
+  async syncProductRating(
+    productId: string,
+  ): Promise<{ averageRating: number; ratingCount: number }> {
     const product = await this.productModel.findById(productId);
     if (!product) {
       throw new NotFoundException('Product not found');
@@ -972,7 +1094,9 @@ export class ReviewService {
       { averageRating, ratingCount },
     );
 
-    this.logger.log(`Product ${productId} rating synced: ${averageRating} (${ratingCount} reviews)`);
+    this.logger.log(
+      `Product ${productId} rating synced: ${averageRating} (${ratingCount} reviews)`,
+    );
 
     return { averageRating, ratingCount };
   }
@@ -980,7 +1104,10 @@ export class ReviewService {
   /**
    * Sync average rating by product external ID (used during WooCommerce sync)
    */
-  async syncProductRatingByExternalId(storeId: string, productExternalId: number): Promise<void> {
+  async syncProductRatingByExternalId(
+    storeId: string,
+    productExternalId: number,
+  ): Promise<void> {
     const product = await this.productModel.findOne({
       storeId: new Types.ObjectId(storeId),
       externalId: productExternalId,
@@ -994,7 +1121,10 @@ export class ReviewService {
   /**
    * Sync ratings for all products in a store
    */
-  async syncAllProductRatings(userId: string, storeId?: string): Promise<{ updated: number }> {
+  async syncAllProductRatings(
+    userId: string,
+    storeId?: string,
+  ): Promise<{ updated: number }> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const productFilter: any = {
@@ -1014,7 +1144,9 @@ export class ReviewService {
         await this.syncProductRating(product._id.toString());
         updated++;
       } catch (error) {
-        this.logger.error(`Failed to sync rating for product ${product._id}: ${error.message}`);
+        this.logger.error(
+          `Failed to sync rating for product ${product._id}: ${error.message}`,
+        );
       }
     }
 
@@ -1022,7 +1154,9 @@ export class ReviewService {
     return { updated };
   }
 
-  private templateToInterface(doc: ResponseTemplateDocument): IResponseTemplate {
+  private templateToInterface(
+    doc: ResponseTemplateDocument,
+  ): IResponseTemplate {
     const obj = doc.toObject();
     return {
       _id: obj._id.toString(),
@@ -1037,7 +1171,10 @@ export class ReviewService {
     };
   }
 
-  private toInterface(doc: ReviewDocument, product?: ProductDocument | null): IReview {
+  private toInterface(
+    doc: ReviewDocument,
+    product?: ProductDocument | null,
+  ): IReview {
     const obj = doc.toObject();
     return {
       _id: obj._id.toString(),
@@ -1125,7 +1262,11 @@ export class ReviewService {
 
     // Upload to S3
     const folder = `reviews/${review.storeId.toString()}/${reviewId}`;
-    const result = await this.s3UploadService.uploadImage(file, file.originalname, folder);
+    const result = await this.s3UploadService.uploadImage(
+      file,
+      file.originalname,
+      folder,
+    );
 
     // Add photo to review
     const newPhoto = {
@@ -1147,7 +1288,11 @@ export class ReviewService {
   /**
    * Remove a photo from a review
    */
-  async removePhoto(reviewId: string, photoId: string, userId: string): Promise<IReview> {
+  async removePhoto(
+    reviewId: string,
+    photoId: string,
+    userId: string,
+  ): Promise<IReview> {
     const review = await this.reviewModel.findOne({
       _id: new Types.ObjectId(reviewId),
       isDeleted: false,
@@ -1261,7 +1406,11 @@ export class ReviewService {
   /**
    * Reject a review
    */
-  async reject(reviewId: string, userId: string, reason?: string): Promise<IReview> {
+  async reject(
+    reviewId: string,
+    userId: string,
+    reason?: string,
+  ): Promise<IReview> {
     const review = await this.reviewModel.findOne({
       _id: new Types.ObjectId(reviewId),
       isDeleted: false,
@@ -1281,7 +1430,9 @@ export class ReviewService {
 
     await review.save();
 
-    this.logger.log(`Review ${reviewId} rejected by user ${userId}: ${reason || 'No reason'}`);
+    this.logger.log(
+      `Review ${reviewId} rejected by user ${userId}: ${reason || 'No reason'}`,
+    );
 
     return this.toInterface(review);
   }
@@ -1289,7 +1440,11 @@ export class ReviewService {
   /**
    * Flag a review for further review
    */
-  async flag(reviewId: string, userId: string, reason: string): Promise<IReview> {
+  async flag(
+    reviewId: string,
+    userId: string,
+    reason: string,
+  ): Promise<IReview> {
     const review = await this.reviewModel.findOne({
       _id: new Types.ObjectId(reviewId),
       isDeleted: false,
@@ -1315,7 +1470,10 @@ export class ReviewService {
   /**
    * Bulk approve reviews
    */
-  async bulkApprove(reviewIds: string[], userId: string): Promise<{ updated: number }> {
+  async bulkApprove(
+    reviewIds: string[],
+    userId: string,
+  ): Promise<{ updated: number }> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const result = await this.reviewModel.updateMany(
@@ -1334,7 +1492,9 @@ export class ReviewService {
       },
     );
 
-    this.logger.log(`Bulk approved ${result.modifiedCount} reviews by user ${userId}`);
+    this.logger.log(
+      `Bulk approved ${result.modifiedCount} reviews by user ${userId}`,
+    );
 
     return { updated: result.modifiedCount };
   }
@@ -1342,7 +1502,11 @@ export class ReviewService {
   /**
    * Bulk reject reviews
    */
-  async bulkReject(reviewIds: string[], userId: string, reason?: string): Promise<{ updated: number }> {
+  async bulkReject(
+    reviewIds: string[],
+    userId: string,
+    reason?: string,
+  ): Promise<{ updated: number }> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const result = await this.reviewModel.updateMany(
@@ -1362,7 +1526,9 @@ export class ReviewService {
       },
     );
 
-    this.logger.log(`Bulk rejected ${result.modifiedCount} reviews by user ${userId}`);
+    this.logger.log(
+      `Bulk rejected ${result.modifiedCount} reviews by user ${userId}`,
+    );
 
     return { updated: result.modifiedCount };
   }
@@ -1385,7 +1551,9 @@ export class ReviewService {
     await this.verifyStoreAccess(review.storeId.toString(), userId);
 
     if (review.moderationStatus !== ModerationStatus.APPROVED) {
-      throw new BadRequestException('Review must be approved before publishing');
+      throw new BadRequestException(
+        'Review must be approved before publishing',
+      );
     }
 
     review.isPublished = true;
@@ -1425,7 +1593,10 @@ export class ReviewService {
   /**
    * Bulk publish reviews
    */
-  async bulkPublish(reviewIds: string[], userId: string): Promise<{ updated: number }> {
+  async bulkPublish(
+    reviewIds: string[],
+    userId: string,
+  ): Promise<{ updated: number }> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const result = await this.reviewModel.updateMany(
@@ -1443,7 +1614,9 @@ export class ReviewService {
       },
     );
 
-    this.logger.log(`Bulk published ${result.modifiedCount} reviews by user ${userId}`);
+    this.logger.log(
+      `Bulk published ${result.modifiedCount} reviews by user ${userId}`,
+    );
 
     return { updated: result.modifiedCount };
   }
@@ -1451,7 +1624,11 @@ export class ReviewService {
   /**
    * Feature a review
    */
-  async feature(reviewId: string, userId: string, order?: number): Promise<IReview> {
+  async feature(
+    reviewId: string,
+    userId: string,
+    order?: number,
+  ): Promise<IReview> {
     const review = await this.reviewModel.findOne({
       _id: new Types.ObjectId(reviewId),
       isDeleted: false,
@@ -1501,7 +1678,11 @@ export class ReviewService {
   /**
    * Create a manual review (from WhatsApp, social media, etc.)
    */
-  async createManualReview(storeId: string, userId: string, dto: CreateReviewDto): Promise<IReview> {
+  async createManualReview(
+    storeId: string,
+    userId: string,
+    dto: CreateReviewDto,
+  ): Promise<IReview> {
     await this.verifyStoreAccess(storeId, userId);
 
     // Helper to check if a value is a valid MongoDB ObjectId
@@ -1526,19 +1707,25 @@ export class ReviewService {
     const reviewData: any = {
       storeId: new Types.ObjectId(storeId),
       reviewer: dto.reviewer,
-      reviewerEmail: dto.reviewerEmail?.toLowerCase() || `manual-${Date.now()}@no-email.local`,
+      reviewerEmail:
+        dto.reviewerEmail?.toLowerCase() ||
+        `manual-${Date.now()}@no-email.local`,
       review: dto.review,
       rating: dto.rating,
       verified: dto.verified || false,
       status: ReviewStatus.APPROVED,
       source: dto.source || ReviewSource.MANUAL,
       reviewType: dto.reviewType || ReviewType.PRODUCT,
-      moderationStatus: dto.autoApprove ? ModerationStatus.APPROVED : ModerationStatus.PENDING,
+      moderationStatus: dto.autoApprove
+        ? ModerationStatus.APPROVED
+        : ModerationStatus.PENDING,
       isPublished: dto.autoApprove && dto.autoPublish ? true : false,
       publishedAt: dto.autoApprove && dto.autoPublish ? new Date() : undefined,
       customerEmail: dto.customerEmail,
       customerPhone: dto.customerPhone,
-      customerId: isValidObjectId(dto.customerId) ? new Types.ObjectId(dto.customerId) : undefined,
+      customerId: isValidObjectId(dto.customerId)
+        ? new Types.ObjectId(dto.customerId)
+        : undefined,
       tags: dto.tags || [],
       internalNotes: dto.internalNotes,
       photos: [],
@@ -1555,7 +1742,13 @@ export class ReviewService {
       reviewData.moderatedAt = new Date();
     }
 
-    this.logger.log(`Creating manual review with data: ${JSON.stringify(reviewData, null, 2)}`);
+    this.logger.log(
+      `Creating manual review with data: ${JSON.stringify(
+        reviewData,
+        null,
+        2,
+      )}`,
+    );
 
     let review;
     try {
@@ -1566,10 +1759,15 @@ export class ReviewService {
       throw error;
     }
 
-    this.logger.log(`Manual review created for store ${storeId} by user ${userId}`);
+    this.logger.log(
+      `Manual review created for store ${storeId} by user ${userId}`,
+    );
 
     // Sync product rating if applicable
-    if (localProduct && reviewData.moderationStatus === ModerationStatus.APPROVED) {
+    if (
+      localProduct &&
+      reviewData.moderationStatus === ModerationStatus.APPROVED
+    ) {
       await this.syncProductRating(localProduct._id.toString()).catch((err) => {
         this.logger.error(`Failed to sync product rating: ${err.message}`);
       });
@@ -1655,15 +1853,22 @@ export class ReviewService {
     ]);
 
     // Get product info
-    const productIds = [...new Set(reviews.map((r) => r.localProductId?.toString()).filter(Boolean))];
-    const products = productIds.length > 0
-      ? await this.productModel.find({ _id: { $in: productIds } })
-      : [];
+    const productIds = [
+      ...new Set(
+        reviews.map((r) => r.localProductId?.toString()).filter(Boolean),
+      ),
+    ];
+    const products =
+      productIds.length > 0
+        ? await this.productModel.find({ _id: { $in: productIds } })
+        : [];
     const productMap = new Map(products.map((p) => [p._id.toString(), p]));
 
     return {
       reviews: reviews.map((r) => {
-        const product = r.localProductId ? productMap.get(r.localProductId.toString()) : null;
+        const product = r.localProductId
+          ? productMap.get(r.localProductId.toString())
+          : null;
         return this.toPublicInterface(r, product);
       }),
       pagination: {
@@ -1681,7 +1886,13 @@ export class ReviewService {
   async getPublicSummary(storeId: string): Promise<{
     totalReviews: number;
     averageRating: number;
-    ratingDistribution: { 1: number; 2: number; 3: number; 4: number; 5: number };
+    ratingDistribution: {
+      1: number;
+      2: number;
+      3: number;
+      4: number;
+      5: number;
+    };
     featuredCount: number;
     photoCount: number;
   }> {
@@ -1735,7 +1946,10 @@ export class ReviewService {
   /**
    * Convert to public interface (hides internal fields)
    */
-  private toPublicInterface(doc: ReviewDocument, product?: ProductDocument | null): IReview {
+  private toPublicInterface(
+    doc: ReviewDocument,
+    product?: ProductDocument | null,
+  ): IReview {
     const obj = doc.toObject();
     return {
       _id: obj._id.toString(),

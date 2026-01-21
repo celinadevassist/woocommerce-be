@@ -1,4 +1,8 @@
-import { Injectable, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Order, OrderDocument } from '../order/schema';
@@ -31,7 +35,10 @@ export class AnalyticsService {
   /**
    * Get dashboard analytics
    */
-  async getDashboard(userId: string, query: QueryAnalyticsDto): Promise<IDashboardAnalytics> {
+  async getDashboard(
+    userId: string,
+    query: QueryAnalyticsDto,
+  ): Promise<IDashboardAnalytics> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const baseFilter: any = {
@@ -89,7 +96,10 @@ export class AnalyticsService {
   /**
    * Get summary statistics
    */
-  private async getSummary(baseFilter: any, dateFilter: any): Promise<IAnalyticsSummary> {
+  private async getSummary(
+    baseFilter: any,
+    dateFilter: any,
+  ): Promise<IAnalyticsSummary> {
     const orderFilter = { ...baseFilter };
     if (Object.keys(dateFilter).length > 0) {
       orderFilter.dateCreatedWoo = dateFilter;
@@ -124,7 +134,9 @@ export class AnalyticsService {
       this.customerModel.countDocuments(baseFilter),
       this.customerModel.countDocuments({
         ...baseFilter,
-        ...(Object.keys(dateFilter).length > 0 ? { createdAt: dateFilter } : {}),
+        ...(Object.keys(dateFilter).length > 0
+          ? { createdAt: dateFilter }
+          : {}),
       }),
       this.productModel.countDocuments(productFilter),
       this.productModel.countDocuments({
@@ -140,7 +152,10 @@ export class AnalyticsService {
         { $match: baseFilter },
         { $group: { _id: null, avg: { $avg: '$rating' } } },
       ]),
-      this.reviewModel.countDocuments({ ...baseFilter, status: ReviewStatus.HOLD }),
+      this.reviewModel.countDocuments({
+        ...baseFilter,
+        status: ReviewStatus.HOLD,
+      }),
     ]);
 
     const statusMap: Record<string, number> = {};
@@ -152,7 +167,8 @@ export class AnalyticsService {
       orders: {
         total: totalOrders,
         revenue: revenueData[0]?.total || 0,
-        averageOrderValue: totalOrders > 0 ? (revenueData[0]?.total || 0) / totalOrders : 0,
+        averageOrderValue:
+          totalOrders > 0 ? (revenueData[0]?.total || 0) / totalOrders : 0,
         byStatus: statusMap,
       },
       customers: {
@@ -186,7 +202,10 @@ export class AnalyticsService {
       dateCreatedWoo: { $exists: true, $ne: null },
     };
     if (Object.keys(dateFilter).length > 0) {
-      orderFilter.dateCreatedWoo = { ...orderFilter.dateCreatedWoo, ...dateFilter };
+      orderFilter.dateCreatedWoo = {
+        ...orderFilter.dateCreatedWoo,
+        ...dateFilter,
+      };
     }
 
     let dateFormat: string;
@@ -208,7 +227,9 @@ export class AnalyticsService {
       { $match: orderFilter },
       {
         $group: {
-          _id: { $dateToString: { format: dateFormat, date: '$dateCreatedWoo' } },
+          _id: {
+            $dateToString: { format: dateFormat, date: '$dateCreatedWoo' },
+          },
           revenue: { $sum: { $toDouble: '$total' } },
           orders: { $sum: 1 },
         },
@@ -229,7 +250,10 @@ export class AnalyticsService {
   /**
    * Get top selling products
    */
-  private async getTopProducts(baseFilter: any, dateFilter: any): Promise<ITopProduct[]> {
+  private async getTopProducts(
+    baseFilter: any,
+    dateFilter: any,
+  ): Promise<ITopProduct[]> {
     const orderFilter = { ...baseFilter };
     if (Object.keys(dateFilter).length > 0) {
       orderFilter.dateCreatedWoo = dateFilter;
@@ -272,7 +296,10 @@ export class AnalyticsService {
   /**
    * Get top customers
    */
-  private async getTopCustomers(baseFilter: any, dateFilter: any): Promise<ITopCustomer[]> {
+  private async getTopCustomers(
+    baseFilter: any,
+    dateFilter: any,
+  ): Promise<ITopCustomer[]> {
     const orderFilter = { ...baseFilter };
     if (Object.keys(dateFilter).length > 0) {
       orderFilter.dateCreatedWoo = dateFilter;
@@ -284,7 +311,9 @@ export class AnalyticsService {
         $group: {
           _id: '$billing.email',
           name: {
-            $first: { $concat: ['$billing.firstName', ' ', '$billing.lastName'] },
+            $first: {
+              $concat: ['$billing.firstName', ' ', '$billing.lastName'],
+            },
           },
           ordersCount: { $sum: 1 },
           totalSpent: { $sum: { $toDouble: '$total' } },
@@ -306,7 +335,10 @@ export class AnalyticsService {
   /**
    * Get orders by status
    */
-  private async getOrdersByStatus(baseFilter: any, dateFilter: any): Promise<IOrdersByStatus[]> {
+  private async getOrdersByStatus(
+    baseFilter: any,
+    dateFilter: any,
+  ): Promise<IOrdersByStatus[]> {
     const orderFilter = { ...baseFilter };
     if (Object.keys(dateFilter).length > 0) {
       orderFilter.dateCreatedWoo = dateFilter;
@@ -399,7 +431,9 @@ export class AnalyticsService {
       _id: review._id.toString(),
       reviewer: review.reviewer,
       rating: review.rating,
-      review: review.review?.substring(0, 100) + (review.review?.length > 100 ? '...' : ''),
+      review:
+        review.review?.substring(0, 100) +
+        (review.review?.length > 100 ? '...' : ''),
       status: review.status,
       date: review.wooCreatedAt,
     }));
@@ -417,7 +451,10 @@ export class AnalyticsService {
     return stores.map((store) => store._id);
   }
 
-  private async getStoreWithAccess(storeId: string, userId: string): Promise<StoreDocument> {
+  private async getStoreWithAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<StoreDocument> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       isDeleted: false,

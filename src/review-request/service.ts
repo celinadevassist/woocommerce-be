@@ -9,8 +9,15 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { randomBytes } from 'crypto';
 import { ReviewRequest, ReviewRequestDocument } from './schema';
-import { ReviewRequestSettings, ReviewRequestSettingsDocument } from './settings.schema';
-import { QueryReviewRequestDto, UpdateReviewRequestSettingsDto, SubmitReviewsDto } from './dto';
+import {
+  ReviewRequestSettings,
+  ReviewRequestSettingsDocument,
+} from './settings.schema';
+import {
+  QueryReviewRequestDto,
+  UpdateReviewRequestSettingsDto,
+  SubmitReviewsDto,
+} from './dto';
 import {
   IReviewRequest,
   IReviewRequestSettings,
@@ -18,7 +25,11 @@ import {
   IReviewRequestStats,
   IPublicReviewRequest,
 } from './interface';
-import { ReviewRequestStatus, ReviewRequestChannel, ReviewRequestTrigger } from './enum';
+import {
+  ReviewRequestStatus,
+  ReviewRequestChannel,
+  ReviewRequestTrigger,
+} from './enum';
 import { Store, StoreDocument } from '../store/schema';
 import { Order, OrderDocument } from '../order/schema';
 import { ReviewService } from '../review/service';
@@ -30,8 +41,10 @@ export class ReviewRequestService {
   private readonly logger = new Logger(ReviewRequestService.name);
 
   constructor(
-    @InjectModel(ReviewRequest.name) private reviewRequestModel: Model<ReviewRequestDocument>,
-    @InjectModel(ReviewRequestSettings.name) private settingsModel: Model<ReviewRequestSettingsDocument>,
+    @InjectModel(ReviewRequest.name)
+    private reviewRequestModel: Model<ReviewRequestDocument>,
+    @InjectModel(ReviewRequestSettings.name)
+    private settingsModel: Model<ReviewRequestSettingsDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     private readonly reviewService: ReviewService,
@@ -42,20 +55,25 @@ export class ReviewRequestService {
    * Get all store IDs the user has access to
    */
   private async getUserStoreIds(userId: string): Promise<Types.ObjectId[]> {
-    const stores = await this.storeModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    }).select('_id');
+    const stores = await this.storeModel
+      .find({
+        isDeleted: false,
+        $or: [
+          { ownerId: new Types.ObjectId(userId) },
+          { 'members.userId': new Types.ObjectId(userId) },
+        ],
+      })
+      .select('_id');
     return stores.map((store) => store._id);
   }
 
   /**
    * Verify user has access to a specific store
    */
-  private async verifyStoreAccess(storeId: string, userId: string): Promise<StoreDocument> {
+  private async verifyStoreAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<StoreDocument> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       isDeleted: false,
@@ -80,7 +98,10 @@ export class ReviewRequestService {
   /**
    * Get settings for a store (creates default if not exists)
    */
-  async getSettings(storeId: string, userId: string): Promise<IReviewRequestSettings> {
+  async getSettings(
+    storeId: string,
+    userId: string,
+  ): Promise<IReviewRequestSettings> {
     await this.verifyStoreAccess(storeId, userId);
 
     let settings = await this.settingsModel.findOne({
@@ -143,7 +164,10 @@ export class ReviewRequestService {
   /**
    * Get review requests with filtering and pagination
    */
-  async findAll(userId: string, query: QueryReviewRequestDto): Promise<IReviewRequestResponse> {
+  async findAll(
+    userId: string,
+    query: QueryReviewRequestDto,
+  ): Promise<IReviewRequestResponse> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
@@ -223,7 +247,10 @@ export class ReviewRequestService {
   /**
    * Get statistics for review requests
    */
-  async getStats(userId: string, storeId?: string): Promise<IReviewRequestStats> {
+  async getStats(
+    userId: string,
+    storeId?: string,
+  ): Promise<IReviewRequestStats> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
@@ -256,14 +283,19 @@ export class ReviewRequestService {
       counts[item._id] = item.count;
     });
 
-    const sentTotal = counts.sent + counts.opened + counts.partial + counts.completed;
+    const sentTotal =
+      counts.sent + counts.opened + counts.partial + counts.completed;
     const respondedTotal = counts.partial + counts.completed;
 
     return {
       total,
       ...counts,
-      conversionRate: sentTotal > 0 ? Math.round((respondedTotal / sentTotal) * 100) : 0,
-      openRate: sentTotal > 0 ? Math.round(((counts.opened + respondedTotal) / sentTotal) * 100) : 0,
+      conversionRate:
+        sentTotal > 0 ? Math.round((respondedTotal / sentTotal) * 100) : 0,
+      openRate:
+        sentTotal > 0
+          ? Math.round(((counts.opened + respondedTotal) / sentTotal) * 100)
+          : 0,
     };
   }
 
@@ -273,8 +305,14 @@ export class ReviewRequestService {
    * Schedule a review request for an order
    * Called when an order reaches the trigger status (delivered/completed)
    */
-  async scheduleRequest(orderId: string, trigger?: string, skipSettingsCheck = false): Promise<ReviewRequestDocument | null> {
-    this.logger.log(`[scheduleRequest] Starting for orderId: ${orderId}, skipSettingsCheck: ${skipSettingsCheck}`);
+  async scheduleRequest(
+    orderId: string,
+    trigger?: string,
+    skipSettingsCheck = false,
+  ): Promise<ReviewRequestDocument | null> {
+    this.logger.log(
+      `[scheduleRequest] Starting for orderId: ${orderId}, skipSettingsCheck: ${skipSettingsCheck}`,
+    );
 
     try {
       const order = await this.orderModel.findOne({
@@ -300,21 +338,29 @@ export class ReviewRequestService {
       }
 
       // Get settings
-      this.logger.log(`[scheduleRequest] Getting settings for store: ${order.storeId}`);
+      this.logger.log(
+        `[scheduleRequest] Getting settings for store: ${order.storeId}`,
+      );
       const settings = await this.settingsModel.findOne({
         storeId: new Types.ObjectId(order.storeId.toString()),
       });
-      this.logger.log(`[scheduleRequest] Settings: ${settings ? 'found' : 'not found'}`);
+      this.logger.log(
+        `[scheduleRequest] Settings: ${settings ? 'found' : 'not found'}`,
+      );
 
       if (!skipSettingsCheck) {
         if (!settings || !settings.enabled) {
-          this.logger.log(`Review requests disabled for store ${order.storeId}`);
+          this.logger.log(
+            `Review requests disabled for store ${order.storeId}`,
+          );
           return null;
         }
 
         // Check if trigger matches settings
         if (trigger && settings.triggerOn && trigger !== settings.triggerOn) {
-          this.logger.log(`Review request trigger mismatch: ${trigger} !== ${settings.triggerOn}`);
+          this.logger.log(
+            `Review request trigger mismatch: ${trigger} !== ${settings.triggerOn}`,
+          );
           return null;
         }
       }
@@ -322,10 +368,15 @@ export class ReviewRequestService {
       // Default settings values for manual trigger or missing settings
       const delayHours = settings?.delayHours ?? 0;
       const linkExpirationDays = settings?.linkExpirationDays ?? 14;
-      this.logger.log(`[scheduleRequest] Using delayHours: ${delayHours}, linkExpirationDays: ${linkExpirationDays}`);
+      this.logger.log(
+        `[scheduleRequest] Using delayHours: ${delayHours}, linkExpirationDays: ${linkExpirationDays}`,
+      );
 
       // Check order value filter (only if settings exist)
-      if (settings?.excludeOrdersBelow && parseFloat(order.total) < settings.excludeOrdersBelow) {
+      if (
+        settings?.excludeOrdersBelow &&
+        parseFloat(order.total) < settings.excludeOrdersBelow
+      ) {
         this.logger.log(`Order ${orderId} excluded - value below threshold`);
         return null;
       }
@@ -335,7 +386,9 @@ export class ReviewRequestService {
         this.logger.warn(`Order ${orderId} has no customer phone`);
         return null;
       }
-      this.logger.log(`[scheduleRequest] Customer phone: ${order.billing.phone}`);
+      this.logger.log(
+        `[scheduleRequest] Customer phone: ${order.billing.phone}`,
+      );
 
       // Helper to check if a value is a valid MongoDB ObjectId
       const isValidObjectId = (value: any): boolean => {
@@ -349,7 +402,9 @@ export class ReviewRequestService {
       const items = (order.lineItems || [])
         .filter((item: any) => item.name) // Skip items without names
         .map((item: any) => ({
-          productId: isValidObjectId(item.productId) ? item.productId : undefined,
+          productId: isValidObjectId(item.productId)
+            ? item.productId
+            : undefined,
           productName: item.name,
           productSku: item.sku,
           productImage: item.image,
@@ -366,13 +421,17 @@ export class ReviewRequestService {
       // Generate token and schedule
       const token = this.generateToken();
       const scheduledFor = new Date(Date.now() + delayHours * 60 * 60 * 1000);
-      const tokenExpiresAt = new Date(scheduledFor.getTime() + linkExpirationDays * 24 * 60 * 60 * 1000);
+      const tokenExpiresAt = new Date(
+        scheduledFor.getTime() + linkExpirationDays * 24 * 60 * 60 * 1000,
+      );
 
       const requestData = {
         storeId: order.storeId,
         orderId: order._id,
         orderNumber: order.orderNumber,
-        customerId: isValidObjectId(order.customerId) ? order.customerId : undefined,
+        customerId: isValidObjectId(order.customerId)
+          ? order.customerId
+          : undefined,
         customerName: order.billing?.firstName
           ? `${order.billing.firstName} ${order.billing.lastName || ''}`.trim()
           : 'Customer',
@@ -387,29 +446,41 @@ export class ReviewRequestService {
         expirationDays: linkExpirationDays,
       };
 
-      this.logger.log(`[scheduleRequest] Token generated, creating request with data: ${JSON.stringify({
-        storeId: requestData.storeId?.toString(),
-        orderId: requestData.orderId?.toString(),
-        orderNumber: requestData.orderNumber,
-        customerName: requestData.customerName,
-        itemsCount: requestData.items?.length,
-      })}`);
+      this.logger.log(
+        `[scheduleRequest] Token generated, creating request with data: ${JSON.stringify(
+          {
+            storeId: requestData.storeId?.toString(),
+            orderId: requestData.orderId?.toString(),
+            orderNumber: requestData.orderNumber,
+            customerName: requestData.customerName,
+            itemsCount: requestData.items?.length,
+          },
+        )}`,
+      );
 
       let request;
       try {
-        console.log('[scheduleRequest] About to call reviewRequestModel.create...');
+        console.log(
+          '[scheduleRequest] About to call reviewRequestModel.create...',
+        );
         request = await this.reviewRequestModel.create(requestData);
         console.log('[scheduleRequest] Create completed successfully');
       } catch (createError) {
         console.error('[scheduleRequest] Create failed:', createError);
-        this.logger.error(`[scheduleRequest] Create failed: ${createError.message}`, createError.stack);
+        this.logger.error(
+          `[scheduleRequest] Create failed: ${createError.message}`,
+          createError.stack,
+        );
         throw createError;
       }
 
       this.logger.log(`[scheduleRequest] Request created: ${request._id}`);
       return request;
     } catch (error) {
-      this.logger.error(`[scheduleRequest] Error: ${error.message}`, error.stack);
+      this.logger.error(
+        `[scheduleRequest] Error: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -418,14 +489,20 @@ export class ReviewRequestService {
    * Send pending review requests that are due
    * Called by scheduled job
    */
-  async processPendingRequests(): Promise<{ processed: number; sent: number; errors: number }> {
+  async processPendingRequests(): Promise<{
+    processed: number;
+    sent: number;
+    errors: number;
+  }> {
     const now = new Date();
 
-    const pendingRequests = await this.reviewRequestModel.find({
-      status: ReviewRequestStatus.PENDING,
-      scheduledFor: { $lte: now },
-      isDeleted: false,
-    }).limit(100);
+    const pendingRequests = await this.reviewRequestModel
+      .find({
+        status: ReviewRequestStatus.PENDING,
+        scheduledFor: { $lte: now },
+        isDeleted: false,
+      })
+      .limit(100);
 
     let sent = 0;
     let errors = 0;
@@ -435,12 +512,16 @@ export class ReviewRequestService {
         await this.sendRequest(request);
         sent++;
       } catch (error) {
-        this.logger.error(`Failed to send request ${request._id}: ${error.message}`);
+        this.logger.error(
+          `Failed to send request ${request._id}: ${error.message}`,
+        );
         errors++;
       }
     }
 
-    this.logger.log(`Processed ${pendingRequests.length} pending requests: ${sent} sent, ${errors} errors`);
+    this.logger.log(
+      `Processed ${pendingRequests.length} pending requests: ${sent} sent, ${errors} errors`,
+    );
 
     return { processed: pendingRequests.length, sent, errors };
   }
@@ -463,7 +544,8 @@ export class ReviewRequestService {
     const reviewLink = `${baseUrl}/review/${request.token}`;
 
     // Default SMS template if settings don't exist
-    const defaultTemplate = 'Hi {customer_name}! Thank you for your order #{order_number}. We\'d love to hear your feedback! Click here to leave a review: {review_link}';
+    const defaultTemplate =
+      "Hi {customer_name}! Thank you for your order #{order_number}. We'd love to hear your feedback! Click here to leave a review: {review_link}";
     const template = settings?.smsTemplate || defaultTemplate;
 
     // Build message from template
@@ -485,13 +567,19 @@ export class ReviewRequestService {
         request.sentAt = new Date();
         request.sentVia = ReviewRequestChannel.SMS;
         await request.save();
-        this.logger.log(`Review request sent to ${request.customerPhone} for order ${request.orderNumber}`);
+        this.logger.log(
+          `Review request sent to ${request.customerPhone} for order ${request.orderNumber}`,
+        );
       } else {
-        this.logger.warn(`SMS sending failed for order ${request.orderNumber} - request remains pending`);
+        this.logger.warn(
+          `SMS sending failed for order ${request.orderNumber} - request remains pending`,
+        );
         // Don't throw - leave request as pending so it can be retried
       }
     } catch (error) {
-      this.logger.error(`SMS service error for order ${request.orderNumber}: ${error.message}`);
+      this.logger.error(
+        `SMS service error for order ${request.orderNumber}: ${error.message}`,
+      );
       // Don't throw - leave request as pending so it can be retried
     }
   }
@@ -504,11 +592,13 @@ export class ReviewRequestService {
     const now = new Date();
 
     // Find requests that need reminders
-    const requests = await this.reviewRequestModel.find({
-      status: ReviewRequestStatus.SENT,
-      tokenExpiresAt: { $gt: now },
-      isDeleted: false,
-    }).limit(100);
+    const requests = await this.reviewRequestModel
+      .find({
+        status: ReviewRequestStatus.SENT,
+        tokenExpiresAt: { $gt: now },
+        isDeleted: false,
+      })
+      .limit(100);
 
     let sent = 0;
 
@@ -524,14 +614,17 @@ export class ReviewRequestService {
       const lastMessage = request.lastReminderAt || request.sentAt;
       if (!lastMessage) continue;
 
-      const daysSinceLastMessage = (now.getTime() - lastMessage.getTime()) / (24 * 60 * 60 * 1000);
+      const daysSinceLastMessage =
+        (now.getTime() - lastMessage.getTime()) / (24 * 60 * 60 * 1000);
       if (daysSinceLastMessage < settings.reminderDelayDays) continue;
 
       try {
         await this.sendReminder(request, settings);
         sent++;
       } catch (error) {
-        this.logger.error(`Failed to send reminder for request ${request._id}: ${error.message}`);
+        this.logger.error(
+          `Failed to send reminder for request ${request._id}: ${error.message}`,
+        );
       }
     }
 
@@ -566,7 +659,9 @@ export class ReviewRequestService {
       request.remindersSent++;
       request.lastReminderAt = new Date();
       await request.save();
-      this.logger.log(`Reminder ${request.remindersSent} sent for request ${request._id}`);
+      this.logger.log(
+        `Reminder ${request.remindersSent} sent for request ${request._id}`,
+      );
     }
   }
 
@@ -579,7 +674,13 @@ export class ReviewRequestService {
 
     const result = await this.reviewRequestModel.updateMany(
       {
-        status: { $in: [ReviewRequestStatus.PENDING, ReviewRequestStatus.SENT, ReviewRequestStatus.OPENED] },
+        status: {
+          $in: [
+            ReviewRequestStatus.PENDING,
+            ReviewRequestStatus.SENT,
+            ReviewRequestStatus.OPENED,
+          ],
+        },
         tokenExpiresAt: { $lt: now },
         isDeleted: false,
       },
@@ -615,7 +716,9 @@ export class ReviewRequestService {
     }
 
     if (request.status === ReviewRequestStatus.COMPLETED) {
-      throw new BadRequestException('Reviews have already been submitted for this order');
+      throw new BadRequestException(
+        'Reviews have already been submitted for this order',
+      );
     }
 
     // Mark as opened if first time
@@ -646,7 +749,10 @@ export class ReviewRequestService {
   /**
    * Submit reviews from public page
    */
-  async submitReviews(token: string, dto: SubmitReviewsDto): Promise<{ success: boolean; reviewsCreated: number }> {
+  async submitReviews(
+    token: string,
+    dto: SubmitReviewsDto,
+  ): Promise<{ success: boolean; reviewsCreated: number }> {
     const request = await this.reviewRequestModel.findOne({
       token,
       isDeleted: false,
@@ -671,14 +777,19 @@ export class ReviewRequestService {
       // Determine if this is for a specific product or general
       const isProductReview = !!submission.productId;
       const item = submission.productId
-        ? request.items.find((i) => i.productId?.toString() === submission.productId)
+        ? request.items.find(
+            (i) => i.productId?.toString() === submission.productId,
+          )
         : null;
 
       // Determine moderation status
       let moderationStatus = ModerationStatus.PENDING;
       let isPublished = false;
 
-      if (settings?.autoApproveReviews && submission.rating >= settings.autoApproveMinRating) {
+      if (
+        settings?.autoApproveReviews &&
+        submission.rating >= settings.autoApproveMinRating
+      ) {
         moderationStatus = ModerationStatus.APPROVED;
         if (settings.autoPublishApproved) {
           isPublished = true;
@@ -721,11 +832,15 @@ export class ReviewRequestService {
 
     // Update request status
     const allReviewed = request.items.every((item) => item.reviewed);
-    request.status = allReviewed ? ReviewRequestStatus.COMPLETED : ReviewRequestStatus.PARTIAL;
+    request.status = allReviewed
+      ? ReviewRequestStatus.COMPLETED
+      : ReviewRequestStatus.PARTIAL;
     request.submittedAt = new Date();
     await request.save();
 
-    this.logger.log(`${reviewsCreated} reviews submitted for request ${request._id}`);
+    this.logger.log(
+      `${reviewsCreated} reviews submitted for request ${request._id}`,
+    );
 
     return { success: true, reviewsCreated };
   }
@@ -735,8 +850,13 @@ export class ReviewRequestService {
   /**
    * Manually trigger a review request for an order
    */
-  async manualTrigger(orderId: string, userId: string): Promise<IReviewRequest> {
-    this.logger.log(`[manualTrigger] Starting for orderId: ${orderId}, userId: ${userId}`);
+  async manualTrigger(
+    orderId: string,
+    userId: string,
+  ): Promise<IReviewRequest> {
+    this.logger.log(
+      `[manualTrigger] Starting for orderId: ${orderId}, userId: ${userId}`,
+    );
 
     try {
       const order = await this.orderModel.findOne({
@@ -759,17 +879,27 @@ export class ReviewRequestService {
       });
 
       if (existingRequest) {
-        this.logger.warn(`[manualTrigger] Request already exists for order: ${orderId}`);
-        throw new BadRequestException('Review request already exists for this order');
+        this.logger.warn(
+          `[manualTrigger] Request already exists for order: ${orderId}`,
+        );
+        throw new BadRequestException(
+          'Review request already exists for this order',
+        );
       }
       this.logger.log(`[manualTrigger] No existing request found`);
 
       // Force schedule with immediate sending (skip settings check for manual trigger)
       const request = await this.scheduleRequest(orderId, undefined, true);
-      this.logger.log(`[manualTrigger] scheduleRequest result: ${request ? 'created' : 'null'}`);
+      this.logger.log(
+        `[manualTrigger] scheduleRequest result: ${
+          request ? 'created' : 'null'
+        }`,
+      );
 
       if (!request) {
-        throw new BadRequestException('Could not create review request - check order has phone and items');
+        throw new BadRequestException(
+          'Could not create review request - check order has phone and items',
+        );
       }
 
       // Send immediately
@@ -799,13 +929,17 @@ export class ReviewRequestService {
     await this.verifyStoreAccess(request.storeId.toString(), userId);
 
     if (request.status === ReviewRequestStatus.COMPLETED) {
-      throw new BadRequestException('Cannot resend - reviews already submitted');
+      throw new BadRequestException(
+        'Cannot resend - reviews already submitted',
+      );
     }
 
     if (request.tokenExpiresAt < new Date()) {
       // Generate new token
       request.token = this.generateToken();
-      request.tokenExpiresAt = new Date(Date.now() + request.expirationDays * 24 * 60 * 60 * 1000);
+      request.tokenExpiresAt = new Date(
+        Date.now() + request.expirationDays * 24 * 60 * 60 * 1000,
+      );
     }
 
     await this.sendRequest(request);
@@ -838,7 +972,10 @@ export class ReviewRequestService {
     return randomBytes(32).toString('hex');
   }
 
-  private buildMessage(template: string, variables: Record<string, string>): string {
+  private buildMessage(
+    template: string,
+    variables: Record<string, string>,
+  ): string {
     let message = template;
     Object.entries(variables).forEach(([key, value]) => {
       message = message.replace(new RegExp(`{${key}}`, 'g'), value || '');
@@ -885,7 +1022,9 @@ export class ReviewRequestService {
     };
   }
 
-  private settingsToInterface(doc: ReviewRequestSettingsDocument): IReviewRequestSettings {
+  private settingsToInterface(
+    doc: ReviewRequestSettingsDocument,
+  ): IReviewRequestSettings {
     const obj = doc.toObject();
     return {
       _id: obj._id.toString(),

@@ -1,5 +1,10 @@
 import * as Joi from 'joi';
-import { AssetCategory, AssetStatus, MaintenanceType, DepreciationMethod } from './enum';
+import {
+  AssetCategory,
+  AssetStatus,
+  MaintenanceType,
+  DepreciationMethod,
+} from './enum';
 
 // ========================
 // Fixed Asset DTOs
@@ -32,13 +37,18 @@ export class CreateFixedAssetDto {
 export const CreateFixedAssetSchema = Joi.object({
   name: Joi.string().required().trim().max(200),
   assetTag: Joi.string().required().trim().max(50),
-  category: Joi.string().valid(...Object.values(AssetCategory)).required(),
+  category: Joi.string()
+    .valid(...Object.values(AssetCategory))
+    .required(),
   description: Joi.string().optional().trim().max(1000).allow(''),
   serialNumber: Joi.string().optional().trim().max(100).allow(''),
   purchaseDate: Joi.string().required().isoDate(),
   purchaseCost: Joi.number().min(0).required(),
   supplier: Joi.string().optional().trim().max(200).allow(''),
-  status: Joi.string().valid(...Object.values(AssetStatus)).optional().default(AssetStatus.ACTIVE),
+  status: Joi.string()
+    .valid(...Object.values(AssetStatus))
+    .optional()
+    .default(AssetStatus.ACTIVE),
   location: Joi.string().optional().trim().max(200).allow(''),
   assignedTo: Joi.string().optional().trim().max(200).allow(''),
   warranty: Joi.object({
@@ -48,7 +58,10 @@ export const CreateFixedAssetSchema = Joi.object({
   }).optional(),
   usefulLifeYears: Joi.number().integer().min(1).max(50).optional().default(5),
   salvageValue: Joi.number().min(0).optional().default(0),
-  depreciationMethod: Joi.string().valid(...Object.values(DepreciationMethod)).optional().default(DepreciationMethod.STRAIGHT_LINE),
+  depreciationMethod: Joi.string()
+    .valid(...Object.values(DepreciationMethod))
+    .optional()
+    .default(DepreciationMethod.STRAIGHT_LINE),
   nextServiceDate: Joi.string().optional().isoDate(),
   notes: Joi.string().optional().trim().max(1000).allow(''),
 });
@@ -80,23 +93,31 @@ export class UpdateFixedAssetDto {
 export const UpdateFixedAssetSchema = Joi.object({
   name: Joi.string().optional().trim().max(200),
   assetTag: Joi.string().optional().trim().max(50),
-  category: Joi.string().valid(...Object.values(AssetCategory)).optional(),
+  category: Joi.string()
+    .valid(...Object.values(AssetCategory))
+    .optional(),
   description: Joi.string().optional().trim().max(1000).allow(''),
   serialNumber: Joi.string().optional().trim().max(100).allow(''),
   purchaseDate: Joi.string().optional().isoDate(),
   purchaseCost: Joi.number().min(0).optional(),
   supplier: Joi.string().optional().trim().max(200).allow(''),
-  status: Joi.string().valid(...Object.values(AssetStatus)).optional(),
+  status: Joi.string()
+    .valid(...Object.values(AssetStatus))
+    .optional(),
   location: Joi.string().optional().trim().max(200).allow(''),
   assignedTo: Joi.string().optional().trim().max(200).allow(''),
   warranty: Joi.object({
     expiresAt: Joi.string().optional().isoDate().allow(null),
     provider: Joi.string().optional().trim().max(200).allow(''),
     notes: Joi.string().optional().trim().max(500).allow(''),
-  }).optional().allow(null),
+  })
+    .optional()
+    .allow(null),
   usefulLifeYears: Joi.number().integer().min(1).max(50).optional(),
   salvageValue: Joi.number().min(0).optional(),
-  depreciationMethod: Joi.string().valid(...Object.values(DepreciationMethod)).optional(),
+  depreciationMethod: Joi.string()
+    .valid(...Object.values(DepreciationMethod))
+    .optional(),
   nextServiceDate: Joi.string().optional().isoDate().allow(null),
   notes: Joi.string().optional().trim().max(1000).allow(''),
 }).min(1);
@@ -116,7 +137,9 @@ export class CreateMaintenanceLogDto {
 
 export const CreateMaintenanceLogSchema = Joi.object({
   date: Joi.string().required().isoDate(),
-  type: Joi.string().valid(...Object.values(MaintenanceType)).required(),
+  type: Joi.string()
+    .valid(...Object.values(MaintenanceType))
+    .required(),
   description: Joi.string().required().trim().max(1000),
   cost: Joi.number().min(0).optional().default(0),
   performedBy: Joi.string().optional().trim().max(200).allow(''),
@@ -138,9 +161,15 @@ export class QueryFixedAssetDto {
 }
 
 export const QueryFixedAssetSchema = Joi.object({
-  storeId: Joi.string().required().regex(/^[0-9a-fA-F]{24}$/),
-  category: Joi.string().valid(...Object.values(AssetCategory)).optional(),
-  status: Joi.string().valid(...Object.values(AssetStatus)).optional(),
+  storeId: Joi.string()
+    .required()
+    .regex(/^[0-9a-fA-F]{24}$/),
+  category: Joi.string()
+    .valid(...Object.values(AssetCategory))
+    .optional(),
+  status: Joi.string()
+    .valid(...Object.values(AssetStatus))
+    .optional(),
   keyword: Joi.string().optional().trim().max(100),
   maintenanceDue: Joi.boolean().optional(),
   page: Joi.number().integer().min(1).optional().default(1),

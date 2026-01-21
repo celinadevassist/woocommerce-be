@@ -23,9 +23,9 @@ export class SearchAnalyticsService {
   async saveSearchQuery(
     searchTerm: string,
     endpoint: string,
-    resultCount: number = 0,
+    resultCount = 0,
     ip?: string,
-    userId?: string
+    userId?: string,
   ): Promise<void> {
     try {
       // Deduplication window: 60 minutes
@@ -36,7 +36,7 @@ export class SearchAnalyticsService {
       const dedupeQuery: any = {
         searchTerm,
         endpoint,
-        createdAt: { $gte: cutoffTime }
+        createdAt: { $gte: cutoffTime },
       };
 
       // Add IP or userId to deduplication if available
@@ -57,9 +57,9 @@ export class SearchAnalyticsService {
           resultCount,
           userId,
           metadata: {
-            ip
+            ip,
           },
-          createdAt: new Date()
+          createdAt: new Date(),
         });
       }
     } catch (error) {
@@ -102,18 +102,18 @@ export class SearchAnalyticsService {
           $group: {
             _id: {
               searchTerm: '$searchTerm',
-              endpoint: '$endpoint'
+              endpoint: '$endpoint',
             },
             count: { $sum: 1 },
             totalResults: { $sum: '$resultCount' },
             avgResults: { $avg: '$resultCount' },
             firstSearched: { $min: '$createdAt' },
-            lastSearched: { $max: '$createdAt' }
-          }
+            lastSearched: { $max: '$createdAt' },
+          },
         },
         { $sort: { count: -1 } },
         { $skip: skip },
-        { $limit: size }
+        { $limit: size },
       ]);
 
       const totalCountPipeline = await this.searchQueryModel.aggregate([
@@ -122,23 +122,23 @@ export class SearchAnalyticsService {
           $group: {
             _id: {
               searchTerm: '$searchTerm',
-              endpoint: '$endpoint'
-            }
-          }
+              endpoint: '$endpoint',
+            },
+          },
         },
-        { $count: 'total' }
+        { $count: 'total' },
       ]);
 
       const total = totalCountPipeline[0]?.total || 0;
 
-      const formattedData = aggregatedData.map(item => ({
+      const formattedData = aggregatedData.map((item) => ({
         searchTerm: item._id.searchTerm,
         endpoint: item._id.endpoint,
         searchCount: item.count,
         totalResults: item.totalResults,
         averageResults: Math.round(item.avgResults * 100) / 100,
         firstSearched: item.firstSearched,
-        lastSearched: item.lastSearched
+        lastSearched: item.lastSearched,
       }));
 
       // Get summary statistics
@@ -149,15 +149,15 @@ export class SearchAnalyticsService {
             _id: null,
             totalSearches: { $sum: 1 },
             uniqueSearchTerms: { $addToSet: '$searchTerm' },
-            totalResults: { $sum: '$resultCount' }
-          }
-        }
+            totalResults: { $sum: '$resultCount' },
+          },
+        },
       ]);
 
       const summary = summaryPipeline[0] || {
         totalSearches: 0,
         uniqueSearchTerms: [],
-        totalResults: 0
+        totalResults: 0,
       };
 
       return {
@@ -166,15 +166,18 @@ export class SearchAnalyticsService {
           total,
           page,
           size,
-          totalPages: Math.ceil(total / size)
+          totalPages: Math.ceil(total / size),
         },
         summary: {
           totalSearches: summary.totalSearches,
           uniqueSearchTerms: summary.uniqueSearchTerms.length,
-          averageResultCount: summary.totalSearches > 0
-            ? Math.round((summary.totalResults / summary.totalSearches) * 100) / 100
-            : 0
-        }
+          averageResultCount:
+            summary.totalSearches > 0
+              ? Math.round(
+                  (summary.totalResults / summary.totalSearches) * 100,
+                ) / 100
+              : 0,
+        },
       };
     }
 
@@ -195,15 +198,15 @@ export class SearchAnalyticsService {
           _id: null,
           totalSearches: { $sum: 1 },
           uniqueSearchTerms: { $addToSet: '$searchTerm' },
-          totalResults: { $sum: '$resultCount' }
-        }
-      }
+          totalResults: { $sum: '$resultCount' },
+        },
+      },
     ]);
 
     const summary = summaryPipeline[0] || {
       totalSearches: 0,
       uniqueSearchTerms: [],
-      totalResults: 0
+      totalResults: 0,
     };
 
     return {
@@ -212,15 +215,17 @@ export class SearchAnalyticsService {
         total,
         page,
         size,
-        totalPages: Math.ceil(total / size)
+        totalPages: Math.ceil(total / size),
       },
       summary: {
         totalSearches: summary.totalSearches,
         uniqueSearchTerms: summary.uniqueSearchTerms.length,
-        averageResultCount: summary.totalSearches > 0
-          ? Math.round((summary.totalResults / summary.totalSearches) * 100) / 100
-          : 0
-      }
+        averageResultCount:
+          summary.totalSearches > 0
+            ? Math.round((summary.totalResults / summary.totalSearches) * 100) /
+              100
+            : 0,
+      },
     };
   }
 }

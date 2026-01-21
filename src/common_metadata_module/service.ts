@@ -1,13 +1,13 @@
-import { 
-  BadRequestException, 
-  ConflictException, 
-  forwardRef, 
-  Inject, 
-  Injectable, 
+import {
+  BadRequestException,
+  ConflictException,
+  forwardRef,
+  Inject,
+  Injectable,
   InternalServerErrorException,
   NotFoundException,
   Optional,
-  ForbiddenException
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, Types } from 'mongoose';
@@ -23,26 +23,29 @@ import { MetadataOrderEnum, SortTypeEnum } from './enum';
 @Injectable()
 export class MetadataService {
   constructor(
-    @InjectModel(Metadata.name) private readonly metadataModel: Model<MetadataDocument>,
+    @InjectModel(Metadata.name)
+    private readonly metadataModel: Model<MetadataDocument>,
     @InjectConnection() private readonly connection: Connection,
-    @Optional() @Inject(forwardRef(() => ActionLogService)) private readonly actionLogService: ActionLogService,
-  ) { }
+    @Optional()
+    @Inject(forwardRef(() => ActionLogService))
+    private readonly actionLogService: ActionLogService,
+  ) {}
 
   // Removed strict create method - using createOrUpdate as the main create method
   // async create(creator, data: CreateMetadataDto, lang?: string): Promise<IMetadata> {
   //   try {
   //     // Check if metadata already exists for this user and module
-  //     const exists = await this.metadataModel.findOne({ 
-  //       userId: data.userId, 
-  //       forModule: data.forModule 
+  //     const exists = await this.metadataModel.findOne({
+  //       userId: data.userId,
+  //       forModule: data.forModule
   //     });
-  //     
+  //
   //     if (exists) {
   //       throw new ConflictException(`Metadata for user ${data.userId} and module ${data.forModule} already exists`);
   //     }
 
   //     const newMetadata = await this.metadataModel.create(data);
-  //     
+  //
   //     // Optionally log the action if service is available
   //     try {
   //       if (this.actionLogService) {
@@ -57,7 +60,7 @@ export class MetadataService {
   //     } catch (logError) {
   //       console.error('Error logging metadata creation:', logError);
   //     }
-  //     
+  //
   //     return this.toInterface(newMetadata);
   //   } catch (error) {
   //     if (error.code === 11000) {
@@ -67,34 +70,38 @@ export class MetadataService {
   //   }
   // }
 
-  async createOrUpdate(creator, data: CreateMetadataDto, lang?: string): Promise<IMetadata> {
+  async createOrUpdate(
+    creator,
+    data: CreateMetadataDto,
+    lang?: string,
+  ): Promise<IMetadata> {
     try {
       // Check if metadata already exists for this user and module
-      const exists = await this.metadataModel.findOne({ 
-        userId: data.userId, 
-        forModule: data.forModule 
+      const exists = await this.metadataModel.findOne({
+        userId: data.userId,
+        forModule: data.forModule,
       });
-      
+
       if (exists) {
         // Merge the new meta with existing meta instead of replacing
         const mergedMeta = {
           ...exists.meta, // Keep existing meta properties
-          ...data.meta    // Add/override with new meta properties
+          ...data.meta, // Add/override with new meta properties
         };
-        
+
         // Update existing metadata with merged meta
         const updateData = {
           ...data,
           meta: mergedMeta,
-          updatedAt: new Date()
+          updatedAt: new Date(),
         };
-        
+
         const updatedMetadata = await this.metadataModel.findByIdAndUpdate(
           exists._id,
           { $set: updateData },
-          { new: true }
+          { new: true },
         );
-        
+
         // Optionally log the action if service is available
         try {
           if (this.actionLogService) {
@@ -103,18 +110,18 @@ export class MetadataService {
               title: 'Metadata Updated',
               description: `Updated existing metadata for module: ${data.forModule}`,
               onId: exists._id,
-              userId: creator?._id
+              userId: creator?._id,
             });
           }
         } catch (logError) {
           console.error('Error logging metadata update:', logError);
         }
-        
+
         return this.toInterface(updatedMetadata);
       } else {
         // Create new metadata
         const newMetadata = await this.metadataModel.create(data);
-        
+
         // Optionally log the action if service is available
         try {
           if (this.actionLogService) {
@@ -123,13 +130,13 @@ export class MetadataService {
               title: 'Metadata Created',
               description: `Created metadata for module: ${data.forModule}`,
               onId: newMetadata._id,
-              userId: creator?._id
+              userId: creator?._id,
             });
           }
         } catch (logError) {
           console.error('Error logging metadata creation:', logError);
         }
-        
+
         return this.toInterface(newMetadata);
       }
     } catch (error) {
@@ -139,36 +146,36 @@ export class MetadataService {
 
   async get(filters: QueryMetadataDto, lang?: string) {
     let skip;
-    const pipeLine: any = [
-      { $match: await this.queryMaker(filters) },
-    ];
+    const pipeLine: any = [{ $match: await this.queryMaker(filters) }];
 
     if (filters.page && filters.size) {
-      skip = (parseInt(filters.page.toString(), 10) - 1) * parseInt(filters.size.toString(), 10);
+      skip =
+        (parseInt(filters.page.toString(), 10) - 1) *
+        parseInt(filters.size.toString(), 10);
       pipeLine.push({ $skip: skip });
       pipeLine.push({ $limit: parseInt(filters.size.toString(), 10) });
     }
-    
+
     if (filters.orderBy && filters.sortType) {
       pipeLine.splice(1, 0, this.sortMaker(filters));
     }
 
     const results = await this.metadataModel.aggregate(pipeLine);
-    return results.map(result => this.toInterface(result));
+    return results.map((result) => this.toInterface(result));
   }
 
   async getAll(query: QueryMetadataDto, creator: any) {
     const filter: any = {};
-    
+
     // Add search functionality
     if (query.search) {
       filter.$text = { $search: query.search };
     }
-    
+
     // Add specific filters
     if (query.userId) filter.userId = query.userId;
     if (query.forModule) filter.forModule = query.forModule;
-    
+
     const page = query.page ?? 1;
     const size = query.size ?? 20;
     const skip = (page - 1) * size;
@@ -183,11 +190,11 @@ export class MetadataService {
 
     const [metadata, total] = await Promise.all([
       this.metadataModel.find(filter).sort(sort).skip(skip).limit(size).exec(),
-      this.metadataModel.countDocuments(filter)
+      this.metadataModel.countDocuments(filter),
     ]);
 
     return {
-      data: metadata.map(m => this.toInterface(m)),
+      data: metadata.map((m) => this.toInterface(m)),
       total,
       page,
       size,
@@ -202,30 +209,46 @@ export class MetadataService {
     return this.toInterface(metadata);
   }
 
-  async findByUserAndModule(userId: string, forModule: string): Promise<IMetadata | null> {
-    const metadata = await this.metadataModel.findOne({ userId, forModule }).exec();
+  async findByUserAndModule(
+    userId: string,
+    forModule: string,
+  ): Promise<IMetadata | null> {
+    const metadata = await this.metadataModel
+      .findOne({ userId, forModule })
+      .exec();
     return metadata ? this.toInterface(metadata) : null;
   }
 
-  async update(id: string, user, data: UpdateMetadataDto, lang?: string): Promise<IMetadata> {
+  async update(
+    id: string,
+    user,
+    data: UpdateMetadataDto,
+    lang?: string,
+  ): Promise<IMetadata> {
     const metadata = await this.metadataModel.findById(id);
     if (!metadata) {
       throw new NotFoundException(`Metadata with ID ${id} not found`);
     }
 
     // Check if trying to update userId/forModule combination that already exists
-    if ((data.userId || data.forModule) && (data.userId !== metadata.userId.toString() || data.forModule !== metadata.forModule)) {
+    if (
+      (data.userId || data.forModule) &&
+      (data.userId !== metadata.userId.toString() ||
+        data.forModule !== metadata.forModule)
+    ) {
       const exists = await this.metadataModel.findOne({
         userId: data.userId || metadata.userId,
         forModule: data.forModule || metadata.forModule,
-        _id: { $ne: id }
+        _id: { $ne: id },
       });
-      
+
       if (exists) {
-        throw new ConflictException('Metadata for this user and module combination already exists');
+        throw new ConflictException(
+          'Metadata for this user and module combination already exists',
+        );
       }
     }
-    
+
     try {
       // For PATCH updates, also merge meta if it exists
       let updateData;
@@ -234,20 +257,20 @@ export class MetadataService {
           ...data,
           meta: {
             ...metadata.meta, // Keep existing meta properties
-            ...data.meta      // Add/override with new meta properties
+            ...data.meta, // Add/override with new meta properties
           },
-          updatedAt: new Date()
+          updatedAt: new Date(),
         };
       } else {
         updateData = { ...data, updatedAt: new Date() };
       }
-      
+
       const updatedMetadata = await this.metadataModel.findByIdAndUpdate(
         id,
         { $set: updateData },
-        { new: true }
+        { new: true },
       );
-      
+
       // Optionally log the action if service is available
       try {
         if (this.actionLogService) {
@@ -256,17 +279,19 @@ export class MetadataService {
             title: 'Metadata Updated',
             description: `Updated metadata for module: ${updatedMetadata.forModule}`,
             onId: id,
-            userId: user?._id
+            userId: user?._id,
           });
         }
       } catch (logError) {
         console.error('Error logging metadata update:', logError);
       }
-      
+
       return this.toInterface(updatedMetadata);
     } catch (error) {
       if (error.code === 11000) {
-        throw new ConflictException('Metadata for this user and module combination already exists');
+        throw new ConflictException(
+          'Metadata for this user and module combination already exists',
+        );
       }
       throw error;
     }
@@ -297,9 +322,9 @@ export class MetadataService {
   //       console.error('Error logging metadata deletion:', logError);
   //     }
 
-  //     return { 
-  //       success: true, 
-  //       message: 'Metadata deleted successfully' 
+  //     return {
+  //       success: true,
+  //       message: 'Metadata deleted successfully'
   //     };
   //   } catch (error) {
   //     console.error('Error deleting metadata:', error);
@@ -313,7 +338,7 @@ export class MetadataService {
     if (filters.userId) {
       query.userId = new Types.ObjectId(filters.userId);
     }
-    
+
     if (filters.forModule) {
       query.forModule = filters.forModule;
     }
@@ -322,7 +347,7 @@ export class MetadataService {
     if (filters.search) {
       // Create a text search on stringified meta values
       query.$or = [
-        { 'meta': { $regex: filters.search, $options: 'i' } },
+        { meta: { $regex: filters.search, $options: 'i' } },
         // You can add more specific search fields here if needed
       ];
     }
@@ -332,18 +357,19 @@ export class MetadataService {
 
   private sortMaker(filters: QueryMetadataDto) {
     const sortObj: any = {};
-    
+
     if (filters.orderBy && filters.sortType) {
-      const sortDirection = filters.sortType === SortTypeEnum.ASCENDING ? 1 : -1;
+      const sortDirection =
+        filters.sortType === SortTypeEnum.ASCENDING ? 1 : -1;
       sortObj[filters.orderBy] = sortDirection;
     }
-    
+
     return { $sort: sortObj };
   }
 
   private toInterface(doc: MetadataDocument): IMetadata {
     if (!doc) return null;
-    
+
     return {
       _id: doc._id.toString(),
       userId: doc.userId,

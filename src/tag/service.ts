@@ -26,7 +26,11 @@ export class TagService {
   /**
    * Create a new tag
    */
-  async create(userId: string, storeId: string, dto: CreateTagDto): Promise<ITag> {
+  async create(
+    userId: string,
+    storeId: string,
+    dto: CreateTagDto,
+  ): Promise<ITag> {
     const store = await this.getStoreWithAccess(storeId, userId);
 
     // Create in WooCommerce first
@@ -126,7 +130,11 @@ export class TagService {
   /**
    * Update a tag
    */
-  async update(userId: string, tagId: string, dto: UpdateTagDto): Promise<ITag> {
+  async update(
+    userId: string,
+    tagId: string,
+    dto: UpdateTagDto,
+  ): Promise<ITag> {
     const tag = await this.tagModel.findOne({
       _id: new Types.ObjectId(tagId),
       isDeleted: false,
@@ -198,7 +206,10 @@ export class TagService {
   /**
    * Sync tags from WooCommerce
    */
-  async syncFromWooCommerce(userId: string, storeId: string): Promise<{ synced: number; created: number; updated: number }> {
+  async syncFromWooCommerce(
+    userId: string,
+    storeId: string,
+  ): Promise<{ synced: number; created: number; updated: number }> {
     const store = await this.getStoreWithAccess(storeId, userId);
 
     const credentials = {
@@ -213,7 +224,11 @@ export class TagService {
 
     // Fetch all tags from WooCommerce
     while (hasMore) {
-      const result = await this.wooCommerceService.getTags(credentials, page, 100);
+      const result = await this.wooCommerceService.getTags(
+        credentials,
+        page,
+        100,
+      );
       allTags = allTags.concat(result.data);
       hasMore = page < result.totalPages;
       page++;
@@ -223,7 +238,7 @@ export class TagService {
     let updated = 0;
 
     for (const wooTag of allTags) {
-      let tag = await this.tagModel.findOne({
+      const tag = await this.tagModel.findOne({
         storeId: store._id,
         externalId: wooTag.id,
       });
@@ -273,7 +288,10 @@ export class TagService {
 
   // Helper methods
 
-  private async getStoreWithAccess(storeId: string, userId: string): Promise<StoreDocument> {
+  private async getStoreWithAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<StoreDocument> {
     const store = await this.storeModel
       .findOne({
         _id: new Types.ObjectId(storeId),

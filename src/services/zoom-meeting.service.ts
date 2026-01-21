@@ -1,4 +1,9 @@
-import { Injectable, InternalServerErrorException, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  BadRequestException,
+  Logger,
+} from '@nestjs/common';
 import axios from 'axios';
 import * as base64 from 'base-64';
 import { DateTime } from 'luxon';
@@ -17,12 +22,18 @@ export class ZoomMeetingService {
 
   constructor() {
     // Log configuration status (without exposing secrets)
-    this.logger.log('================================================================================');
+    this.logger.log(
+      '================================================================================',
+    );
     this.logger.log('🔧 Zoom Service Configuration Check:');
     this.logger.log(`Account ID: ${this.accountId ? '✅ Set' : '❌ Missing'}`);
     this.logger.log(`Client ID: ${this.clientId ? '✅ Set' : '❌ Missing'}`);
-    this.logger.log(`Client Secret: ${this.clientSecret ? '✅ Set' : '❌ Missing'}`);
-    this.logger.log('================================================================================');
+    this.logger.log(
+      `Client Secret: ${this.clientSecret ? '✅ Set' : '❌ Missing'}`,
+    );
+    this.logger.log(
+      '================================================================================',
+    );
   }
 
   private async getAccessToken(): Promise<string> {
@@ -36,9 +47,13 @@ export class ZoomMeetingService {
     // Validate credentials before making request
     if (!this.accountId || !this.clientId || !this.clientSecret) {
       this.logger.error('❌ Missing Zoom credentials in environment variables');
-      this.logger.error(`Account ID: ${this.accountId ? 'Present' : 'MISSING'}`);
+      this.logger.error(
+        `Account ID: ${this.accountId ? 'Present' : 'MISSING'}`,
+      );
       this.logger.error(`Client ID: ${this.clientId ? 'Present' : 'MISSING'}`);
-      this.logger.error(`Client Secret: ${this.clientSecret ? 'Present' : 'MISSING'}`);
+      this.logger.error(
+        `Client Secret: ${this.clientSecret ? 'Present' : 'MISSING'}`,
+      );
       throw new InternalServerErrorException('Zoom credentials not configured');
     }
 
@@ -55,20 +70,30 @@ export class ZoomMeetingService {
             Authorization: `Basic ${authHeader}`,
             'Content-Type': 'application/x-www-form-urlencoded',
           },
-        }
+        },
       );
 
       this.accessToken = response.data.access_token;
       this.logger.log('✅ Zoom access token obtained successfully');
       return this.accessToken;
     } catch (error) {
-      this.logger.error('================================================================================');
+      this.logger.error(
+        '================================================================================',
+      );
       this.logger.error('❌ Zoom Authentication Error:');
       this.logger.error(`Status: ${error.response?.status}`);
-      this.logger.error(`Error Data: ${JSON.stringify(error.response?.data, null, 2)}`);
+      this.logger.error(
+        `Error Data: ${JSON.stringify(error.response?.data, null, 2)}`,
+      );
       this.logger.error(`Error Message: ${error.message}`);
-      this.logger.error('================================================================================');
-      throw new InternalServerErrorException(`Failed to fetch Zoom Access Token: ${error.response?.data?.message || error.message}`);
+      this.logger.error(
+        '================================================================================',
+      );
+      throw new InternalServerErrorException(
+        `Failed to fetch Zoom Access Token: ${
+          error.response?.data?.message || error.message
+        }`,
+      );
     }
   }
 
@@ -81,7 +106,9 @@ export class ZoomMeetingService {
     timezone?: string;
     settings?: any;
   }): Promise<any> {
-    this.logger.log('================================================================================');
+    this.logger.log(
+      '================================================================================',
+    );
     this.logger.log('📅 Creating Zoom Meeting');
     this.logger.log(`Topic: ${meetingData.topic}`);
     this.logger.log(`Start Time: ${meetingData.start_time}`);
@@ -117,35 +144,48 @@ export class ZoomMeetingService {
             Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       this.logger.log('✅ Zoom meeting created successfully');
       this.logger.log(`Meeting ID: ${response.data.id}`);
       this.logger.log(`Join URL: ${response.data.join_url}`);
-      this.logger.log('================================================================================');
+      this.logger.log(
+        '================================================================================',
+      );
 
       return response.data;
     } catch (error) {
-      this.logger.error('================================================================================');
+      this.logger.error(
+        '================================================================================',
+      );
       this.logger.error('❌ Zoom API Error (Create Meeting):');
       this.logger.error(`Status: ${error.response?.status}`);
-      this.logger.error(`Error Data: ${JSON.stringify(error.response?.data, null, 2)}`);
+      this.logger.error(
+        `Error Data: ${JSON.stringify(error.response?.data, null, 2)}`,
+      );
       this.logger.error(`Error Message: ${error.message}`);
       this.logger.error(`Request Payload: ${JSON.stringify(payload, null, 2)}`);
-      this.logger.error('================================================================================');
-      throw new BadRequestException(error.response?.data?.message || 'Failed to create Zoom meeting');
+      this.logger.error(
+        '================================================================================',
+      );
+      throw new BadRequestException(
+        error.response?.data?.message || 'Failed to create Zoom meeting',
+      );
     }
   }
 
-  async updateMeeting(meetingId: string, updateData: Partial<{
-    topic: string;
-    agenda: string;
-    start_time: string;
-    duration: number;
-    timezone: string;
-    settings: any;
-  }>): Promise<any> {
+  async updateMeeting(
+    meetingId: string,
+    updateData: Partial<{
+      topic: string;
+      agenda: string;
+      start_time: string;
+      duration: number;
+      timezone: string;
+      settings: any;
+    }>,
+  ): Promise<any> {
     const accessToken = await this.getAccessToken();
 
     try {
@@ -157,13 +197,16 @@ export class ZoomMeetingService {
             Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       console.log('✅ Meeting updated successfully!');
       return response.data;
     } catch (error) {
-      console.error('❌ Error updating meeting:', error.response?.data || error.message);
+      console.error(
+        '❌ Error updating meeting:',
+        error.response?.data || error.message,
+      );
       throw new BadRequestException('Failed to update Zoom meeting');
     }
   }
@@ -172,19 +215,19 @@ export class ZoomMeetingService {
     const accessToken = await this.getAccessToken();
 
     try {
-      await axios.delete(
-        `${this.zoomApiUrl}/meetings/${meetingId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+      await axios.delete(`${this.zoomApiUrl}/meetings/${meetingId}`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
       console.log('✅ Meeting deleted successfully!');
     } catch (error) {
-      console.error('❌ Error deleting meeting:', error.response?.data || error.message);
+      console.error(
+        '❌ Error deleting meeting:',
+        error.response?.data || error.message,
+      );
       throw new BadRequestException('Failed to delete Zoom meeting');
     }
   }
@@ -200,20 +243,20 @@ export class ZoomMeetingService {
             Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
           },
-        }
+        },
       );
 
       console.log('✅ Meeting fetched successfully!');
       return response.data;
     } catch (error) {
-      console.error('❌ Error fetching meeting:', error.response?.data || error.message);
+      console.error(
+        '❌ Error fetching meeting:',
+        error.response?.data || error.message,
+      );
       throw new BadRequestException('Failed to fetch Zoom meeting');
     }
   }
 }
-
-
-
 
 export function buildZoomStartTime(input: {
   date: string;
@@ -223,7 +266,9 @@ export function buildZoomStartTime(input: {
   const logger = new Logger('buildZoomStartTime');
 
   logger.log('🕐 Building Zoom start time');
-  logger.log(`Input - Date: ${input.date}, Start Time: ${input.startTime}, TimeZone: ${input.timeZone}`);
+  logger.log(
+    `Input - Date: ${input.date}, Start Time: ${input.startTime}, TimeZone: ${input.timeZone}`,
+  );
 
   const timezoneMap = {
     CAI: 'Africa/Cairo',
@@ -232,7 +277,11 @@ export function buildZoomStartTime(input: {
   const mappedTimezone = timezoneMap[input.timeZone];
   if (!mappedTimezone) {
     logger.error(`❌ Unknown timezone code: ${input.timeZone}`);
-    throw new Error(`Unknown timezone code: ${input.timeZone}. Valid codes: ${Object.keys(timezoneMap).join(', ')}`);
+    throw new Error(
+      `Unknown timezone code: ${input.timeZone}. Valid codes: ${Object.keys(
+        timezoneMap,
+      ).join(', ')}`,
+    );
   }
 
   logger.log(`Mapped timezone: ${mappedTimezone}`);
@@ -240,7 +289,7 @@ export function buildZoomStartTime(input: {
   const localTime = DateTime.fromFormat(
     `${input.date} ${input.startTime}`,
     'yyyy-MM-dd HH:mm',
-    { zone: mappedTimezone }
+    { zone: mappedTimezone },
   );
 
   if (!localTime.isValid) {
@@ -248,7 +297,9 @@ export function buildZoomStartTime(input: {
     logger.error(`Expected format: YYYY-MM-DD HH:mm`);
     logger.error(`Received: ${input.date} ${input.startTime}`);
     logger.error(`Validation reason: ${localTime.invalidReason}`);
-    throw new Error(`Invalid date or time provided. Format should be YYYY-MM-DD HH:mm`);
+    throw new Error(
+      `Invalid date or time provided. Format should be YYYY-MM-DD HH:mm`,
+    );
   }
 
   // Very important: drop milliseconds
@@ -259,4 +310,3 @@ export function buildZoomStartTime(input: {
 
   return isoString;
 }
-

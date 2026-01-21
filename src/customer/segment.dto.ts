@@ -13,7 +13,9 @@ export class SegmentRuleDto {
 }
 
 export class CreateSegmentDto {
-  @ApiPropertyOptional({ description: 'Store ID (optional if user has only one store)' })
+  @ApiPropertyOptional({
+    description: 'Store ID (optional if user has only one store)',
+  })
   storeId?: string;
 
   @ApiProperty({ description: 'Segment name' })
@@ -37,13 +39,17 @@ export const CreateSegmentSchema = Joi.object().keys({
   name: Joi.string().required().min(1).max(100),
   description: Joi.string().max(500).optional(),
   color: Joi.string().required(),
-  rules: Joi.array().items(
-    Joi.object({
-      field: Joi.string().required(),
-      operator: Joi.string().valid('eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'in').required(),
-      value: Joi.any().required(),
-    })
-  ).optional(),
+  rules: Joi.array()
+    .items(
+      Joi.object({
+        field: Joi.string().required(),
+        operator: Joi.string()
+          .valid('eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'in')
+          .required(),
+        value: Joi.any().required(),
+      }),
+    )
+    .optional(),
   ruleLogic: Joi.string().valid('and', 'or').default('and').optional(),
 });
 
@@ -68,13 +74,17 @@ export const UpdateSegmentSchema = Joi.object().keys({
   name: Joi.string().min(1).max(100).optional(),
   description: Joi.string().max(500).optional().allow(''),
   color: Joi.string().optional(),
-  rules: Joi.array().items(
-    Joi.object({
-      field: Joi.string().required(),
-      operator: Joi.string().valid('eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'in').required(),
-      value: Joi.any().required(),
-    })
-  ).optional(),
+  rules: Joi.array()
+    .items(
+      Joi.object({
+        field: Joi.string().required(),
+        operator: Joi.string()
+          .valid('eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains', 'in')
+          .required(),
+        value: Joi.any().required(),
+      }),
+    )
+    .optional(),
   ruleLogic: Joi.string().valid('and', 'or').optional(),
 });
 

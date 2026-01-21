@@ -71,7 +71,8 @@ export class ScheduledSyncService implements OnModuleInit {
 
     // Skip if synced recently
     if (lastSync) {
-      const minutesSinceLastSync = (now.getTime() - lastSync.getTime()) / (1000 * 60);
+      const minutesSinceLastSync =
+        (now.getTime() - lastSync.getTime()) / (1000 * 60);
       if (minutesSinceLastSync < syncInterval) {
         return;
       }
@@ -94,7 +95,9 @@ export class ScheduledSyncService implements OnModuleInit {
       // Sync all entity types
       await this.runFullSync(store);
     } catch (error) {
-      this.logger.error(`Scheduled sync failed for store ${store.name}: ${error.message}`);
+      this.logger.error(
+        `Scheduled sync failed for store ${store.name}: ${error.message}`,
+      );
       await this.recordSyncError(store, 'full', error.message);
     }
   }
@@ -112,7 +115,9 @@ export class ScheduledSyncService implements OnModuleInit {
     // This significantly reduces API calls and bandwidth
     const syncMode = SyncMode.DELTA;
 
-    this.logger.log(`Starting scheduled ${syncMode} sync for store: ${store.name}`);
+    this.logger.log(
+      `Starting scheduled ${syncMode} sync for store: ${store.name}`,
+    );
 
     // Products and Orders support delta sync
     const deltaSyncEntities = [
@@ -130,11 +135,18 @@ export class ScheduledSyncService implements OnModuleInit {
     for (const entity of deltaSyncEntities) {
       try {
         if (typeof this.syncService[entity.method] === 'function') {
-          await this.syncService[entity.method](storeId, systemUserId, SyncJobType.SCHEDULED, syncMode);
+          await this.syncService[entity.method](
+            storeId,
+            systemUserId,
+            SyncJobType.SCHEDULED,
+            syncMode,
+          );
           await this.delay(2000);
         }
       } catch (error) {
-        this.logger.error(`Scheduled ${entity.type} sync failed for ${store.name}: ${error.message}`);
+        this.logger.error(
+          `Scheduled ${entity.type} sync failed for ${store.name}: ${error.message}`,
+        );
         await this.recordSyncError(store, entity.type, error.message);
       }
     }
@@ -143,11 +155,17 @@ export class ScheduledSyncService implements OnModuleInit {
     for (const entity of fullSyncEntities) {
       try {
         if (typeof this.syncService[entity.method] === 'function') {
-          await this.syncService[entity.method](storeId, systemUserId, SyncJobType.SCHEDULED);
+          await this.syncService[entity.method](
+            storeId,
+            systemUserId,
+            SyncJobType.SCHEDULED,
+          );
           await this.delay(2000);
         }
       } catch (error) {
-        this.logger.error(`Scheduled ${entity.type} sync failed for ${store.name}: ${error.message}`);
+        this.logger.error(
+          `Scheduled ${entity.type} sync failed for ${store.name}: ${error.message}`,
+        );
         await this.recordSyncError(store, entity.type, error.message);
       }
     }
@@ -248,7 +266,9 @@ export class ScheduledSyncService implements OnModuleInit {
       const text = `
 Hello,
 
-We detected ${errors.length} sync error(s) in your CartFlow stores in the last hour:
+We detected ${
+        errors.length
+      } sync error(s) in your CartFlow stores in the last hour:
 
 ${errorSummary}
 ${errors.length > 10 ? `\n... and ${errors.length - 10} more errors` : ''}
@@ -263,11 +283,23 @@ CartFlow Team
 
       const html = `
 <p>Hello,</p>
-<p>We detected <strong>${errors.length} sync error(s)</strong> in your CartFlow stores in the last hour:</p>
+<p>We detected <strong>${
+        errors.length
+      } sync error(s)</strong> in your CartFlow stores in the last hour:</p>
 <ul>
-${errors.slice(0, 10).map((e) => `<li><strong>${e.storeName}</strong> (${e.entityType}): ${e.error}</li>`).join('\n')}
+${errors
+  .slice(0, 10)
+  .map(
+    (e) =>
+      `<li><strong>${e.storeName}</strong> (${e.entityType}): ${e.error}</li>`,
+  )
+  .join('\n')}
 </ul>
-${errors.length > 10 ? `<p><em>... and ${errors.length - 10} more errors</em></p>` : ''}
+${
+  errors.length > 10
+    ? `<p><em>... and ${errors.length - 10} more errors</em></p>`
+    : ''
+}
 <p>Please check your store connections and credentials in the CartFlow dashboard.</p>
 <p>If the issue persists, please contact support.</p>
 <p>Best regards,<br>CartFlow Team</p>
@@ -276,7 +308,9 @@ ${errors.length > 10 ? `<p><em>... and ${errors.length - 10} more errors</em></p
       await this.emailService.sendEmail(owner.email, subject, html);
       this.logger.log(`Sent sync error notification to ${owner.email}`);
     } catch (error) {
-      this.logger.error(`Failed to send sync error notification: ${error.message}`);
+      this.logger.error(
+        `Failed to send sync error notification: ${error.message}`,
+      );
     }
   }
 
@@ -293,7 +327,9 @@ ${errors.length > 10 ? `<p><em>... and ${errors.length - 10} more errors</em></p
     });
 
     if (stuckJobs.length > 0) {
-      this.logger.warn(`Found ${stuckJobs.length} stuck sync jobs, marking as failed`);
+      this.logger.warn(
+        `Found ${stuckJobs.length} stuck sync jobs, marking as failed`,
+      );
 
       for (const job of stuckJobs) {
         job.status = SyncJobStatus.FAILED;
@@ -367,7 +403,9 @@ ${errors.length > 10 ? `<p><em>... and ${errors.length - 10} more errors</em></p
       {
         $set: {
           'settings.autoSync': settings.autoSync,
-          ...(settings.syncInterval && { 'settings.syncInterval': settings.syncInterval }),
+          ...(settings.syncInterval && {
+            'settings.syncInterval': settings.syncInterval,
+          }),
         },
       },
     );

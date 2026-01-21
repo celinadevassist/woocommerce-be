@@ -12,7 +12,12 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { ProductionBatchesService } from './service';
 import { JoiValidationPipe } from '../pipes';
 import {
@@ -103,7 +108,11 @@ export class ProductionBatchesController {
     @Param('id') id: string,
     @Body() dto: StartProductionDto,
   ) {
-    return this.batchesService.startProduction(req.user._id.toString(), id, dto);
+    return this.batchesService.startProduction(
+      req.user._id.toString(),
+      id,
+      dto,
+    );
   }
 
   @Post(':id/qc')
@@ -122,7 +131,11 @@ export class ProductionBatchesController {
     @Param('id') id: string,
     @Body() dto: CompleteProductionDto,
   ) {
-    return this.batchesService.completeProduction(req.user._id.toString(), id, dto);
+    return this.batchesService.completeProduction(
+      req.user._id.toString(),
+      id,
+      dto,
+    );
   }
 
   @Post(':id/cancel')
@@ -134,7 +147,11 @@ export class ProductionBatchesController {
     @Param('id') id: string,
     @Body() dto: CancelProductionDto,
   ) {
-    return this.batchesService.cancelProduction(req.user._id.toString(), id, dto);
+    return this.batchesService.cancelProduction(
+      req.user._id.toString(),
+      id,
+      dto,
+    );
   }
 
   @Get(':id/cost')

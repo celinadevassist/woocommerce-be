@@ -14,7 +14,10 @@ export class StateGroup {
   @Prop({ required: true, uppercase: true })
   countryCode: string;
 
-  @ApiProperty({ description: 'Color for visual distinction', example: '#3B82F6' })
+  @ApiProperty({
+    description: 'Color for visual distinction',
+    example: '#3B82F6',
+  })
   @Prop({ default: '#6B7280' })
   color: string;
 

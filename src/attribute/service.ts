@@ -8,7 +8,12 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Store, StoreDocument } from '../store/schema';
-import { Attribute, AttributeDocument, AttributeTerm, AttributeTermDocument } from './schema';
+import {
+  Attribute,
+  AttributeDocument,
+  AttributeTerm,
+  AttributeTermDocument,
+} from './schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 
 export interface IAttributeWithTerms {
@@ -36,8 +41,10 @@ export class AttributeService {
   private readonly logger = new Logger(AttributeService.name);
 
   constructor(
-    @InjectModel(Attribute.name) private attributeModel: Model<AttributeDocument>,
-    @InjectModel(AttributeTerm.name) private termModel: Model<AttributeTermDocument>,
+    @InjectModel(Attribute.name)
+    private attributeModel: Model<AttributeDocument>,
+    @InjectModel(AttributeTerm.name)
+    private termModel: Model<AttributeTermDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     private readonly wooCommerceService: WooCommerceService,
   ) {}
@@ -45,13 +52,18 @@ export class AttributeService {
   /**
    * Sync attributes and terms from WooCommerce to MongoDB
    */
-  async syncFromWooCommerce(userId: string, storeId: string): Promise<{ attributes: number; terms: number }> {
+  async syncFromWooCommerce(
+    userId: string,
+    storeId: string,
+  ): Promise<{ attributes: number; terms: number }> {
     const store = await this.getStoreWithAccess(storeId, userId);
     const credentials = this.getCredentials(store);
     const storeObjectId = new Types.ObjectId(storeId);
 
     // Fetch all attributes from WooCommerce
-    const wooAttributes = await this.wooCommerceService.getAttributes(credentials);
+    const wooAttributes = await this.wooCommerceService.getAttributes(
+      credentials,
+    );
 
     let totalTerms = 0;
 
@@ -74,12 +86,19 @@ export class AttributeService {
 
       // Fetch terms for this attribute
       try {
-        const termsResult = await this.wooCommerceService.getAttributeTerms(credentials, wooAttr.id);
+        const termsResult = await this.wooCommerceService.getAttributeTerms(
+          credentials,
+          wooAttr.id,
+        );
         const wooTerms = termsResult.data;
 
         // Get existing term wooIds for this attribute
         const existingTermWooIds = new Set(
-          (await this.termModel.find({ attributeId: attribute._id, isDeleted: false }).select('wooId')).map(t => t.wooId)
+          (
+            await this.termModel
+              .find({ attributeId: attribute._id, isDeleted: false })
+              .select('wooId')
+          ).map((t) => t.wooId),
         );
 
         for (const wooTerm of wooTerms) {
@@ -105,17 +124,22 @@ export class AttributeService {
         // Mark terms that no longer exist in WooCommerce as deleted
         if (existingTermWooIds.size > 0) {
           await this.termModel.updateMany(
-            { attributeId: attribute._id, wooId: { $in: Array.from(existingTermWooIds) } },
+            {
+              attributeId: attribute._id,
+              wooId: { $in: Array.from(existingTermWooIds) },
+            },
             { isDeleted: true },
           );
         }
       } catch (error) {
-        this.logger.warn(`Failed to fetch terms for attribute ${wooAttr.id}: ${error.message}`);
+        this.logger.warn(
+          `Failed to fetch terms for attribute ${wooAttr.id}: ${error.message}`,
+        );
       }
     }
 
     // Mark attributes that no longer exist in WooCommerce as deleted
-    const syncedWooIds = wooAttributes.map(a => a.id);
+    const syncedWooIds = wooAttributes.map((a) => a.id);
     await this.attributeModel.updateMany(
       { storeId: storeObjectId, wooId: { $nin: syncedWooIds } },
       { isDeleted: true },
@@ -127,18 +151,26 @@ export class AttributeService {
   /**
    * Get all attributes for a store (from MongoDB)
    */
-  async getAttributes(userId: string, storeId: string): Promise<AttributeDocument[]> {
+  async getAttributes(
+    userId: string,
+    storeId: string,
+  ): Promise<AttributeDocument[]> {
     await this.getStoreWithAccess(storeId, userId);
-    return this.attributeModel.find({
-      storeId: new Types.ObjectId(storeId),
-      isDeleted: false,
-    }).sort({ name: 1 });
+    return this.attributeModel
+      .find({
+        storeId: new Types.ObjectId(storeId),
+        isDeleted: false,
+      })
+      .sort({ name: 1 });
   }
 
   /**
    * Get all attributes with their terms (from MongoDB) - optimized with aggregation
    */
-  async getAttributesWithTerms(userId: string, storeId: string): Promise<IAttributeWithTerms[]> {
+  async getAttributesWithTerms(
+    userId: string,
+    storeId: string,
+  ): Promise<IAttributeWithTerms[]> {
     await this.getStoreWithAccess(storeId, userId);
     const storeObjectId = new Types.ObjectId(storeId);
 
@@ -169,7 +201,7 @@ export class AttributeService {
       { $sort: { name: 1 } },
     ]);
 
-    return result.map(attr => ({
+    return result.map((attr) => ({
       _id: attr._id.toString(),
       storeId: attr.storeId.toString(),
       wooId: attr.wooId,
@@ -193,7 +225,11 @@ export class AttributeService {
   /**
    * Get a single attribute with its terms
    */
-  async getAttribute(userId: string, storeId: string, attributeId: string): Promise<IAttributeWithTerms> {
+  async getAttribute(
+    userId: string,
+    storeId: string,
+    attributeId: string,
+  ): Promise<IAttributeWithTerms> {
     await this.getStoreWithAccess(storeId, userId);
 
     const attribute = await this.attributeModel.findOne({
@@ -206,10 +242,12 @@ export class AttributeService {
       throw new NotFoundException('Attribute not found');
     }
 
-    const terms = await this.termModel.find({
-      attributeId: attribute._id,
-      isDeleted: false,
-    }).sort({ menuOrder: 1, name: 1 });
+    const terms = await this.termModel
+      .find({
+        attributeId: attribute._id,
+        isDeleted: false,
+      })
+      .sort({ menuOrder: 1, name: 1 });
 
     return {
       _id: attribute._id.toString(),
@@ -220,7 +258,7 @@ export class AttributeService {
       type: attribute.type,
       orderBy: attribute.orderBy,
       hasArchives: attribute.hasArchives,
-      terms: terms.map(t => ({
+      terms: terms.map((t) => ({
         _id: t._id.toString(),
         wooId: t.wooId,
         name: t.name,
@@ -238,7 +276,13 @@ export class AttributeService {
   async createAttribute(
     userId: string,
     storeId: string,
-    data: { name: string; slug?: string; type?: string; orderBy?: string; hasArchives?: boolean },
+    data: {
+      name: string;
+      slug?: string;
+      type?: string;
+      orderBy?: string;
+      hasArchives?: boolean;
+    },
   ): Promise<IAttributeWithTerms> {
     const store = await this.getStoreWithAccess(storeId, userId);
     const credentials = this.getCredentials(store);
@@ -283,7 +327,13 @@ export class AttributeService {
     userId: string,
     storeId: string,
     attributeId: string,
-    data: { name?: string; slug?: string; type?: string; orderBy?: string; hasArchives?: boolean },
+    data: {
+      name?: string;
+      slug?: string;
+      type?: string;
+      orderBy?: string;
+      hasArchives?: boolean;
+    },
   ): Promise<IAttributeWithTerms> {
     const store = await this.getStoreWithAccess(storeId, userId);
     const credentials = this.getCredentials(store);
@@ -299,13 +349,17 @@ export class AttributeService {
     }
 
     // Update in WooCommerce first
-    const wooAttr = await this.wooCommerceService.updateAttribute(credentials, attribute.wooId, {
-      name: data.name,
-      slug: data.slug,
-      type: data.type,
-      order_by: data.orderBy,
-      has_archives: data.hasArchives,
-    });
+    const wooAttr = await this.wooCommerceService.updateAttribute(
+      credentials,
+      attribute.wooId,
+      {
+        name: data.name,
+        slug: data.slug,
+        type: data.type,
+        order_by: data.orderBy,
+        has_archives: data.hasArchives,
+      },
+    );
 
     // Update in MongoDB
     attribute.name = wooAttr.name;
@@ -316,10 +370,12 @@ export class AttributeService {
     await attribute.save();
 
     // Get terms
-    const terms = await this.termModel.find({
-      attributeId: attribute._id,
-      isDeleted: false,
-    }).sort({ menuOrder: 1, name: 1 });
+    const terms = await this.termModel
+      .find({
+        attributeId: attribute._id,
+        isDeleted: false,
+      })
+      .sort({ menuOrder: 1, name: 1 });
 
     return {
       _id: attribute._id.toString(),
@@ -330,7 +386,7 @@ export class AttributeService {
       type: attribute.type,
       orderBy: attribute.orderBy,
       hasArchives: attribute.hasArchives,
-      terms: terms.map(t => ({
+      terms: terms.map((t) => ({
         _id: t._id.toString(),
         wooId: t.wooId,
         name: t.name,
@@ -345,7 +401,11 @@ export class AttributeService {
   /**
    * Delete an attribute (from WooCommerce and MongoDB)
    */
-  async deleteAttribute(userId: string, storeId: string, attributeId: string): Promise<void> {
+  async deleteAttribute(
+    userId: string,
+    storeId: string,
+    attributeId: string,
+  ): Promise<void> {
     const store = await this.getStoreWithAccess(storeId, userId);
     const credentials = this.getCredentials(store);
 
@@ -360,7 +420,11 @@ export class AttributeService {
     }
 
     // Delete from WooCommerce first
-    await this.wooCommerceService.deleteAttribute(credentials, attribute.wooId, true);
+    await this.wooCommerceService.deleteAttribute(
+      credentials,
+      attribute.wooId,
+      true,
+    );
 
     // Soft delete in MongoDB
     attribute.isDeleted = true;
@@ -389,10 +453,12 @@ export class AttributeService {
       throw new NotFoundException('Attribute not found');
     }
 
-    return this.termModel.find({
-      attributeId: attribute._id,
-      isDeleted: false,
-    }).sort({ menuOrder: 1, name: 1 });
+    return this.termModel
+      .find({
+        attributeId: attribute._id,
+        isDeleted: false,
+      })
+      .sort({ menuOrder: 1, name: 1 });
   }
 
   /**
@@ -402,7 +468,12 @@ export class AttributeService {
     userId: string,
     storeId: string,
     attributeId: string,
-    data: { name: string; slug?: string; description?: string; menuOrder?: number },
+    data: {
+      name: string;
+      slug?: string;
+      description?: string;
+      menuOrder?: number;
+    },
   ) {
     const store = await this.getStoreWithAccess(storeId, userId);
     const credentials = this.getCredentials(store);
@@ -420,15 +491,24 @@ export class AttributeService {
     // Create in WooCommerce first
     let wooTerm;
     try {
-      wooTerm = await this.wooCommerceService.createAttributeTerm(credentials, attribute.wooId, {
-        name: data.name,
-        slug: data.slug || undefined,
-        description: data.description,
-        menu_order: data.menuOrder,
-      });
+      wooTerm = await this.wooCommerceService.createAttributeTerm(
+        credentials,
+        attribute.wooId,
+        {
+          name: data.name,
+          slug: data.slug || undefined,
+          description: data.description,
+          menu_order: data.menuOrder,
+        },
+      );
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to create term in WooCommerce';
-      this.logger.error(`Failed to create attribute term in WooCommerce: ${errorMessage}`);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to create term in WooCommerce';
+      this.logger.error(
+        `Failed to create attribute term in WooCommerce: ${errorMessage}`,
+      );
       throw new BadRequestException(errorMessage);
     }
 
@@ -463,7 +543,12 @@ export class AttributeService {
     storeId: string,
     attributeId: string,
     termId: string,
-    data: { name?: string; slug?: string; description?: string; menuOrder?: number },
+    data: {
+      name?: string;
+      slug?: string;
+      description?: string;
+      menuOrder?: number;
+    },
   ) {
     const store = await this.getStoreWithAccess(storeId, userId);
     const credentials = this.getCredentials(store);
@@ -491,15 +576,25 @@ export class AttributeService {
     // Update in WooCommerce first
     let wooTerm;
     try {
-      wooTerm = await this.wooCommerceService.updateAttributeTerm(credentials, attribute.wooId, term.wooId, {
-        name: data.name,
-        slug: data.slug || undefined,
-        description: data.description,
-        menu_order: data.menuOrder,
-      });
+      wooTerm = await this.wooCommerceService.updateAttributeTerm(
+        credentials,
+        attribute.wooId,
+        term.wooId,
+        {
+          name: data.name,
+          slug: data.slug || undefined,
+          description: data.description,
+          menu_order: data.menuOrder,
+        },
+      );
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to update term in WooCommerce';
-      this.logger.error(`Failed to update attribute term in WooCommerce: ${errorMessage}`);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to update term in WooCommerce';
+      this.logger.error(
+        `Failed to update attribute term in WooCommerce: ${errorMessage}`,
+      );
       throw new BadRequestException(errorMessage);
     }
 
@@ -556,10 +651,20 @@ export class AttributeService {
 
     // Delete from WooCommerce first
     try {
-      await this.wooCommerceService.deleteAttributeTerm(credentials, attribute.wooId, term.wooId, true);
+      await this.wooCommerceService.deleteAttributeTerm(
+        credentials,
+        attribute.wooId,
+        term.wooId,
+        true,
+      );
     } catch (error) {
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to delete term in WooCommerce';
-      this.logger.error(`Failed to delete attribute term in WooCommerce: ${errorMessage}`);
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to delete term in WooCommerce';
+      this.logger.error(
+        `Failed to delete attribute term in WooCommerce: ${errorMessage}`,
+      );
       throw new BadRequestException(errorMessage);
     }
 
@@ -617,7 +722,10 @@ export class AttributeService {
   }
 
   // Helper methods
-  private async getStoreWithAccess(storeId: string, userId: string): Promise<StoreDocument> {
+  private async getStoreWithAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<StoreDocument> {
     const store = await this.storeModel
       .findOne({
         _id: new Types.ObjectId(storeId),

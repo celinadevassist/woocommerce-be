@@ -6,19 +6,30 @@ export class QueryOrderDto {
   @ApiPropertyOptional({ description: 'Store ID to filter by' })
   storeId?: string;
 
-  @ApiPropertyOptional({ description: 'Filter by order status', enum: OrderStatus })
+  @ApiPropertyOptional({
+    description: 'Filter by order status',
+    enum: OrderStatus,
+  })
   status?: OrderStatus;
 
-  @ApiPropertyOptional({ description: 'Filter by payment status', enum: PaymentStatus })
+  @ApiPropertyOptional({
+    description: 'Filter by payment status',
+    enum: PaymentStatus,
+  })
   paymentStatus?: PaymentStatus;
 
-  @ApiPropertyOptional({ description: 'Filter by fulfillment status', enum: FulfillmentStatus })
+  @ApiPropertyOptional({
+    description: 'Filter by fulfillment status',
+    enum: FulfillmentStatus,
+  })
   fulfillmentStatus?: FulfillmentStatus;
 
   @ApiPropertyOptional({ description: 'Customer ID' })
   customerId?: string;
 
-  @ApiPropertyOptional({ description: 'Search by order number, email, or phone' })
+  @ApiPropertyOptional({
+    description: 'Search by order number, email, or phone',
+  })
   keyword?: string;
 
   @ApiPropertyOptional({ description: 'Start date filter' })
@@ -47,10 +58,18 @@ export class QueryOrderDto {
 }
 
 export const QueryOrderSchema = Joi.object().keys({
-  storeId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).optional(),
-  status: Joi.string().valid(...Object.values(OrderStatus)).optional(),
-  paymentStatus: Joi.string().valid(...Object.values(PaymentStatus)).optional(),
-  fulfillmentStatus: Joi.string().valid(...Object.values(FulfillmentStatus)).optional(),
+  storeId: Joi.string()
+    .pattern(/^[0-9a-fA-F]{24}$/)
+    .optional(),
+  status: Joi.string()
+    .valid(...Object.values(OrderStatus))
+    .optional(),
+  paymentStatus: Joi.string()
+    .valid(...Object.values(PaymentStatus))
+    .optional(),
+  fulfillmentStatus: Joi.string()
+    .valid(...Object.values(FulfillmentStatus))
+    .optional(),
   customerId: Joi.string().optional(),
   keyword: Joi.string().optional(),
   startDate: Joi.string().isoDate().optional(),
@@ -59,6 +78,9 @@ export const QueryOrderSchema = Joi.object().keys({
   maxTotal: Joi.number().min(0).optional(),
   page: Joi.number().min(1).default(1).optional(),
   size: Joi.number().min(1).max(100).default(20).optional(),
-  sortBy: Joi.string().valid('dateCreatedWoo', 'total', 'orderNumber', 'status', 'createdAt').default('dateCreatedWoo').optional(),
+  sortBy: Joi.string()
+    .valid('dateCreatedWoo', 'total', 'orderNumber', 'status', 'createdAt')
+    .default('dateCreatedWoo')
+    .optional(),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc').optional(),
 });

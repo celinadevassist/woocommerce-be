@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ProductionBatch } from './schema';
@@ -8,7 +14,11 @@ import { Store } from '../store/schema';
 import { InventoryMaterialsService } from '../inventory-materials/service';
 import { ProductUnitService } from '../product-unit/service';
 import { ProductionBatchStatus, ProductionBatchType } from './enum';
-import { IProductionBatch, IProductionBatchResponse, IProductionBatchCostSummary } from './interface';
+import {
+  IProductionBatch,
+  IProductionBatchResponse,
+  IProductionBatchCostSummary,
+} from './interface';
 import {
   CreateProductionBatchDto,
   UpdateProductionBatchDto,
@@ -23,7 +33,8 @@ export class ProductionBatchesService {
   private readonly logger = new Logger(ProductionBatchesService.name);
 
   constructor(
-    @InjectModel(ProductionBatch.name) private batchModel: Model<ProductionBatch>,
+    @InjectModel(ProductionBatch.name)
+    private batchModel: Model<ProductionBatch>,
     @InjectModel(Material.name) private materialModel: Model<Material>,
     @InjectModel(SKU.name) private skuModel: Model<SKU>,
     @InjectModel(Store.name) private storeModel: Model<Store>,
@@ -45,7 +56,7 @@ export class ProductionBatchesService {
       plannedQuantity: doc.plannedQuantity,
       completedQuantity: doc.completedQuantity,
       defectQuantity: doc.defectQuantity,
-      consumedMaterials: doc.consumedMaterials.map(m => ({
+      consumedMaterials: doc.consumedMaterials.map((m) => ({
         materialId: m.materialId as any,
         plannedQuantity: m.plannedQuantity,
         actualQuantity: m.actualQuantity,
@@ -71,7 +82,10 @@ export class ProductionBatchesService {
   /**
    * Verify store access
    */
-  private async getStoreWithAccess(storeId: string, userId: string): Promise<any> {
+  private async getStoreWithAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<any> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       $or: [
@@ -100,7 +114,10 @@ export class ProductionBatchesService {
 
     let nextNumber = 1;
     if (lastBatch) {
-      const lastNumber = parseInt(lastBatch.batchNumber.replace(prefix, ''), 10);
+      const lastNumber = parseInt(
+        lastBatch.batchNumber.replace(prefix, ''),
+        10,
+      );
       nextNumber = lastNumber + 1;
     }
 
@@ -110,7 +127,11 @@ export class ProductionBatchesService {
   /**
    * Create a new production batch
    */
-  async create(storeId: string, userId: string, dto: CreateProductionBatchDto): Promise<IProductionBatchResponse> {
+  async create(
+    storeId: string,
+    userId: string,
+    dto: CreateProductionBatchDto,
+  ): Promise<IProductionBatchResponse> {
     await this.getStoreWithAccess(storeId, userId);
 
     // Verify SKU exists
@@ -130,7 +151,7 @@ export class ProductionBatchesService {
     const batchNumber = await this.generateBatchNumber(storeObjectId);
 
     // Prepare consumed materials from DTO or from SKU BOM
-    let consumedMaterials: any[] = [];
+    const consumedMaterials: any[] = [];
 
     if (dto.consumedMaterials && dto.consumedMaterials.length > 0) {
       // Use provided materials
@@ -199,7 +220,15 @@ export class ProductionBatchesService {
   /**
    * Find all batches for a store with filters
    */
-  async findByStore(userId: string, query: QueryProductionBatchDto): Promise<{ data: IProductionBatchResponse[]; total: number; page: number; pages: number }> {
+  async findByStore(
+    userId: string,
+    query: QueryProductionBatchDto,
+  ): Promise<{
+    data: IProductionBatchResponse[];
+    total: number;
+    page: number;
+    pages: number;
+  }> {
     if (!query.storeId) {
       throw new BadRequestException('storeId is required');
     }
@@ -225,7 +254,8 @@ export class ProductionBatchesService {
 
     if (query.startDate || query.endDate) {
       filter.plannedStartDate = {};
-      if (query.startDate) filter.plannedStartDate.$gte = new Date(query.startDate);
+      if (query.startDate)
+        filter.plannedStartDate.$gte = new Date(query.startDate);
       if (query.endDate) filter.plannedStartDate.$lte = new Date(query.endDate);
     }
 
@@ -238,13 +268,17 @@ export class ProductionBatchesService {
     const skip = (page - 1) * size;
 
     const [batches, total] = await Promise.all([
-      this.batchModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(size),
+      this.batchModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(size),
       this.batchModel.countDocuments(filter),
     ]);
 
     // Enrich with SKU and material data
     const enrichedBatches = await Promise.all(
-      batches.map(async (batch) => this.enrichBatch(batch))
+      batches.map(async (batch) => this.enrichBatch(batch)),
     );
 
     return {
@@ -258,7 +292,10 @@ export class ProductionBatchesService {
   /**
    * Get batch by ID
    */
-  async findById(userId: string, batchId: string): Promise<IProductionBatchResponse> {
+  async findById(
+    userId: string,
+    batchId: string,
+  ): Promise<IProductionBatchResponse> {
     const batch = await this.batchModel.findOne({
       _id: new Types.ObjectId(batchId),
       isDeleted: false,
@@ -276,7 +313,9 @@ export class ProductionBatchesService {
   /**
    * Enrich batch with SKU and material names
    */
-  private async enrichBatch(batch: ProductionBatch): Promise<IProductionBatchResponse> {
+  private async enrichBatch(
+    batch: ProductionBatch,
+  ): Promise<IProductionBatchResponse> {
     const sku = await this.skuModel.findById(batch.skuId);
 
     const enrichedMaterials = await Promise.all(
@@ -289,22 +328,26 @@ export class ProductionBatchesService {
           unit: mat.unit,
           unitCost: mat.unitCost,
           totalCost: mat.totalCost,
-          material: material ? {
-            _id: material._id as any,
-            sku: material.sku,
-            name: material.name,
-          } : undefined,
+          material: material
+            ? {
+                _id: material._id as any,
+                sku: material.sku,
+                name: material.name,
+              }
+            : undefined,
         };
-      })
+      }),
     );
 
     return {
       ...this.toInterface(batch),
-      sku: sku ? {
-        _id: sku._id as any,
-        sku: sku.sku,
-        title: sku.title,
-      } : undefined,
+      sku: sku
+        ? {
+            _id: sku._id as any,
+            sku: sku.sku,
+            title: sku.title,
+          }
+        : undefined,
       consumedMaterials: enrichedMaterials as any,
     };
   }
@@ -312,7 +355,11 @@ export class ProductionBatchesService {
   /**
    * Update a planned batch
    */
-  async update(userId: string, batchId: string, dto: UpdateProductionBatchDto): Promise<IProductionBatchResponse> {
+  async update(
+    userId: string,
+    batchId: string,
+    dto: UpdateProductionBatchDto,
+  ): Promise<IProductionBatchResponse> {
     const batch = await this.batchModel.findOne({
       _id: new Types.ObjectId(batchId),
       isDeleted: false,
@@ -330,11 +377,13 @@ export class ProductionBatchesService {
     }
 
     if (dto.type !== undefined) batch.type = dto.type;
-    if (dto.plannedQuantity !== undefined) batch.plannedQuantity = dto.plannedQuantity;
+    if (dto.plannedQuantity !== undefined)
+      batch.plannedQuantity = dto.plannedQuantity;
     if (dto.laborCost !== undefined) batch.laborCost = dto.laborCost;
     if (dto.overheadCost !== undefined) batch.overheadCost = dto.overheadCost;
     if (dto.notes !== undefined) batch.notes = dto.notes;
-    if (dto.plannedStartDate !== undefined) batch.plannedStartDate = dto.plannedStartDate;
+    if (dto.plannedStartDate !== undefined)
+      batch.plannedStartDate = dto.plannedStartDate;
 
     // Update consumed materials if provided
     if (dto.consumedMaterials !== undefined) {
@@ -370,7 +419,11 @@ export class ProductionBatchesService {
   /**
    * Start production
    */
-  async startProduction(userId: string, batchId: string, dto: StartProductionDto): Promise<IProductionBatchResponse> {
+  async startProduction(
+    userId: string,
+    batchId: string,
+    dto: StartProductionDto,
+  ): Promise<IProductionBatchResponse> {
     const batch = await this.batchModel.findOne({
       _id: new Types.ObjectId(batchId),
       isDeleted: false,
@@ -383,7 +436,9 @@ export class ProductionBatchesService {
     await this.getStoreWithAccess(batch.storeId.toString(), userId);
 
     if (batch.status !== ProductionBatchStatus.PLANNED) {
-      throw new ConflictException('Can only start production from PLANNED status');
+      throw new ConflictException(
+        'Can only start production from PLANNED status',
+      );
     }
 
     // Verify material availability
@@ -394,7 +449,7 @@ export class ProductionBatchesService {
       }
       if (material.currentStock < mat.plannedQuantity) {
         throw new BadRequestException(
-          `Insufficient stock for ${material.name}. Required: ${mat.plannedQuantity}, Available: ${material.currentStock}`
+          `Insufficient stock for ${material.name}. Required: ${mat.plannedQuantity}, Available: ${material.currentStock}`,
         );
       }
     }
@@ -410,7 +465,11 @@ export class ProductionBatchesService {
   /**
    * Complete production - deducts materials and calculates costs
    */
-  async completeProduction(userId: string, batchId: string, dto: CompleteProductionDto): Promise<IProductionBatchResponse> {
+  async completeProduction(
+    userId: string,
+    batchId: string,
+    dto: CompleteProductionDto,
+  ): Promise<IProductionBatchResponse> {
     const batch = await this.batchModel.findOne({
       _id: new Types.ObjectId(batchId),
       isDeleted: false,
@@ -422,24 +481,31 @@ export class ProductionBatchesService {
 
     await this.getStoreWithAccess(batch.storeId.toString(), userId);
 
-    if (batch.status !== ProductionBatchStatus.IN_PROGRESS && batch.status !== ProductionBatchStatus.QC_PENDING) {
-      throw new ConflictException('Can only complete production from IN_PROGRESS or QC_PENDING status');
+    if (
+      batch.status !== ProductionBatchStatus.IN_PROGRESS &&
+      batch.status !== ProductionBatchStatus.QC_PENDING
+    ) {
+      throw new ConflictException(
+        'Can only complete production from IN_PROGRESS or QC_PENDING status',
+      );
     }
 
     // Update actual quantities if provided
     if (dto.actualMaterials) {
       for (const actual of dto.actualMaterials) {
         const matIndex = batch.consumedMaterials.findIndex(
-          m => m.materialId.toString() === actual.materialId
+          (m) => m.materialId.toString() === actual.materialId,
         );
         if (matIndex !== -1) {
-          batch.consumedMaterials[matIndex].actualQuantity = actual.actualQuantity;
+          batch.consumedMaterials[matIndex].actualQuantity =
+            actual.actualQuantity;
         }
       }
     } else {
       // Use planned quantities as actual
       for (let i = 0; i < batch.consumedMaterials.length; i++) {
-        batch.consumedMaterials[i].actualQuantity = batch.consumedMaterials[i].plannedQuantity;
+        batch.consumedMaterials[i].actualQuantity =
+          batch.consumedMaterials[i].plannedQuantity;
       }
     }
 
@@ -465,7 +531,7 @@ export class ProductionBatchesService {
         mat.materialId.toString(),
         quantityToDeduct,
         batch.batchNumber,
-        `Production batch: ${batch.batchNumber}`
+        `Production batch: ${batch.batchNumber}`,
       );
     }
 
@@ -473,9 +539,10 @@ export class ProductionBatchesService {
     batch.completedQuantity = dto.completedQuantity;
     batch.defectQuantity = dto.defectQuantity || 0;
     batch.totalCost = totalMaterialsCost + batch.laborCost + batch.overheadCost;
-    batch.costPerUnit = batch.completedQuantity > 0
-      ? Math.round((batch.totalCost / batch.completedQuantity) * 100) / 100
-      : 0;
+    batch.costPerUnit =
+      batch.completedQuantity > 0
+        ? Math.round((batch.totalCost / batch.completedQuantity) * 100) / 100
+        : 0;
     batch.status = ProductionBatchStatus.COMPLETED;
     batch.completedDate = new Date();
 
@@ -500,18 +567,25 @@ export class ProductionBatchesService {
           unitCost: batch.costPerUnit,
           rfidCodes: dto.rfidCodes,
         });
-        this.logger.log(`Created ${unitResult.created} product units for batch ${batch.batchNumber}`);
+        this.logger.log(
+          `Created ${unitResult.created} product units for batch ${batch.batchNumber}`,
+        );
       }
     }
 
-    this.logger.log(`Production completed: ${batch.batchNumber}, ${dto.completedQuantity} units at ${batch.costPerUnit}/unit`);
+    this.logger.log(
+      `Production completed: ${batch.batchNumber}, ${dto.completedQuantity} units at ${batch.costPerUnit}/unit`,
+    );
     return this.findById(userId, batchId);
   }
 
   /**
    * Move to QC pending
    */
-  async sendToQC(userId: string, batchId: string): Promise<IProductionBatchResponse> {
+  async sendToQC(
+    userId: string,
+    batchId: string,
+  ): Promise<IProductionBatchResponse> {
     const batch = await this.batchModel.findOne({
       _id: new Types.ObjectId(batchId),
       isDeleted: false,
@@ -524,7 +598,9 @@ export class ProductionBatchesService {
     await this.getStoreWithAccess(batch.storeId.toString(), userId);
 
     if (batch.status !== ProductionBatchStatus.IN_PROGRESS) {
-      throw new ConflictException('Can only send to QC from IN_PROGRESS status');
+      throw new ConflictException(
+        'Can only send to QC from IN_PROGRESS status',
+      );
     }
 
     batch.status = ProductionBatchStatus.QC_PENDING;
@@ -537,7 +613,11 @@ export class ProductionBatchesService {
   /**
    * Cancel production
    */
-  async cancelProduction(userId: string, batchId: string, dto: CancelProductionDto): Promise<IProductionBatchResponse> {
+  async cancelProduction(
+    userId: string,
+    batchId: string,
+    dto: CancelProductionDto,
+  ): Promise<IProductionBatchResponse> {
     const batch = await this.batchModel.findOne({
       _id: new Types.ObjectId(batchId),
       isDeleted: false,
@@ -555,7 +635,9 @@ export class ProductionBatchesService {
 
     batch.status = ProductionBatchStatus.CANCELLED;
     if (dto.reason) {
-      batch.notes = batch.notes ? `${batch.notes}\nCancelled: ${dto.reason}` : `Cancelled: ${dto.reason}`;
+      batch.notes = batch.notes
+        ? `${batch.notes}\nCancelled: ${dto.reason}`
+        : `Cancelled: ${dto.reason}`;
     }
     await batch.save();
 
@@ -579,7 +661,9 @@ export class ProductionBatchesService {
     await this.getStoreWithAccess(batch.storeId.toString(), userId);
 
     if (batch.status === ProductionBatchStatus.IN_PROGRESS) {
-      throw new ConflictException('Cannot delete batch in progress. Cancel it first.');
+      throw new ConflictException(
+        'Cannot delete batch in progress. Cancel it first.',
+      );
     }
 
     batch.isDeleted = true;
@@ -591,7 +675,10 @@ export class ProductionBatchesService {
   /**
    * Get cost summary for a batch
    */
-  async getCostSummary(userId: string, batchId: string): Promise<IProductionBatchCostSummary> {
+  async getCostSummary(
+    userId: string,
+    batchId: string,
+  ): Promise<IProductionBatchCostSummary> {
     const batch = await this.batchModel.findOne({
       _id: new Types.ObjectId(batchId),
       isDeleted: false,
@@ -603,7 +690,10 @@ export class ProductionBatchesService {
 
     await this.getStoreWithAccess(batch.storeId.toString(), userId);
 
-    const materialsCost = batch.consumedMaterials.reduce((sum, m) => sum + (m.totalCost || 0), 0);
+    const materialsCost = batch.consumedMaterials.reduce(
+      (sum, m) => sum + (m.totalCost || 0),
+      0,
+    );
 
     return {
       materialsCost,
@@ -623,13 +713,34 @@ export class ProductionBatchesService {
 
     const storeObjectId = new Types.ObjectId(storeId);
 
-    const [planned, inProgress, qcPending, completed, cancelled] = await Promise.all([
-      this.batchModel.countDocuments({ storeId: storeObjectId, status: ProductionBatchStatus.PLANNED, isDeleted: false }),
-      this.batchModel.countDocuments({ storeId: storeObjectId, status: ProductionBatchStatus.IN_PROGRESS, isDeleted: false }),
-      this.batchModel.countDocuments({ storeId: storeObjectId, status: ProductionBatchStatus.QC_PENDING, isDeleted: false }),
-      this.batchModel.countDocuments({ storeId: storeObjectId, status: ProductionBatchStatus.COMPLETED, isDeleted: false }),
-      this.batchModel.countDocuments({ storeId: storeObjectId, status: ProductionBatchStatus.CANCELLED, isDeleted: false }),
-    ]);
+    const [planned, inProgress, qcPending, completed, cancelled] =
+      await Promise.all([
+        this.batchModel.countDocuments({
+          storeId: storeObjectId,
+          status: ProductionBatchStatus.PLANNED,
+          isDeleted: false,
+        }),
+        this.batchModel.countDocuments({
+          storeId: storeObjectId,
+          status: ProductionBatchStatus.IN_PROGRESS,
+          isDeleted: false,
+        }),
+        this.batchModel.countDocuments({
+          storeId: storeObjectId,
+          status: ProductionBatchStatus.QC_PENDING,
+          isDeleted: false,
+        }),
+        this.batchModel.countDocuments({
+          storeId: storeObjectId,
+          status: ProductionBatchStatus.COMPLETED,
+          isDeleted: false,
+        }),
+        this.batchModel.countDocuments({
+          storeId: storeObjectId,
+          status: ProductionBatchStatus.CANCELLED,
+          isDeleted: false,
+        }),
+      ]);
 
     // Get this month's completed batches
     const startOfMonth = new Date();
@@ -657,7 +768,11 @@ export class ProductionBatchesService {
 
     return {
       byStatus: { planned, inProgress, qcPending, completed, cancelled },
-      thisMonth: completedThisMonth[0] || { totalUnits: 0, totalCost: 0, batchCount: 0 },
+      thisMonth: completedThisMonth[0] || {
+        totalUnits: 0,
+        totalCost: 0,
+        batchCount: 0,
+      },
     };
   }
 }

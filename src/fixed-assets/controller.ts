@@ -11,7 +11,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { JoiValidationPipe } from '../pipes';
 import { User } from '../decorators';
 import { FixedAssetsService } from './service';
@@ -48,7 +54,10 @@ export class FixedAssetsController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'size', required: false, type: Number })
   @UsePipes(new JoiValidationPipe({ query: QueryFixedAssetSchema }))
-  async findAll(@User('_id') userId: string, @Query() query: QueryFixedAssetDto) {
+  async findAll(
+    @User('_id') userId: string,
+    @Query() query: QueryFixedAssetDto,
+  ) {
     return this.assetsService.findAll(userId, query);
   }
 
@@ -56,7 +65,10 @@ export class FixedAssetsController {
   @ApiOperation({ summary: 'Get asset summary for dashboard' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: true })
-  async getSummary(@User('_id') userId: string, @Query('storeId') storeId: string) {
+  async getSummary(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+  ) {
     return this.assetsService.getSummary(userId, storeId);
   }
 
@@ -64,7 +76,10 @@ export class FixedAssetsController {
   @ApiOperation({ summary: 'Get assets with overdue maintenance' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: true })
-  async getMaintenanceDue(@User('_id') userId: string, @Query('storeId') storeId: string) {
+  async getMaintenanceDue(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+  ) {
     return this.assetsService.getMaintenanceDue(userId, storeId);
   }
 

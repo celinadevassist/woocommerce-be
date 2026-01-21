@@ -1,12 +1,12 @@
-import {
-  Controller,
-  Get,
-  Query,
-  UseGuards,
-  UsePipes,
-} from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, UsePipes } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { AnalyticsService } from './service';
 import { QueryAnalyticsDto, QueryAnalyticsSchema } from './dto.query';
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
@@ -26,9 +26,21 @@ export class AnalyticsController {
   @ApiQuery({ name: 'storeId', required: false })
   @ApiQuery({ name: 'startDate', required: false })
   @ApiQuery({ name: 'endDate', required: false })
-  @ApiQuery({ name: 'period', required: false, enum: ['day', 'week', 'month', 'year'] })
-  @UsePipes(new JoiValidationPipe({ query: QueryAnalyticsSchema, param: { lang: LanguageSchema } }))
-  async getDashboard(@User('_id') userId: string, @Query() query: QueryAnalyticsDto) {
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    enum: ['day', 'week', 'month', 'year'],
+  })
+  @UsePipes(
+    new JoiValidationPipe({
+      query: QueryAnalyticsSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async getDashboard(
+    @User('_id') userId: string,
+    @Query() query: QueryAnalyticsDto,
+  ) {
     return this.analyticsService.getDashboard(userId, query);
   }
 }

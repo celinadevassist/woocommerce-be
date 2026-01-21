@@ -21,15 +21,9 @@ import { MetadataService } from './service';
       // References to other models are included in service via injection
     ]),
   ],
-  controllers: [
-    MetadataController,
-  ],
-  providers: [
-    MetadataService,
-  ],
-  exports: [
-    MetadataService,
-  ],
+  controllers: [MetadataController],
+  providers: [MetadataService],
+  exports: [MetadataService],
 })
 export class MetadataModule implements OnModuleInit {
   constructor(@InjectConnection() private readonly connection: Connection) {}
@@ -38,13 +32,13 @@ export class MetadataModule implements OnModuleInit {
     try {
       // Ensure indexes are properly created for metadata collection
       const collection = this.connection.collection('metadata');
-      
+
       console.log('Checking metadata collection indexes...');
       const indexes = await collection.indexes();
-      
+
       console.log('Metadata collection indexes checked/updated successfully');
     } catch (error) {
       console.error('Error managing metadata indexes:', error);
     }
   }
-} 
+}

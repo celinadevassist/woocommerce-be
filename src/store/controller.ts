@@ -11,11 +11,23 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiBody, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiBody,
+  ApiParam,
+} from '@nestjs/swagger';
 import { StoreService } from './service';
 import { SyncService } from '../sync/service';
 import { CreateStoreDto, CreateStoreSchema } from './dto.create';
-import { UpdateStoreDto, UpdateStoreSchema, UpdateCredentialsDto, UpdateCredentialsSchema } from './dto.update';
+import {
+  UpdateStoreDto,
+  UpdateStoreSchema,
+  UpdateCredentialsDto,
+  UpdateCredentialsSchema,
+} from './dto.update';
 import { QueryStoreDto, QueryStoreSchema } from './dto.query';
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
 import { User } from '../decorators/user.decorator';
@@ -120,7 +132,11 @@ export class StoreController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.storeService.updateCredentials(id, user._id.toString(), dto);
+    return await this.storeService.updateCredentials(
+      id,
+      user._id.toString(),
+      dto,
+    );
   }
 
   @Post(':id/test-connection')
@@ -191,7 +207,10 @@ export class StoreController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.storeService.regenerateWebhookSecret(id, user._id.toString());
+    return await this.storeService.regenerateWebhookSecret(
+      id,
+      user._id.toString(),
+    );
   }
 
   // ==================== PUBLIC API KEY MANAGEMENT ====================
@@ -229,7 +248,10 @@ export class StoreController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.storeService.regeneratePublicApiKey(id, user._id.toString());
+    return await this.storeService.regeneratePublicApiKey(
+      id,
+      user._id.toString(),
+    );
   }
 
   // ==================== MEMBER MANAGEMENT ====================
@@ -255,8 +277,14 @@ export class StoreController {
   @Post(':id/members')
   @ApiOperation({ summary: 'Add a member to the store' })
   @ApiResponse({ status: 200, description: 'Member added successfully' })
-  @ApiResponse({ status: 400, description: 'Cannot add member with owner role' })
-  @ApiResponse({ status: 403, description: 'Only owner and admin can add members' })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot add member with owner role',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Only owner and admin can add members',
+  })
   @ApiResponse({ status: 404, description: 'Store not found' })
   @ApiResponse({ status: 409, description: 'User is already a member' })
   @ApiParam({ name: 'id', description: 'Store ID' })
@@ -269,7 +297,7 @@ export class StoreController {
         role: {
           type: 'string',
           enum: ['admin', 'manager', 'staff', 'viewer'],
-          description: 'Role for the new member'
+          description: 'Role for the new member',
         },
       },
     },
@@ -298,10 +326,13 @@ export class StoreController {
   }
 
   @Patch(':id/members/:memberId/role')
-  @ApiOperation({ summary: 'Update a member\'s role' })
+  @ApiOperation({ summary: "Update a member's role" })
   @ApiResponse({ status: 200, description: 'Member role updated successfully' })
   @ApiResponse({ status: 400, description: 'Cannot assign owner role' })
-  @ApiResponse({ status: 403, description: 'Only store owner can change member roles' })
+  @ApiResponse({
+    status: 403,
+    description: 'Only store owner can change member roles',
+  })
   @ApiResponse({ status: 404, description: 'Store or member not found' })
   @ApiParam({ name: 'id', description: 'Store ID' })
   @ApiParam({ name: 'memberId', description: 'Member user ID' })
@@ -313,7 +344,7 @@ export class StoreController {
         role: {
           type: 'string',
           enum: ['admin', 'manager', 'staff', 'viewer'],
-          description: 'New role for the member'
+          description: 'New role for the member',
         },
       },
     },
@@ -346,7 +377,10 @@ export class StoreController {
   @ApiOperation({ summary: 'Remove a member from the store' })
   @ApiResponse({ status: 200, description: 'Member removed successfully' })
   @ApiResponse({ status: 400, description: 'Cannot remove store owner' })
-  @ApiResponse({ status: 403, description: 'Only owner and admin can remove members' })
+  @ApiResponse({
+    status: 403,
+    description: 'Only owner and admin can remove members',
+  })
   @ApiResponse({ status: 404, description: 'Store or member not found' })
   @ApiParam({ name: 'id', description: 'Store ID' })
   @ApiParam({ name: 'memberId', description: 'Member user ID' })
@@ -394,9 +428,18 @@ export class StoreController {
 
   @Post(':id/transfer-ownership')
   @ApiOperation({ summary: 'Transfer store ownership to another user' })
-  @ApiResponse({ status: 200, description: 'Ownership transferred successfully' })
-  @ApiResponse({ status: 400, description: 'Cannot transfer ownership to yourself' })
-  @ApiResponse({ status: 403, description: 'Only store owner can transfer ownership' })
+  @ApiResponse({
+    status: 200,
+    description: 'Ownership transferred successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot transfer ownership to yourself',
+  })
+  @ApiResponse({
+    status: 403,
+    description: 'Only store owner can transfer ownership',
+  })
   @ApiResponse({ status: 404, description: 'Store not found' })
   @ApiParam({ name: 'id', description: 'Store ID' })
   @ApiBody({
@@ -433,7 +476,10 @@ export class StoreController {
   @Delete(':id')
   @ApiOperation({ summary: 'Disconnect store' })
   @ApiResponse({ status: 200, description: 'Store disconnected successfully' })
-  @ApiResponse({ status: 403, description: 'Only store owner can delete the store' })
+  @ApiResponse({
+    status: 403,
+    description: 'Only store owner can delete the store',
+  })
   @ApiResponse({ status: 404, description: 'Store not found' })
   @UsePipes(
     new JoiValidationPipe({

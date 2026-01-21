@@ -3,13 +3,22 @@ import * as Joi from 'joi';
 import { FulfillmentStatus, OrderStatus } from './enum';
 
 export class UpdateOrderDto {
-  @ApiPropertyOptional({ description: 'Order status (WooCommerce status)', enum: OrderStatus })
+  @ApiPropertyOptional({
+    description: 'Order status (WooCommerce status)',
+    enum: OrderStatus,
+  })
   status?: OrderStatus;
 
-  @ApiPropertyOptional({ description: 'Sync status change to WooCommerce', default: true })
+  @ApiPropertyOptional({
+    description: 'Sync status change to WooCommerce',
+    default: true,
+  })
   syncToStore?: boolean;
 
-  @ApiPropertyOptional({ description: 'Fulfillment status', enum: FulfillmentStatus })
+  @ApiPropertyOptional({
+    description: 'Fulfillment status',
+    enum: FulfillmentStatus,
+  })
   fulfillmentStatus?: FulfillmentStatus;
 
   @ApiPropertyOptional({ description: 'Tracking number' })
@@ -29,9 +38,13 @@ export class UpdateOrderDto {
 }
 
 export const UpdateOrderSchema = Joi.object().keys({
-  status: Joi.string().valid(...Object.values(OrderStatus)).optional(),
+  status: Joi.string()
+    .valid(...Object.values(OrderStatus))
+    .optional(),
   syncToStore: Joi.boolean().default(true).optional(),
-  fulfillmentStatus: Joi.string().valid(...Object.values(FulfillmentStatus)).optional(),
+  fulfillmentStatus: Joi.string()
+    .valid(...Object.values(FulfillmentStatus))
+    .optional(),
   trackingNumber: Joi.string().optional(),
   trackingCarrier: Joi.string().optional(),
   trackingUrl: Joi.string().uri().optional(),
@@ -60,7 +73,10 @@ export class AddOrderNoteDto {
   @ApiPropertyOptional({ description: 'Note content', required: true })
   content: string;
 
-  @ApiPropertyOptional({ description: 'Is this a customer-visible note?', default: false })
+  @ApiPropertyOptional({
+    description: 'Is this a customer-visible note?',
+    default: false,
+  })
   isCustomerNote?: boolean;
 }
 
@@ -70,10 +86,18 @@ export const AddOrderNoteSchema = Joi.object().keys({
 });
 
 export class BulkUpdateStatusDto {
-  @ApiPropertyOptional({ description: 'Order IDs to update', type: [String], required: true })
+  @ApiPropertyOptional({
+    description: 'Order IDs to update',
+    type: [String],
+    required: true,
+  })
   orderIds: string[];
 
-  @ApiPropertyOptional({ description: 'New status', enum: OrderStatus, required: true })
+  @ApiPropertyOptional({
+    description: 'New status',
+    enum: OrderStatus,
+    required: true,
+  })
   status: OrderStatus;
 
   @ApiPropertyOptional({ description: 'Sync to WooCommerce', default: true })
@@ -82,7 +106,9 @@ export class BulkUpdateStatusDto {
 
 export const BulkUpdateStatusSchema = Joi.object().keys({
   orderIds: Joi.array().items(Joi.string()).min(1).required(),
-  status: Joi.string().valid(...Object.values(OrderStatus)).required(),
+  status: Joi.string()
+    .valid(...Object.values(OrderStatus))
+    .required(),
   syncToStore: Joi.boolean().default(true),
 });
 
@@ -93,15 +119,23 @@ export class CreateRefundDto {
   @ApiPropertyOptional({ description: 'Refund reason' })
   reason?: string;
 
-  @ApiPropertyOptional({ description: 'Sync refund to WooCommerce', default: true })
+  @ApiPropertyOptional({
+    description: 'Sync refund to WooCommerce',
+    default: true,
+  })
   syncToStore?: boolean;
 
-  @ApiPropertyOptional({ description: 'Process refund via payment gateway (if supported)', default: false })
+  @ApiPropertyOptional({
+    description: 'Process refund via payment gateway (if supported)',
+    default: false,
+  })
   apiRefund?: boolean;
 }
 
 export const CreateRefundSchema = Joi.object().keys({
-  amount: Joi.string().required().pattern(/^\d+(\.\d{1,2})?$/),
+  amount: Joi.string()
+    .required()
+    .pattern(/^\d+(\.\d{1,2})?$/),
   reason: Joi.string().max(500).optional(),
   syncToStore: Joi.boolean().default(true),
   apiRefund: Joi.boolean().default(false),
@@ -207,9 +241,19 @@ export class BatchCreateOrderItemDto {
 // Valid statuses for batch operations (CartFlow + WooCommerce)
 const VALID_BATCH_STATUSES = [
   // WooCommerce statuses
-  'pending', 'processing', 'on-hold', 'completed', 'cancelled', 'refunded', 'failed', 'trash',
+  'pending',
+  'processing',
+  'on-hold',
+  'completed',
+  'cancelled',
+  'refunded',
+  'failed',
+  'trash',
   // CartFlow-specific statuses (will be mapped to WooCommerce statuses)
-  'draft', 'confirmed', 'shipped', 'delivered',
+  'draft',
+  'confirmed',
+  'shipped',
+  'delivered',
 ];
 
 export const BatchCreateOrderItemSchema = Joi.object({
@@ -217,14 +261,19 @@ export const BatchCreateOrderItemSchema = Joi.object({
   payment_method_title: Joi.string().optional(),
   set_paid: Joi.boolean().optional(),
   billing: AddressSchema.optional(),
-  shipping: AddressSchema.keys({ email: Joi.forbidden(), phone: Joi.forbidden() }).optional(),
+  shipping: AddressSchema.keys({
+    email: Joi.forbidden(),
+    phone: Joi.forbidden(),
+  }).optional(),
   line_items: Joi.array().items(LineItemSchema).optional(),
   shipping_lines: Joi.array().items(ShippingLineSchema).optional(),
   fee_lines: Joi.array().items(FeeLineSchema).optional(),
   coupon_lines: Joi.array().items(CouponLineSchema).optional(),
   customer_id: Joi.number().integer().optional(),
   customer_note: Joi.string().optional().allow(''),
-  status: Joi.string().valid(...VALID_BATCH_STATUSES).optional(),
+  status: Joi.string()
+    .valid(...VALID_BATCH_STATUSES)
+    .optional(),
   meta_data: Joi.array().items(MetaDataSchema).optional(),
 });
 
@@ -243,13 +292,26 @@ export class BatchUpdateOrderItemDto {
 
 export const BatchUpdateOrderItemSchema = Joi.object({
   id: Joi.number().integer().required(),
-  status: Joi.string().valid(...VALID_BATCH_STATUSES).optional(),
+  status: Joi.string()
+    .valid(...VALID_BATCH_STATUSES)
+    .optional(),
   billing: AddressSchema.optional(),
-  shipping: AddressSchema.keys({ email: Joi.forbidden(), phone: Joi.forbidden() }).optional(),
-  line_items: Joi.array().items(LineItemSchema.keys({ id: Joi.number().optional() })).optional(),
-  shipping_lines: Joi.array().items(ShippingLineSchema.keys({ id: Joi.number().optional() })).optional(),
-  fee_lines: Joi.array().items(FeeLineSchema.keys({ id: Joi.number().optional() })).optional(),
-  coupon_lines: Joi.array().items(CouponLineSchema.keys({ id: Joi.number().optional() })).optional(),
+  shipping: AddressSchema.keys({
+    email: Joi.forbidden(),
+    phone: Joi.forbidden(),
+  }).optional(),
+  line_items: Joi.array()
+    .items(LineItemSchema.keys({ id: Joi.number().optional() }))
+    .optional(),
+  shipping_lines: Joi.array()
+    .items(ShippingLineSchema.keys({ id: Joi.number().optional() }))
+    .optional(),
+  fee_lines: Joi.array()
+    .items(FeeLineSchema.keys({ id: Joi.number().optional() }))
+    .optional(),
+  coupon_lines: Joi.array()
+    .items(CouponLineSchema.keys({ id: Joi.number().optional() }))
+    .optional(),
   customer_note: Joi.string().optional().allow(''),
   meta_data: Joi.array().items(MetaDataSchema).optional(),
 });

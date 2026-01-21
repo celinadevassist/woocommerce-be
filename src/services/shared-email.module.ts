@@ -8,20 +8,8 @@ import { MetadataModule } from '../common_metadata_module/module';
 
 @Global()
 @Module({
-  imports: [
-    ConfigModule,
-    LoggerModule,
-    MetadataModule,
-  ],
-  providers: [
-    EmailService,
-    MailerService,
-    MailrelayService,
-  ],
-  exports: [
-    EmailService,
-    MailerService,
-    MailrelayService,
-  ],
+  imports: [ConfigModule, LoggerModule, MetadataModule],
+  providers: [EmailService, MailerService, MailrelayService],
+  exports: [EmailService, MailerService, MailrelayService],
 })
 export class SharedEmailModule {}

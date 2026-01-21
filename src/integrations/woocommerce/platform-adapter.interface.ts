@@ -28,7 +28,9 @@ export interface IPlatformAdapter {
   /**
    * Test connection to the e-commerce platform
    */
-  testConnection(credentials: IPlatformCredentials): Promise<IConnectionTestResult>;
+  testConnection(
+    credentials: IPlatformCredentials,
+  ): Promise<IConnectionTestResult>;
 
   /**
    * Get products with pagination
@@ -42,12 +44,19 @@ export interface IPlatformAdapter {
   /**
    * Get a single product by external ID
    */
-  getProduct(credentials: IPlatformCredentials, externalId: number): Promise<any>;
+  getProduct(
+    credentials: IPlatformCredentials,
+    externalId: number,
+  ): Promise<any>;
 
   /**
    * Update a product on the platform
    */
-  updateProduct(credentials: IPlatformCredentials, externalId: number, data: any): Promise<any>;
+  updateProduct(
+    credentials: IPlatformCredentials,
+    externalId: number,
+    data: any,
+  ): Promise<any>;
 
   /**
    * Update product stock

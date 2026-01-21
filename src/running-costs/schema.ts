@@ -13,10 +13,18 @@ export class CostTemplate extends Document {
   @Prop({ trim: true, default: '' })
   description: string;
 
-  @Prop({ required: true, enum: Object.values(CostType), default: CostType.FIXED })
+  @Prop({
+    required: true,
+    enum: Object.values(CostType),
+    default: CostType.FIXED,
+  })
   type: CostType;
 
-  @Prop({ required: true, enum: Object.values(CostCategory), default: CostCategory.OTHER })
+  @Prop({
+    required: true,
+    enum: Object.values(CostCategory),
+    default: CostCategory.OTHER,
+  })
   category: CostCategory;
 
   @Prop({ required: true, default: 0, min: 0 })
@@ -47,10 +55,18 @@ export class CostEntry extends Document {
   @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop({ required: true, enum: Object.values(CostType), default: CostType.FIXED })
+  @Prop({
+    required: true,
+    enum: Object.values(CostType),
+    default: CostType.FIXED,
+  })
   type: CostType;
 
-  @Prop({ required: true, enum: Object.values(CostCategory), default: CostCategory.OTHER })
+  @Prop({
+    required: true,
+    enum: Object.values(CostCategory),
+    default: CostCategory.OTHER,
+  })
   category: CostCategory;
 
   @Prop({ required: true })

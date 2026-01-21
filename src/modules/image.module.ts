@@ -5,15 +5,13 @@ import { PassportModule } from '@nestjs/passport';
 import { ImageService } from 'src/services/image.service';
 import { HttpModule } from '@nestjs/axios/dist';
 
-
-
 @Module({
-    imports: [
-        PassportModule.register({ defaultStrategy: 'jwt' }),
-        MongooseModule.forFeature([{ name: 'Image', schema: ImageMongoSchema }]),
-        HttpModule,
-    ],
-    providers: [ImageService],
-    exports: [ImageService,],
+  imports: [
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    MongooseModule.forFeature([{ name: 'Image', schema: ImageMongoSchema }]),
+    HttpModule,
+  ],
+  providers: [ImageService],
+  exports: [ImageService],
 })
-export class ImageModule { }
+export class ImageModule {}

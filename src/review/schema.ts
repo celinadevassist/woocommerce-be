@@ -1,6 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { ReviewStatus, ReviewSource, ReviewType, ModerationStatus } from './enum';
+import {
+  ReviewStatus,
+  ReviewSource,
+  ReviewType,
+  ModerationStatus,
+} from './enum';
 import { ReviewPhoto, ReviewPhotoSchema } from './review-photo.schema';
 
 @Schema({ timestamps: true, versionKey: false, collection: 'reviews' })
@@ -10,7 +15,12 @@ export class Review extends Document {
   externalId?: number;
 
   // Store reference
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   // Product reference (optional for service/general reviews)
@@ -41,14 +51,26 @@ export class Review extends Document {
   verified: boolean;
 
   // Status
-  @Prop({ type: String, enum: Object.values(ReviewStatus), default: ReviewStatus.APPROVED })
+  @Prop({
+    type: String,
+    enum: Object.values(ReviewStatus),
+    default: ReviewStatus.APPROVED,
+  })
   status: ReviewStatus;
 
-  @Prop({ type: String, enum: Object.values(ReviewSource), default: ReviewSource.WOOCOMMERCE })
+  @Prop({
+    type: String,
+    enum: Object.values(ReviewSource),
+    default: ReviewSource.WOOCOMMERCE,
+  })
   source: ReviewSource;
 
   // Review type
-  @Prop({ type: String, enum: Object.values(ReviewType), default: ReviewType.PRODUCT })
+  @Prop({
+    type: String,
+    enum: Object.values(ReviewType),
+    default: ReviewType.PRODUCT,
+  })
   reviewType: ReviewType;
 
   // Photos
@@ -56,7 +78,11 @@ export class Review extends Document {
   photos: ReviewPhoto[];
 
   // Moderation
-  @Prop({ type: String, enum: Object.values(ModerationStatus), default: ModerationStatus.PENDING })
+  @Prop({
+    type: String,
+    enum: Object.values(ModerationStatus),
+    default: ModerationStatus.PENDING,
+  })
   moderationStatus: ModerationStatus;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
@@ -147,7 +173,10 @@ export type ReviewDocument = Review & Document;
 export const ReviewSchema = SchemaFactory.createForClass(Review);
 
 // Indexes
-ReviewSchema.index({ storeId: 1, externalId: 1 }, { unique: true, sparse: true });
+ReviewSchema.index(
+  { storeId: 1, externalId: 1 },
+  { unique: true, sparse: true },
+);
 ReviewSchema.index({ storeId: 1, productExternalId: 1 });
 ReviewSchema.index({ storeId: 1, status: 1 });
 ReviewSchema.index({ storeId: 1, createdAt: -1 });

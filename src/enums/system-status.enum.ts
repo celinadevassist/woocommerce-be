@@ -1,3 +1,4 @@
-export enum systemStatusEnum{
-  'ACTIVE'= 'ACTIVE', 'INACTIVE'= 'INACTIVE'
+export enum systemStatusEnum {
+  'ACTIVE' = 'ACTIVE',
+  'INACTIVE' = 'INACTIVE',
 }

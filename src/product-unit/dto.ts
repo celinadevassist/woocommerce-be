@@ -22,7 +22,9 @@ export const QueryProductUnitSchema = Joi.object({
   skuId: Joi.string().optional(),
   sku: Joi.string().optional(),
   batchId: Joi.string().optional(),
-  status: Joi.string().valid(...Object.values(ProductUnitStatus)).optional(),
+  status: Joi.string()
+    .valid(...Object.values(ProductUnitStatus))
+    .optional(),
   orderId: Joi.string().optional(),
   rfidCode: Joi.string().optional(),
   location: Joi.string().optional(),
@@ -40,7 +42,9 @@ export class UpdateUnitStatusDto {
 }
 
 export const UpdateUnitStatusSchema = Joi.object({
-  status: Joi.string().valid(...Object.values(ProductUnitStatus)).required(),
+  status: Joi.string()
+    .valid(...Object.values(ProductUnitStatus))
+    .required(),
   notes: Joi.string().optional().allow(''),
   location: Joi.string().optional().allow(''),
 });

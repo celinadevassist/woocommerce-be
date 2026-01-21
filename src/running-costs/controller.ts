@@ -11,7 +11,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { JoiValidationPipe } from '../pipes';
 import { User } from '../decorators';
 import { RunningCostsService } from './service';
@@ -53,7 +59,10 @@ export class RunningCostsController {
   @ApiQuery({ name: 'type', required: false })
   @ApiQuery({ name: 'isActive', required: false })
   @UsePipes(new JoiValidationPipe({ query: QueryCostTemplateSchema }))
-  async getTemplates(@User('_id') userId: string, @Query() query: QueryCostTemplateDto) {
+  async getTemplates(
+    @User('_id') userId: string,
+    @Query() query: QueryCostTemplateDto,
+  ) {
     return this.costsService.getTemplates(userId, query);
   }
 
@@ -114,7 +123,10 @@ export class RunningCostsController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'size', required: false, type: Number })
   @UsePipes(new JoiValidationPipe({ query: QueryCostEntrySchema }))
-  async getEntries(@User('_id') userId: string, @Query() query: QueryCostEntryDto) {
+  async getEntries(
+    @User('_id') userId: string,
+    @Query() query: QueryCostEntryDto,
+  ) {
     return this.costsService.getEntries(userId, query);
   }
 
@@ -180,7 +192,10 @@ export class RunningCostsController {
   @ApiOperation({ summary: 'Get cost summary for dashboard' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: true })
-  async getSummary(@User('_id') userId: string, @Query('storeId') storeId: string) {
+  async getSummary(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+  ) {
     return this.costsService.getCostSummary(userId, storeId);
   }
 
@@ -192,7 +207,10 @@ export class RunningCostsController {
   @ApiQuery({ name: 'startMonth', required: false })
   @ApiQuery({ name: 'endMonth', required: false })
   @UsePipes(new JoiValidationPipe({ query: QueryMonthlySummarySchema }))
-  async getMonthlySummaries(@User('_id') userId: string, @Query() query: QueryMonthlySummaryDto) {
+  async getMonthlySummaries(
+    @User('_id') userId: string,
+    @Query() query: QueryMonthlySummaryDto,
+  ) {
     return this.costsService.getMonthlySummaries(userId, query);
   }
 

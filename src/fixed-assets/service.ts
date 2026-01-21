@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { FixedAsset } from './schema';
@@ -24,7 +29,10 @@ export class FixedAssetsService {
   /**
    * Verify store access
    */
-  private async getStoreWithAccess(storeId: string, userId: string): Promise<any> {
+  private async getStoreWithAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<any> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       $or: [
@@ -50,15 +58,19 @@ export class FixedAssetsService {
   } {
     const purchaseDate = new Date(asset.purchaseDate);
     const now = new Date();
-    const monthsOwned = Math.max(0,
+    const monthsOwned = Math.max(
+      0,
       (now.getFullYear() - purchaseDate.getFullYear()) * 12 +
-      (now.getMonth() - purchaseDate.getMonth())
+        (now.getMonth() - purchaseDate.getMonth()),
     );
 
     const depreciableAmount = asset.purchaseCost - (asset.salvageValue || 0);
     const totalMonths = (asset.usefulLifeYears || 5) * 12;
 
-    if (asset.depreciationMethod === DepreciationMethod.NONE || depreciableAmount <= 0) {
+    if (
+      asset.depreciationMethod === DepreciationMethod.NONE ||
+      depreciableAmount <= 0
+    ) {
       return {
         currentBookValue: asset.purchaseCost,
         accumulatedDepreciation: 0,
@@ -71,15 +83,23 @@ export class FixedAssetsService {
 
     if (asset.depreciationMethod === DepreciationMethod.STRAIGHT_LINE) {
       monthlyDepreciation = depreciableAmount / totalMonths;
-      accumulatedDepreciation = Math.min(monthlyDepreciation * monthsOwned, depreciableAmount);
-    } else if (asset.depreciationMethod === DepreciationMethod.DECLINING_BALANCE) {
+      accumulatedDepreciation = Math.min(
+        monthlyDepreciation * monthsOwned,
+        depreciableAmount,
+      );
+    } else if (
+      asset.depreciationMethod === DepreciationMethod.DECLINING_BALANCE
+    ) {
       // Double declining balance method
-      const annualRate = (2 / (asset.usefulLifeYears || 5));
+      const annualRate = 2 / (asset.usefulLifeYears || 5);
       let bookValue = asset.purchaseCost;
       const yearsOwned = monthsOwned / 12;
 
       for (let year = 0; year < Math.floor(yearsOwned); year++) {
-        const yearDepreciation = Math.min(bookValue * annualRate, bookValue - (asset.salvageValue || 0));
+        const yearDepreciation = Math.min(
+          bookValue * annualRate,
+          bookValue - (asset.salvageValue || 0),
+        );
         accumulatedDepreciation += yearDepreciation;
         bookValue -= yearDepreciation;
       }
@@ -88,8 +108,8 @@ export class FixedAssetsService {
       const remainingMonths = monthsOwned % 12;
       if (remainingMonths > 0) {
         const partialDepreciation = Math.min(
-          (bookValue * annualRate) * (remainingMonths / 12),
-          bookValue - (asset.salvageValue || 0)
+          bookValue * annualRate * (remainingMonths / 12),
+          bookValue - (asset.salvageValue || 0),
         );
         accumulatedDepreciation += partialDepreciation;
       }
@@ -97,7 +117,10 @@ export class FixedAssetsService {
       monthlyDepreciation = accumulatedDepreciation / Math.max(monthsOwned, 1);
     }
 
-    const currentBookValue = Math.max(asset.purchaseCost - accumulatedDepreciation, asset.salvageValue || 0);
+    const currentBookValue = Math.max(
+      asset.purchaseCost - accumulatedDepreciation,
+      asset.salvageValue || 0,
+    );
 
     return {
       currentBookValue: Math.round(currentBookValue * 100) / 100,
@@ -121,7 +144,11 @@ export class FixedAssetsService {
   // CRUD Operations
   // ========================
 
-  async create(storeId: string, userId: string, dto: CreateFixedAssetDto): Promise<IAssetWithDepreciation> {
+  async create(
+    storeId: string,
+    userId: string,
+    dto: CreateFixedAssetDto,
+  ): Promise<IAssetWithDepreciation> {
     await this.getStoreWithAccess(storeId, userId);
 
     const storeObjectId = new Types.ObjectId(storeId);
@@ -151,15 +178,22 @@ export class FixedAssetsService {
       status: dto.status || AssetStatus.ACTIVE,
       location: dto.location || '',
       assignedTo: dto.assignedTo || '',
-      warranty: dto.warranty ? {
-        expiresAt: dto.warranty.expiresAt ? new Date(dto.warranty.expiresAt) : undefined,
-        provider: dto.warranty.provider || '',
-        notes: dto.warranty.notes || '',
-      } : undefined,
+      warranty: dto.warranty
+        ? {
+            expiresAt: dto.warranty.expiresAt
+              ? new Date(dto.warranty.expiresAt)
+              : undefined,
+            provider: dto.warranty.provider || '',
+            notes: dto.warranty.notes || '',
+          }
+        : undefined,
       usefulLifeYears: dto.usefulLifeYears || 5,
       salvageValue: dto.salvageValue || 0,
-      depreciationMethod: dto.depreciationMethod || DepreciationMethod.STRAIGHT_LINE,
-      nextServiceDate: dto.nextServiceDate ? new Date(dto.nextServiceDate) : undefined,
+      depreciationMethod:
+        dto.depreciationMethod || DepreciationMethod.STRAIGHT_LINE,
+      nextServiceDate: dto.nextServiceDate
+        ? new Date(dto.nextServiceDate)
+        : undefined,
       notes: dto.notes || '',
       createdBy: userObjectId,
     });
@@ -168,7 +202,10 @@ export class FixedAssetsService {
     return this.assetToResponse(asset);
   }
 
-  async findAll(userId: string, query: QueryFixedAssetDto): Promise<{
+  async findAll(
+    userId: string,
+    query: QueryFixedAssetDto,
+  ): Promise<{
     assets: IAssetWithDepreciation[];
     total: number;
     page: number;
@@ -199,19 +236,26 @@ export class FixedAssetsService {
     const skip = (page - 1) * size;
 
     const [assets, total] = await Promise.all([
-      this.assetModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(size),
+      this.assetModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(size),
       this.assetModel.countDocuments(filter),
     ]);
 
     return {
-      assets: assets.map(a => this.assetToResponse(a)),
+      assets: assets.map((a) => this.assetToResponse(a)),
       total,
       page,
       pages: Math.ceil(total / size),
     };
   }
 
-  async findById(userId: string, assetId: string): Promise<IAssetWithDepreciation> {
+  async findById(
+    userId: string,
+    assetId: string,
+  ): Promise<IAssetWithDepreciation> {
     const asset = await this.assetModel.findOne({
       _id: new Types.ObjectId(assetId),
       isDeleted: false,
@@ -226,7 +270,11 @@ export class FixedAssetsService {
     return this.assetToResponse(asset);
   }
 
-  async update(userId: string, assetId: string, dto: UpdateFixedAssetDto): Promise<IAssetWithDepreciation> {
+  async update(
+    userId: string,
+    assetId: string,
+    dto: UpdateFixedAssetDto,
+  ): Promise<IAssetWithDepreciation> {
     const asset = await this.assetModel.findOne({
       _id: new Types.ObjectId(assetId),
       isDeleted: false,
@@ -248,7 +296,9 @@ export class FixedAssetsService {
       });
 
       if (existing) {
-        throw new ConflictException(`Asset tag "${dto.assetTag}" already exists`);
+        throw new ConflictException(
+          `Asset tag "${dto.assetTag}" already exists`,
+        );
       }
     }
 
@@ -258,24 +308,33 @@ export class FixedAssetsService {
     if (dto.category !== undefined) asset.category = dto.category;
     if (dto.description !== undefined) asset.description = dto.description;
     if (dto.serialNumber !== undefined) asset.serialNumber = dto.serialNumber;
-    if (dto.purchaseDate !== undefined) asset.purchaseDate = new Date(dto.purchaseDate);
+    if (dto.purchaseDate !== undefined)
+      asset.purchaseDate = new Date(dto.purchaseDate);
     if (dto.purchaseCost !== undefined) asset.purchaseCost = dto.purchaseCost;
     if (dto.supplier !== undefined) asset.supplier = dto.supplier;
     if (dto.status !== undefined) asset.status = dto.status;
     if (dto.location !== undefined) asset.location = dto.location;
     if (dto.assignedTo !== undefined) asset.assignedTo = dto.assignedTo;
     if (dto.warranty !== undefined) {
-      asset.warranty = dto.warranty ? {
-        expiresAt: dto.warranty.expiresAt ? new Date(dto.warranty.expiresAt) : undefined,
-        provider: dto.warranty.provider || '',
-        notes: dto.warranty.notes || '',
-      } : undefined;
+      asset.warranty = dto.warranty
+        ? {
+            expiresAt: dto.warranty.expiresAt
+              ? new Date(dto.warranty.expiresAt)
+              : undefined,
+            provider: dto.warranty.provider || '',
+            notes: dto.warranty.notes || '',
+          }
+        : undefined;
     }
-    if (dto.usefulLifeYears !== undefined) asset.usefulLifeYears = dto.usefulLifeYears;
+    if (dto.usefulLifeYears !== undefined)
+      asset.usefulLifeYears = dto.usefulLifeYears;
     if (dto.salvageValue !== undefined) asset.salvageValue = dto.salvageValue;
-    if (dto.depreciationMethod !== undefined) asset.depreciationMethod = dto.depreciationMethod;
+    if (dto.depreciationMethod !== undefined)
+      asset.depreciationMethod = dto.depreciationMethod;
     if (dto.nextServiceDate !== undefined) {
-      asset.nextServiceDate = dto.nextServiceDate ? new Date(dto.nextServiceDate) : undefined;
+      asset.nextServiceDate = dto.nextServiceDate
+        ? new Date(dto.nextServiceDate)
+        : undefined;
     }
     if (dto.notes !== undefined) asset.notes = dto.notes;
 
@@ -307,7 +366,11 @@ export class FixedAssetsService {
   // Maintenance
   // ========================
 
-  async addMaintenanceLog(userId: string, assetId: string, dto: CreateMaintenanceLogDto): Promise<IAssetWithDepreciation> {
+  async addMaintenanceLog(
+    userId: string,
+    assetId: string,
+    dto: CreateMaintenanceLogDto,
+  ): Promise<IAssetWithDepreciation> {
     const asset = await this.assetModel.findOne({
       _id: new Types.ObjectId(assetId),
       isDeleted: false,
@@ -343,7 +406,11 @@ export class FixedAssetsService {
     return this.assetToResponse(asset);
   }
 
-  async deleteMaintenanceLog(userId: string, assetId: string, logId: string): Promise<IAssetWithDepreciation> {
+  async deleteMaintenanceLog(
+    userId: string,
+    assetId: string,
+    logId: string,
+  ): Promise<IAssetWithDepreciation> {
     const asset = await this.assetModel.findOne({
       _id: new Types.ObjectId(assetId),
       isDeleted: false,
@@ -356,7 +423,7 @@ export class FixedAssetsService {
     await this.getStoreWithAccess(asset.storeId.toString(), userId);
 
     const logIndex = asset.maintenanceHistory.findIndex(
-      (log: any) => log._id.toString() === logId
+      (log: any) => log._id.toString() === logId,
     );
 
     if (logIndex === -1) {
@@ -379,7 +446,9 @@ export class FixedAssetsService {
 
     const storeObjectId = new Types.ObjectId(storeId);
     const now = new Date();
-    const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const thirtyDaysFromNow = new Date(
+      now.getTime() + 30 * 24 * 60 * 60 * 1000,
+    );
 
     const assets = await this.assetModel.find({
       storeId: storeObjectId,
@@ -394,7 +463,7 @@ export class FixedAssetsService {
     let maintenanceDueCount = 0;
     let warrantyExpiringCount = 0;
 
-    assets.forEach(asset => {
+    assets.forEach((asset) => {
       const depreciation = this.calculateDepreciation(asset);
 
       totalPurchaseValue += asset.purchaseCost;
@@ -437,22 +506,29 @@ export class FixedAssetsService {
     };
   }
 
-  async getMaintenanceDue(userId: string, storeId: string): Promise<IAssetWithDepreciation[]> {
+  async getMaintenanceDue(
+    userId: string,
+    storeId: string,
+  ): Promise<IAssetWithDepreciation[]> {
     await this.getStoreWithAccess(storeId, userId);
 
-    const assets = await this.assetModel.find({
-      storeId: new Types.ObjectId(storeId),
-      isDeleted: false,
-      nextServiceDate: { $lte: new Date() },
-      status: { $ne: AssetStatus.DISPOSED },
-    }).sort({ nextServiceDate: 1 });
+    const assets = await this.assetModel
+      .find({
+        storeId: new Types.ObjectId(storeId),
+        isDeleted: false,
+        nextServiceDate: { $lte: new Date() },
+        status: { $ne: AssetStatus.DISPOSED },
+      })
+      .sort({ nextServiceDate: 1 });
 
-    return assets.map(a => this.assetToResponse(a));
+    return assets.map((a) => this.assetToResponse(a));
   }
 
-  async getCategories(): Promise<{ categories: { value: string; label: string }[] }> {
+  async getCategories(): Promise<{
+    categories: { value: string; label: string }[];
+  }> {
     const { AssetCategory } = await import('./enum');
-    const categories = Object.values(AssetCategory).map(c => ({
+    const categories = Object.values(AssetCategory).map((c) => ({
       value: c,
       label: c.charAt(0).toUpperCase() + c.slice(1),
     }));

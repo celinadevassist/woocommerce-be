@@ -76,9 +76,7 @@ export class StoreRoleGuard implements CanActivate {
     }
 
     // Find user's membership
-    const member = store.members?.find(
-      (m) => m.userId.toString() === userId,
-    );
+    const member = store.members?.find((m) => m.userId.toString() === userId);
 
     if (!member) {
       throw new ForbiddenException('You do not have access to this store');
@@ -95,7 +93,9 @@ export class StoreRoleGuard implements CanActivate {
 
     if (!hasRequiredRole) {
       throw new ForbiddenException(
-        `Insufficient permissions. Required role: ${requiredRoles.join(' or ')}`,
+        `Insufficient permissions. Required role: ${requiredRoles.join(
+          ' or ',
+        )}`,
       );
     }
 

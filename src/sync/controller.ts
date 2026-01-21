@@ -10,7 +10,13 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { SyncService } from './service';
 import { ScheduledSyncService } from './scheduled-sync.service';
 import { SyncJobType, SyncEntityType, SyncMode } from './enum';
@@ -37,7 +43,8 @@ export class SyncController {
     name: 'mode',
     required: false,
     enum: SyncMode,
-    description: 'Sync mode: "full" for all products, "delta" for only modified since last sync',
+    description:
+      'Sync mode: "full" for all products, "delta" for only modified since last sync',
   })
   @UsePipes(
     new JoiValidationPipe({
@@ -51,7 +58,12 @@ export class SyncController {
     @Query('mode') mode?: SyncMode,
   ) {
     const syncMode = mode === SyncMode.DELTA ? SyncMode.DELTA : SyncMode.FULL;
-    return await this.syncService.startProductSync(storeId, user._id.toString(), SyncJobType.MANUAL, syncMode);
+    return await this.syncService.startProductSync(
+      storeId,
+      user._id.toString(),
+      SyncJobType.MANUAL,
+      syncMode,
+    );
   }
 
   @Post('store/:storeId/orders')
@@ -62,7 +74,8 @@ export class SyncController {
     name: 'mode',
     required: false,
     enum: SyncMode,
-    description: 'Sync mode: "full" for all orders, "delta" for only modified since last sync',
+    description:
+      'Sync mode: "full" for all orders, "delta" for only modified since last sync',
   })
   @UsePipes(
     new JoiValidationPipe({
@@ -76,7 +89,12 @@ export class SyncController {
     @Query('mode') mode?: SyncMode,
   ) {
     const syncMode = mode === SyncMode.DELTA ? SyncMode.DELTA : SyncMode.FULL;
-    return await this.syncService.startOrderSync(storeId, user._id.toString(), SyncJobType.MANUAL, syncMode);
+    return await this.syncService.startOrderSync(
+      storeId,
+      user._id.toString(),
+      SyncJobType.MANUAL,
+      syncMode,
+    );
   }
 
   @Post('store/:storeId/customers')
@@ -93,7 +111,11 @@ export class SyncController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.syncService.startCustomerSync(storeId, user._id.toString(), SyncJobType.MANUAL);
+    return await this.syncService.startCustomerSync(
+      storeId,
+      user._id.toString(),
+      SyncJobType.MANUAL,
+    );
   }
 
   @Post('store/:storeId/reviews')
@@ -110,7 +132,11 @@ export class SyncController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.syncService.startReviewSync(storeId, user._id.toString(), SyncJobType.MANUAL);
+    return await this.syncService.startReviewSync(
+      storeId,
+      user._id.toString(),
+      SyncJobType.MANUAL,
+    );
   }
 
   @Post('store/:storeId/full')
@@ -120,7 +146,8 @@ export class SyncController {
     name: 'mode',
     required: false,
     enum: SyncMode,
-    description: 'Sync mode: "full" for all records, "delta" for only modified since last sync (products & orders only)',
+    description:
+      'Sync mode: "full" for all records, "delta" for only modified since last sync (products & orders only)',
   })
   @UsePipes(
     new JoiValidationPipe({
@@ -134,7 +161,11 @@ export class SyncController {
     @Query('mode') mode?: string,
   ) {
     const syncMode = mode === SyncMode.DELTA ? SyncMode.DELTA : SyncMode.FULL;
-    return await this.syncService.startFullSync(storeId, user._id.toString(), syncMode);
+    return await this.syncService.startFullSync(
+      storeId,
+      user._id.toString(),
+      syncMode,
+    );
   }
 
   @Post('job/:jobId/pause')
@@ -234,8 +265,8 @@ export class SyncController {
   )
   async getSyncJobs(
     @Param('storeId') storeId: string,
-    @Query('page') page: number = 1,
-    @Query('size') size: number = 10,
+    @Query('page') page = 1,
+    @Query('size') size = 10,
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {

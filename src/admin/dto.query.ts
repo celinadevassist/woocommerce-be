@@ -16,7 +16,9 @@ export const AdminQueryUsersSchema = Joi.object({
   size: Joi.number().min(1).max(100).default(20),
   keyword: Joi.string().optional().allow(''),
   role: Joi.string().valid('admin', 'user', '').optional().allow(''),
-  sortBy: Joi.string().valid('createdAt', 'email', 'firstName', 'lastName').default('createdAt'),
+  sortBy: Joi.string()
+    .valid('createdAt', 'email', 'firstName', 'lastName')
+    .default('createdAt'),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
 });
 
@@ -36,9 +38,17 @@ export const AdminQueryStoresSchema = Joi.object({
   size: Joi.number().min(1).max(100).default(20),
   keyword: Joi.string().optional().allow(''),
   platform: Joi.string().optional().allow(''),
-  status: Joi.string().valid('active', 'inactive', 'suspended', 'error', '').optional().allow(''),
-  subscriptionStatus: Joi.string().valid('active', 'suspended', 'cancelled', 'trial', '').optional().allow(''),
-  sortBy: Joi.string().valid('createdAt', 'name', 'status').default('createdAt'),
+  status: Joi.string()
+    .valid('active', 'inactive', 'suspended', 'error', '')
+    .optional()
+    .allow(''),
+  subscriptionStatus: Joi.string()
+    .valid('active', 'suspended', 'cancelled', 'trial', '')
+    .optional()
+    .allow(''),
+  sortBy: Joi.string()
+    .valid('createdAt', 'name', 'status')
+    .default('createdAt'),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
 });
 
@@ -55,8 +65,13 @@ export const AdminQuerySubscriptionsSchema = Joi.object({
   page: Joi.number().min(1).default(1),
   size: Joi.number().min(1).max(100).default(20),
   keyword: Joi.string().optional().allow(''),
-  status: Joi.string().valid('active', 'suspended', 'cancelled', 'trial', '').optional().allow(''),
-  sortBy: Joi.string().valid('createdAt', 'nextInvoiceDate', 'status').default('createdAt'),
+  status: Joi.string()
+    .valid('active', 'suspended', 'cancelled', 'trial', '')
+    .optional()
+    .allow(''),
+  sortBy: Joi.string()
+    .valid('createdAt', 'nextInvoiceDate', 'status')
+    .default('createdAt'),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
 });
 
@@ -76,10 +91,15 @@ export const AdminQueryInvoicesSchema = Joi.object({
   page: Joi.number().min(1).default(1),
   size: Joi.number().min(1).max(100).default(20),
   keyword: Joi.string().optional().allow(''),
-  status: Joi.string().valid('pending', 'paid', 'overdue', 'cancelled', '').optional().allow(''),
+  status: Joi.string()
+    .valid('pending', 'paid', 'overdue', 'cancelled', '')
+    .optional()
+    .allow(''),
   storeId: Joi.string().optional().allow(''),
   dateFrom: Joi.date().iso().optional(),
   dateTo: Joi.date().iso().optional(),
-  sortBy: Joi.string().valid('createdAt', 'dueDate', 'amount', 'status').default('createdAt'),
+  sortBy: Joi.string()
+    .valid('createdAt', 'dueDate', 'amount', 'status')
+    .default('createdAt'),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
 });

@@ -1,4 +1,10 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ProductUnit } from './schema';
@@ -66,7 +72,10 @@ export class ProductUnitService {
   /**
    * Verify store access
    */
-  private async getStoreWithAccess(storeId: string, userId: string): Promise<any> {
+  private async getStoreWithAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<any> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       $or: [
@@ -88,8 +97,14 @@ export class ProductUnitService {
    */
   async generateRfidCode(storeId: string, skuCode: string): Promise<string> {
     const storePrefix = storeId.substring(0, 6).toUpperCase();
-    const cleanSku = skuCode.replace(/[^a-zA-Z0-9-]/g, '').substring(0, 20).toUpperCase();
-    const timestamp = new Date().toISOString().replace(/[-:T.Z]/g, '').substring(0, 14);
+    const cleanSku = skuCode
+      .replace(/[^a-zA-Z0-9-]/g, '')
+      .substring(0, 20)
+      .toUpperCase();
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[-:T.Z]/g, '')
+      .substring(0, 14);
 
     // Find existing codes with same prefix to get next sequence
     const prefix = `${storePrefix}-${cleanSku}-${timestamp}`;
@@ -104,10 +119,20 @@ export class ProductUnitService {
   /**
    * Generate multiple RFID codes
    */
-  async generateBulkRfidCodes(storeId: string, skuCode: string, count: number): Promise<string[]> {
+  async generateBulkRfidCodes(
+    storeId: string,
+    skuCode: string,
+    count: number,
+  ): Promise<string[]> {
     const storePrefix = storeId.substring(0, 6).toUpperCase();
-    const cleanSku = skuCode.replace(/[^a-zA-Z0-9-]/g, '').substring(0, 20).toUpperCase();
-    const timestamp = new Date().toISOString().replace(/[-:T.Z]/g, '').substring(0, 14);
+    const cleanSku = skuCode
+      .replace(/[^a-zA-Z0-9-]/g, '')
+      .substring(0, 20)
+      .toUpperCase();
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[-:T.Z]/g, '')
+      .substring(0, 14);
     const prefix = `${storePrefix}-${cleanSku}-${timestamp}`;
 
     // Get current max sequence for this prefix
@@ -135,7 +160,9 @@ export class ProductUnitService {
   /**
    * Validate RFID codes are unique
    */
-  async validateRfidCodes(rfidCodes: string[]): Promise<{ valid: boolean; duplicates: string[] }> {
+  async validateRfidCodes(
+    rfidCodes: string[],
+  ): Promise<{ valid: boolean; duplicates: string[] }> {
     const existing = await this.unitModel
       .find({ rfidCode: { $in: rfidCodes } })
       .select('rfidCode')
@@ -151,20 +178,37 @@ export class ProductUnitService {
   /**
    * Create units from a production batch
    */
-  async createUnitsFromBatch(dto: CreateUnitsFromBatchDto): Promise<IBulkCreateResult> {
-    const { storeId, skuId, sku, productName, batchId, batchNumber, quantity, unitCost, rfidCodes, location } = dto;
+  async createUnitsFromBatch(
+    dto: CreateUnitsFromBatchDto,
+  ): Promise<IBulkCreateResult> {
+    const {
+      storeId,
+      skuId,
+      sku,
+      productName,
+      batchId,
+      batchNumber,
+      quantity,
+      unitCost,
+      rfidCodes,
+      location,
+    } = dto;
 
     let codes: string[];
 
     if (rfidCodes && rfidCodes.length > 0) {
       // Validate manual RFID codes
       if (rfidCodes.length !== quantity) {
-        throw new BadRequestException(`Number of RFID codes (${rfidCodes.length}) must match quantity (${quantity})`);
+        throw new BadRequestException(
+          `Number of RFID codes (${rfidCodes.length}) must match quantity (${quantity})`,
+        );
       }
 
       const validation = await this.validateRfidCodes(rfidCodes);
       if (!validation.valid) {
-        throw new ConflictException(`Duplicate RFID codes found: ${validation.duplicates.join(', ')}`);
+        throw new ConflictException(
+          `Duplicate RFID codes found: ${validation.duplicates.join(', ')}`,
+        );
       }
 
       codes = rfidCodes;
@@ -191,7 +235,9 @@ export class ProductUnitService {
 
     await this.unitModel.insertMany(units, { ordered: false });
 
-    this.logger.log(`Created ${quantity} product units for batch ${batchNumber}`);
+    this.logger.log(
+      `Created ${quantity} product units for batch ${batchNumber}`,
+    );
 
     return {
       created: quantity,
@@ -202,7 +248,11 @@ export class ProductUnitService {
   /**
    * Get available units for a SKU (FIFO - oldest first)
    */
-  async getAvailableUnits(storeId: string, skuId: string, limit?: number): Promise<IProductUnit[]> {
+  async getAvailableUnits(
+    storeId: string,
+    skuId: string,
+    limit?: number,
+  ): Promise<IProductUnit[]> {
     const query: any = {
       storeId: new Types.ObjectId(storeId),
       skuId: new Types.ObjectId(skuId),
@@ -223,7 +273,10 @@ export class ProductUnitService {
   /**
    * Find unit by RFID code
    */
-  async findByRfidCode(storeId: string, rfidCode: string): Promise<IProductUnit | null> {
+  async findByRfidCode(
+    storeId: string,
+    rfidCode: string,
+  ): Promise<IProductUnit | null> {
     const unit = await this.unitModel.findOne({
       storeId: new Types.ObjectId(storeId),
       rfidCode,
@@ -236,7 +289,10 @@ export class ProductUnitService {
   /**
    * Bulk lookup by RFID codes
    */
-  async findByRfidCodes(storeId: string, rfidCodes: string[]): Promise<IProductUnit[]> {
+  async findByRfidCodes(
+    storeId: string,
+    rfidCodes: string[],
+  ): Promise<IProductUnit[]> {
     const units = await this.unitModel.find({
       storeId: new Types.ObjectId(storeId),
       rfidCode: { $in: rfidCodes },
@@ -266,7 +322,12 @@ export class ProductUnitService {
    * Mark units as sold (direct sale from in_stock)
    * Automatically syncs Product Stock for affected SKUs
    */
-  async markAsSold(userId: string, unitIds: string[], orderId: string, orderNumber: string): Promise<IProductUnit[]> {
+  async markAsSold(
+    userId: string,
+    unitIds: string[],
+    orderId: string,
+    orderNumber: string,
+  ): Promise<IProductUnit[]> {
     const objectIds = unitIds.map((id) => new Types.ObjectId(id));
 
     // Verify all units are in_stock
@@ -293,7 +354,9 @@ export class ProductUnitService {
       },
     );
 
-    this.logger.log(`Marked ${units.length} units as sold for order ${orderNumber}`);
+    this.logger.log(
+      `Marked ${units.length} units as sold for order ${orderNumber}`,
+    );
 
     // Fetch updated units
     const updatedUnits = await this.unitModel.find({ _id: { $in: objectIds } });
@@ -304,7 +367,11 @@ export class ProductUnitService {
    * Put units on hold (temporarily unavailable)
    * Deducts from available stock, can be reversed via unholdUnits
    */
-  async holdUnits(userId: string, unitIds: string[], reason: string): Promise<IProductUnit[]> {
+  async holdUnits(
+    userId: string,
+    unitIds: string[],
+    reason: string,
+  ): Promise<IProductUnit[]> {
     const objectIds = unitIds.map((id) => new Types.ObjectId(id));
 
     // Verify all units are in_stock
@@ -315,9 +382,11 @@ export class ProductUnitService {
     });
 
     if (units.length !== unitIds.length) {
-      const foundIds = units.map(u => u._id.toString());
-      const missingIds = unitIds.filter(id => !foundIds.includes(id));
-      throw new BadRequestException(`Some units are not available to hold. Missing or invalid: ${missingIds.length} units`);
+      const foundIds = units.map((u) => u._id.toString());
+      const missingIds = unitIds.filter((id) => !foundIds.includes(id));
+      throw new BadRequestException(
+        `Some units are not available to hold. Missing or invalid: ${missingIds.length} units`,
+      );
     }
 
     // Mark all units as hold
@@ -333,7 +402,9 @@ export class ProductUnitService {
       },
     );
 
-    this.logger.log(`Placed ${units.length} units on hold by user ${userId}: ${reason}`);
+    this.logger.log(
+      `Placed ${units.length} units on hold by user ${userId}: ${reason}`,
+    );
 
     // Fetch updated units
     const updatedUnits = await this.unitModel.find({ _id: { $in: objectIds } });
@@ -344,7 +415,10 @@ export class ProductUnitService {
    * Release units from hold back to in_stock
    * Restores units to available stock
    */
-  async unholdUnits(userId: string, unitIds: string[]): Promise<IProductUnit[]> {
+  async unholdUnits(
+    userId: string,
+    unitIds: string[],
+  ): Promise<IProductUnit[]> {
     const objectIds = unitIds.map((id) => new Types.ObjectId(id));
 
     // Verify all units are on hold
@@ -373,7 +447,9 @@ export class ProductUnitService {
       },
     );
 
-    this.logger.log(`Released ${units.length} units from hold by user ${userId}`);
+    this.logger.log(
+      `Released ${units.length} units from hold by user ${userId}`,
+    );
 
     // Fetch updated units
     const updatedUnits = await this.unitModel.find({ _id: { $in: objectIds } });
@@ -384,7 +460,11 @@ export class ProductUnitService {
    * Mark units as damaged (permanent, cannot be reversed)
    * Deducts from available stock permanently
    */
-  async markAsDamaged(userId: string, unitIds: string[], reason: string): Promise<IProductUnit[]> {
+  async markAsDamaged(
+    userId: string,
+    unitIds: string[],
+    reason: string,
+  ): Promise<IProductUnit[]> {
     const objectIds = unitIds.map((id) => new Types.ObjectId(id));
 
     // Can mark in_stock or hold units as damaged
@@ -395,7 +475,9 @@ export class ProductUnitService {
     });
 
     if (units.length !== unitIds.length) {
-      throw new BadRequestException('Some units cannot be marked as damaged (may be sold or already damaged)');
+      throw new BadRequestException(
+        'Some units cannot be marked as damaged (may be sold or already damaged)',
+      );
     }
 
     // Mark all units as damaged
@@ -416,7 +498,9 @@ export class ProductUnitService {
       },
     );
 
-    this.logger.log(`Marked ${units.length} units as damaged by user ${userId}: ${reason}`);
+    this.logger.log(
+      `Marked ${units.length} units as damaged by user ${userId}: ${reason}`,
+    );
 
     // Fetch updated units
     const updatedUnits = await this.unitModel.find({ _id: { $in: objectIds } });
@@ -459,7 +543,11 @@ export class ProductUnitService {
    * Update unit location only
    * Status changes must go through specific methods (holdUnits, unholdUnits, markAsDamaged)
    */
-  async updateUnitLocation(userId: string, unitId: string, location: string): Promise<IProductUnit> {
+  async updateUnitLocation(
+    userId: string,
+    unitId: string,
+    location: string,
+  ): Promise<IProductUnit> {
     const unit = await this.unitModel.findOne({
       _id: new Types.ObjectId(unitId),
       isDeleted: false,
@@ -486,7 +574,11 @@ export class ProductUnitService {
    * - markAsSold() - for sales (via order confirmation)
    * - releaseFromOrder() - for order cancellation
    */
-  async updateUnitStatus(userId: string, unitId: string, dto: UpdateUnitStatusDto): Promise<IProductUnit> {
+  async updateUnitStatus(
+    userId: string,
+    unitId: string,
+    dto: UpdateUnitStatusDto,
+  ): Promise<IProductUnit> {
     const unit = await this.unitModel.findOne({
       _id: new Types.ObjectId(unitId),
       isDeleted: false,
@@ -520,10 +612,12 @@ export class ProductUnitService {
    * Get units by batch (traceability)
    */
   async getUnitsByBatch(batchId: string): Promise<IProductUnit[]> {
-    const units = await this.unitModel.find({
-      batchId: new Types.ObjectId(batchId),
-      isDeleted: false,
-    }).sort({ createdAt: 1 });
+    const units = await this.unitModel
+      .find({
+        batchId: new Types.ObjectId(batchId),
+        isDeleted: false,
+      })
+      .sort({ createdAt: 1 });
 
     return units.map((u) => this.toInterface(u));
   }
@@ -543,7 +637,10 @@ export class ProductUnitService {
   /**
    * Get unit counts by status for a SKU
    */
-  async getUnitCountsByStatus(storeId: string, skuId: string): Promise<IProductUnitCountsByStatus> {
+  async getUnitCountsByStatus(
+    storeId: string,
+    skuId: string,
+  ): Promise<IProductUnitCountsByStatus> {
     const results = await this.unitModel.aggregate([
       {
         $match: {
@@ -591,7 +688,11 @@ export class ProductUnitService {
   /**
    * List units with filters and pagination
    */
-  async findAll(storeId: string, userId: string, query: QueryProductUnitDto): Promise<IProductUnitListResponse> {
+  async findAll(
+    storeId: string,
+    userId: string,
+    query: QueryProductUnitDto,
+  ): Promise<IProductUnitListResponse> {
     await this.getStoreWithAccess(storeId, userId);
 
     const filter: any = {
@@ -635,7 +736,12 @@ export class ProductUnitService {
     const skip = (page - 1) * size;
 
     const [units, total] = await Promise.all([
-      this.unitModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(size).lean(),
+      this.unitModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(size)
+        .lean(),
       this.unitModel.countDocuments(filter),
     ]);
 
@@ -671,14 +777,19 @@ export class ProductUnitService {
   /**
    * Get stock summary across all SKUs
    */
-  async getStockSummary(userId: string, storeId: string): Promise<IStockSummary> {
+  async getStockSummary(
+    userId: string,
+    storeId: string,
+  ): Promise<IStockSummary> {
     await this.getStoreWithAccess(storeId, userId);
 
     // Get all SKUs with their settings
-    const skus = await this.skuModel.find({
-      storeId: new Types.ObjectId(storeId),
-      isDeleted: false,
-    }).lean();
+    const skus = await this.skuModel
+      .find({
+        storeId: new Types.ObjectId(storeId),
+        isDeleted: false,
+      })
+      .lean();
 
     // Aggregate unit counts by SKU
     const unitCounts = await this.unitModel.aggregate([
@@ -705,7 +816,10 @@ export class ProductUnitService {
     let outOfStock = 0;
 
     // Create map of SKU -> counts
-    const skuCounts = new Map<string, { in_stock: number; total: number; value: number }>();
+    const skuCounts = new Map<
+      string,
+      { in_stock: number; total: number; value: number }
+    >();
 
     for (const item of unitCounts) {
       const skuId = item._id.skuId.toString();
@@ -725,7 +839,11 @@ export class ProductUnitService {
 
     // Classify SKUs
     for (const sku of skus) {
-      const counts = skuCounts.get(sku._id.toString()) || { in_stock: 0, total: 0, value: 0 };
+      const counts = skuCounts.get(sku._id.toString()) || {
+        in_stock: 0,
+        total: 0,
+        value: 0,
+      };
       const minLevel = sku.minStockLevel || 0;
 
       if (counts.in_stock === 0) {
@@ -809,7 +927,9 @@ export class ProductUnitService {
       const skuId = sku._id.toString();
 
       // Get counts for this SKU
-      const skuUnits = unitAggregation.filter((u) => u._id.skuId.toString() === skuId);
+      const skuUnits = unitAggregation.filter(
+        (u) => u._id.skuId.toString() === skuId,
+      );
 
       let currentStock = 0;
       let holdStock = 0;
@@ -902,28 +1022,43 @@ export class ProductUnitService {
   /**
    * Get low stock items (for alerts)
    */
-  async getLowStockItems(userId: string, storeId: string): Promise<IStockItem[]> {
-    const result = await this.getStockList(userId, storeId, { status: 'low_stock', size: 100 });
+  async getLowStockItems(
+    userId: string,
+    storeId: string,
+  ): Promise<IStockItem[]> {
+    const result = await this.getStockList(userId, storeId, {
+      status: 'low_stock',
+      size: 100,
+    });
     return result.items;
   }
 
   /**
    * Get stock for a specific SKU
    */
-  async getStockBySku(userId: string, storeId: string, skuCode: string): Promise<IStockItem | null> {
+  async getStockBySku(
+    userId: string,
+    storeId: string,
+    skuCode: string,
+  ): Promise<IStockItem | null> {
     await this.getStoreWithAccess(storeId, userId);
 
-    const sku = await this.skuModel.findOne({
-      storeId: new Types.ObjectId(storeId),
-      sku: skuCode,
-      isDeleted: false,
-    }).lean();
+    const sku = await this.skuModel
+      .findOne({
+        storeId: new Types.ObjectId(storeId),
+        sku: skuCode,
+        isDeleted: false,
+      })
+      .lean();
 
     if (!sku) {
       return null;
     }
 
-    const result = await this.getStockList(userId, storeId, { keyword: skuCode, size: 1 });
+    const result = await this.getStockList(userId, storeId, {
+      keyword: skuCode,
+      size: 1,
+    });
     return result.items[0] || null;
   }
 }

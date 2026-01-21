@@ -42,9 +42,10 @@ export class BusinessErrorFilter implements ExceptionFilter {
 
       errorResponse = {
         statusCode: status,
-        message: typeof exceptionResponse === 'string'
-          ? exceptionResponse
-          : (exceptionResponse as any).message || exception.message,
+        message:
+          typeof exceptionResponse === 'string'
+            ? exceptionResponse
+            : (exceptionResponse as any).message || exception.message,
         timestamp: new Date().toISOString(),
         path: request.url,
       };

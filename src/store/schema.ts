@@ -1,6 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { StorePlatform, StoreStatus, SyncStatus, StoreMemberRole } from './enum';
+import {
+  StorePlatform,
+  StoreStatus,
+  SyncStatus,
+  StoreMemberRole,
+} from './enum';
 
 // Sub-schema for sync status per entity type
 @Schema({ _id: false })
@@ -8,7 +13,11 @@ export class SyncStatusDetail {
   @Prop()
   lastSync?: Date;
 
-  @Prop({ type: String, enum: Object.values(SyncStatus), default: SyncStatus.IDLE })
+  @Prop({
+    type: String,
+    enum: Object.values(SyncStatus),
+    default: SyncStatus.IDLE,
+  })
   status: SyncStatus;
 
   @Prop({ default: 0 })
@@ -18,7 +27,8 @@ export class SyncStatusDetail {
   error?: string;
 }
 
-export const SyncStatusDetailSchema = SchemaFactory.createForClass(SyncStatusDetail);
+export const SyncStatusDetailSchema =
+  SchemaFactory.createForClass(SyncStatusDetail);
 
 // Sub-schema for store settings
 @Schema({ _id: false })
@@ -68,7 +78,8 @@ export class StoreCredentials {
   wpAppPassword?: string;
 }
 
-export const StoreCredentialsSchema = SchemaFactory.createForClass(StoreCredentials);
+export const StoreCredentialsSchema =
+  SchemaFactory.createForClass(StoreCredentials);
 
 // Sub-schema for store members
 @Schema({ _id: false })
@@ -87,7 +98,12 @@ export const StoreMemberSchema = SchemaFactory.createForClass(StoreMember);
 
 @Schema({ timestamps: true, versionKey: false, collection: 'stores' })
 export class Store extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    index: true,
+  })
   ownerId: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: [StoreMemberSchema], default: [] })
@@ -96,7 +112,11 @@ export class Store extends Document {
   @Prop({ required: true, trim: true })
   name: string;
 
-  @Prop({ type: String, enum: Object.values(StorePlatform), default: StorePlatform.WOOCOMMERCE })
+  @Prop({
+    type: String,
+    enum: Object.values(StorePlatform),
+    default: StorePlatform.WOOCOMMERCE,
+  })
   platform: StorePlatform;
 
   @Prop({ required: true })
@@ -105,7 +125,11 @@ export class Store extends Document {
   @Prop({ type: StoreCredentialsSchema, select: false }) // Don't include credentials by default
   credentials: StoreCredentials;
 
-  @Prop({ type: String, enum: Object.values(StoreStatus), default: StoreStatus.CONNECTING })
+  @Prop({
+    type: String,
+    enum: Object.values(StoreStatus),
+    default: StoreStatus.CONNECTING,
+  })
   status: StoreStatus;
 
   @Prop()

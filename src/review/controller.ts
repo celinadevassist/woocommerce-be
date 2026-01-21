@@ -17,10 +17,24 @@ import {
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiParam, ApiQuery, ApiResponse, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
 import { ReviewService } from './service';
 import { QueryReviewDto, QueryReviewSchema } from './dto.query';
-import { UpdateReviewDto, UpdateReviewSchema, ReplyReviewDto, ReplyReviewSchema } from './dto.update';
+import {
+  UpdateReviewDto,
+  UpdateReviewSchema,
+  ReplyReviewDto,
+  ReplyReviewSchema,
+} from './dto.update';
 import {
   CreateReviewDto,
   CreateReviewSchema,
@@ -44,7 +58,12 @@ import {
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
 import { User } from '../decorators/user.decorator';
 import { LanguageSchema } from '../dtos/lang.dto';
-import { ReviewStatus, ReviewType, ReviewSource, ModerationStatus } from './enum';
+import {
+  ReviewStatus,
+  ReviewType,
+  ReviewSource,
+  ModerationStatus,
+} from './enum';
 import { UploadedFile as UploadedFileType } from '../modules/s3-upload/s3-upload.service';
 import { Multer } from 'multer';
 
@@ -67,7 +86,12 @@ export class ReviewController {
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'size', required: false, type: Number })
-  @UsePipes(new JoiValidationPipe({ query: QueryReviewSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      query: QueryReviewSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async findAll(@User('_id') userId: string, @Query() query: QueryReviewDto) {
     return this.reviewService.findAll(userId, query);
   }
@@ -77,7 +101,10 @@ export class ReviewController {
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: false })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
-  async getStats(@User('_id') userId: string, @Query('storeId') storeId?: string) {
+  async getStats(
+    @User('_id') userId: string,
+    @Query('storeId') storeId?: string,
+  ) {
     return this.reviewService.getStats(userId, storeId);
   }
 
@@ -86,7 +113,10 @@ export class ReviewController {
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: false })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
-  async getNewReviews(@User('_id') userId: string, @Query('storeId') storeId?: string) {
+  async getNewReviews(
+    @User('_id') userId: string,
+    @Query('storeId') storeId?: string,
+  ) {
     return this.reviewService.getNewReviewsCount(userId, storeId);
   }
 
@@ -94,7 +124,11 @@ export class ReviewController {
   @ApiOperation({ summary: 'Get review analytics and trends' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: false })
-  @ApiQuery({ name: 'period', required: false, enum: ['week', 'month', 'quarter', 'year'] })
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    enum: ['week', 'month', 'quarter', 'year'],
+  })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
   async getAnalytics(
     @User('_id') userId: string,
@@ -107,17 +141,29 @@ export class ReviewController {
   @Get('export')
   @ApiOperation({ summary: 'Export reviews to CSV' })
   @ApiResponse({ status: 200, description: 'Returns CSV file' })
-  @UsePipes(new JoiValidationPipe({ query: QueryReviewSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      query: QueryReviewSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async exportCsv(
     @User('_id') userId: string,
     @Query() query: QueryReviewDto,
     @Res() res: Response,
   ): Promise<void> {
     const csv = await this.reviewService.exportToCsv(userId, query);
-    const filename = `reviews-export-${new Date().toISOString().split('T')[0]}.csv`;
+    const filename = `reviews-export-${
+      new Date().toISOString().split('T')[0]
+    }.csv`;
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(
+        filename,
+      )}`,
+    );
     res.send(csv);
   }
 
@@ -134,7 +180,12 @@ export class ReviewController {
   @ApiOperation({ summary: 'Update review' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Review ID' })
-  @UsePipes(new JoiValidationPipe({ body: UpdateReviewSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: UpdateReviewSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async update(
     @User('_id') userId: string,
     @Param('id') id: string,
@@ -147,7 +198,12 @@ export class ReviewController {
   @ApiOperation({ summary: 'Reply to a review' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Review ID' })
-  @UsePipes(new JoiValidationPipe({ body: ReplyReviewSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: ReplyReviewSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async reply(
     @User('_id') userId: string,
     @Param('id') id: string,
@@ -173,7 +229,12 @@ export class ReviewController {
   @Post('templates')
   @ApiOperation({ summary: 'Create a response template' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
-  @UsePipes(new JoiValidationPipe({ body: CreateResponseTemplateSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: CreateResponseTemplateSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async createTemplate(
     @User('_id') userId: string,
     @Body() dto: CreateResponseTemplateDto,
@@ -185,7 +246,12 @@ export class ReviewController {
   @ApiOperation({ summary: 'Update a response template' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'templateId', description: 'Template ID' })
-  @UsePipes(new JoiValidationPipe({ body: UpdateResponseTemplateSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: UpdateResponseTemplateSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async updateTemplate(
     @User('_id') userId: string,
     @Param('templateId') templateId: string,
@@ -222,7 +288,11 @@ export class ReviewController {
   @Post('sync-ratings')
   @ApiOperation({ summary: 'Sync average ratings to all products' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
-  @ApiQuery({ name: 'storeId', required: false, description: 'Limit sync to specific store' })
+  @ApiQuery({
+    name: 'storeId',
+    required: false,
+    description: 'Limit sync to specific store',
+  })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
   async syncRatings(
     @User('_id') userId: string,
@@ -237,7 +307,12 @@ export class ReviewController {
   @ApiOperation({ summary: 'Create a manual review' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: true, description: 'Store ID' })
-  @UsePipes(new JoiValidationPipe({ body: CreateReviewSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: CreateReviewSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async createManualReview(
     @User('_id') userId: string,
     @Query('storeId') storeId: string,
@@ -276,7 +351,12 @@ export class ReviewController {
       mimetype: file.mimetype,
       size: file.size,
     };
-    return this.reviewService.uploadPhoto(reviewId, userId, uploadedFile, caption);
+    return this.reviewService.uploadPhoto(
+      reviewId,
+      userId,
+      uploadedFile,
+      caption,
+    );
   }
 
   @Delete(':id/photos/:photoId')
@@ -297,7 +377,12 @@ export class ReviewController {
   @ApiOperation({ summary: 'Reorder photos in a review' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Review ID' })
-  @UsePipes(new JoiValidationPipe({ body: ReorderPhotosSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: ReorderPhotosSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async reorderPhotos(
     @User('_id') userId: string,
     @Param('id') reviewId: string,
@@ -321,7 +406,12 @@ export class ReviewController {
   @ApiOperation({ summary: 'Reject a review' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Review ID' })
-  @UsePipes(new JoiValidationPipe({ body: RejectReviewSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: RejectReviewSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async reject(
     @User('_id') userId: string,
     @Param('id') reviewId: string,
@@ -334,27 +424,49 @@ export class ReviewController {
   @ApiOperation({ summary: 'Flag a review for further review' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Review ID' })
-  @UsePipes(new JoiValidationPipe({ body: RejectReviewSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: RejectReviewSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async flag(
     @User('_id') userId: string,
     @Param('id') reviewId: string,
     @Body() dto: RejectReviewDto,
   ) {
-    return this.reviewService.flag(reviewId, userId, dto.reason || 'Flagged for review');
+    return this.reviewService.flag(
+      reviewId,
+      userId,
+      dto.reason || 'Flagged for review',
+    );
   }
 
   @Post('bulk-approve')
   @ApiOperation({ summary: 'Bulk approve reviews' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
-  @UsePipes(new JoiValidationPipe({ body: BulkReviewIdsSchema, param: { lang: LanguageSchema } }))
-  async bulkApprove(@User('_id') userId: string, @Body() dto: BulkReviewIdsDto) {
+  @UsePipes(
+    new JoiValidationPipe({
+      body: BulkReviewIdsSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async bulkApprove(
+    @User('_id') userId: string,
+    @Body() dto: BulkReviewIdsDto,
+  ) {
     return this.reviewService.bulkApprove(dto.reviewIds, userId);
   }
 
   @Post('bulk-reject')
   @ApiOperation({ summary: 'Bulk reject reviews' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
-  @UsePipes(new JoiValidationPipe({ body: BulkReviewIdsSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: BulkReviewIdsSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async bulkReject(@User('_id') userId: string, @Body() dto: BulkReviewIdsDto) {
     return this.reviewService.bulkReject(dto.reviewIds, userId, dto.reason);
   }
@@ -382,8 +494,16 @@ export class ReviewController {
   @Post('bulk-publish')
   @ApiOperation({ summary: 'Bulk publish reviews' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
-  @UsePipes(new JoiValidationPipe({ body: BulkReviewIdsSchema, param: { lang: LanguageSchema } }))
-  async bulkPublish(@User('_id') userId: string, @Body() dto: BulkReviewIdsDto) {
+  @UsePipes(
+    new JoiValidationPipe({
+      body: BulkReviewIdsSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async bulkPublish(
+    @User('_id') userId: string,
+    @Body() dto: BulkReviewIdsDto,
+  ) {
     return this.reviewService.bulkPublish(dto.reviewIds, userId);
   }
 
@@ -391,7 +511,12 @@ export class ReviewController {
   @ApiOperation({ summary: 'Feature a review' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Review ID' })
-  @UsePipes(new JoiValidationPipe({ body: FeatureReviewSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: FeatureReviewSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async feature(
     @User('_id') userId: string,
     @Param('id') reviewId: string,

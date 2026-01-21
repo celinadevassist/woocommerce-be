@@ -11,7 +11,13 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ReviewRequestService } from './service';
 import {
   QueryReviewRequestDto,
@@ -40,8 +46,16 @@ export class ReviewRequestController {
   @ApiQuery({ name: 'status', enum: ReviewRequestStatus, required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'size', required: false, type: Number })
-  @UsePipes(new JoiValidationPipe({ query: QueryReviewRequestSchema, param: { lang: LanguageSchema } }))
-  async findAll(@User('_id') userId: string, @Query() query: QueryReviewRequestDto) {
+  @UsePipes(
+    new JoiValidationPipe({
+      query: QueryReviewRequestSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async findAll(
+    @User('_id') userId: string,
+    @Query() query: QueryReviewRequestDto,
+  ) {
     return this.reviewRequestService.findAll(userId, query);
   }
 
@@ -50,7 +64,10 @@ export class ReviewRequestController {
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: false })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
-  async getStats(@User('_id') userId: string, @Query('storeId') storeId?: string) {
+  async getStats(
+    @User('_id') userId: string,
+    @Query('storeId') storeId?: string,
+  ) {
     return this.reviewRequestService.getStats(userId, storeId);
   }
 
@@ -70,7 +87,12 @@ export class ReviewRequestController {
   @ApiOperation({ summary: 'Update review request settings for a store' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'storeId', description: 'Store ID' })
-  @UsePipes(new JoiValidationPipe({ body: UpdateReviewRequestSettingsSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: UpdateReviewRequestSettingsSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async updateSettings(
     @User('_id') userId: string,
     @Param('storeId') storeId: string,
@@ -91,7 +113,12 @@ export class ReviewRequestController {
   @Post('trigger')
   @ApiOperation({ summary: 'Manually trigger a review request for an order' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
-  @UsePipes(new JoiValidationPipe({ body: ManualTriggerSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: ManualTriggerSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async manualTrigger(
     @User('_id') userId: string,
     @Body() dto: ManualTriggerDto,

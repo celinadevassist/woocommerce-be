@@ -1,4 +1,9 @@
-import { OrderStatus, PaymentStatus, FulfillmentStatus, OrderSource } from './enum';
+import {
+  OrderStatus,
+  PaymentStatus,
+  FulfillmentStatus,
+  OrderSource,
+} from './enum';
 import { OrderItemStockStatus } from '../order-item/enum';
 
 export interface IOrderAddress {

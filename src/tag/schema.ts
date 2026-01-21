@@ -3,7 +3,12 @@ import { Document, Schema as MongooseSchema } from 'mongoose';
 
 @Schema({ timestamps: true, versionKey: false, collection: 'tags' })
 export class Tag extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true, index: true })

@@ -414,7 +414,10 @@ export interface WooProductUpdatePayload {
   status?: 'draft' | 'pending' | 'private' | 'publish';
   categories?: { id: number }[];
   tags?: { id: number }[];
-  images?: ({ id: number; alt?: string; position?: number } | { src: string; alt?: string; position?: number })[];
+  images?: (
+    | { id: number; alt?: string; position?: number }
+    | { src: string; alt?: string; position?: number }
+  )[];
 }
 
 export interface WooStockUpdatePayload {

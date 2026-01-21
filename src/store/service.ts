@@ -14,7 +14,12 @@ import { Store, StoreDocument, StoreMember } from './schema';
 import { CreateStoreDto } from './dto.create';
 import { UpdateStoreDto, UpdateCredentialsDto } from './dto.update';
 import { QueryStoreDto } from './dto.query';
-import { IStore, IStoreResponse, IConnectionTestResult, IStoreMember } from './interface';
+import {
+  IStore,
+  IStoreResponse,
+  IConnectionTestResult,
+  IStoreMember,
+} from './interface';
 import { StoreStatus, SyncStatus, StoreMemberRole } from './enum';
 import { UserDocument } from '../schema/user.schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
@@ -83,7 +88,9 @@ export class StoreService {
       );
     } catch (error) {
       // Log error but don't fail store creation
-      console.error(`Failed to create subscription for store ${store._id}: ${error.message}`);
+      console.error(
+        `Failed to create subscription for store ${store._id}: ${error.message}`,
+      );
     }
 
     return this.toInterface(store);
@@ -92,15 +99,15 @@ export class StoreService {
   /**
    * Get stores for user (owned or member of)
    */
-  async findByUser(userId: string, query: QueryStoreDto): Promise<IStoreResponse> {
+  async findByUser(
+    userId: string,
+    query: QueryStoreDto,
+  ): Promise<IStoreResponse> {
     const userObjectId = new Types.ObjectId(userId);
 
     const filter: any = {
       isDeleted: false,
-      $or: [
-        { ownerId: userObjectId },
-        { 'members.userId': userObjectId },
-      ],
+      $or: [{ ownerId: userObjectId }, { 'members.userId': userObjectId }],
     };
 
     // Apply additional filters
@@ -113,10 +120,7 @@ export class StoreService {
     if (query.keyword) {
       filter.$and = [
         {
-          $or: [
-            { ownerId: userObjectId },
-            { 'members.userId': userObjectId },
-          ],
+          $or: [{ ownerId: userObjectId }, { 'members.userId': userObjectId }],
         },
         {
           $or: [
@@ -202,7 +206,11 @@ export class StoreService {
         };
 
         // Add user info if populated
-        if (member.userId && typeof member.userId === 'object' && member.userId.email) {
+        if (
+          member.userId &&
+          typeof member.userId === 'object' &&
+          member.userId.email
+        ) {
           memberData.user = {
             _id: member.userId._id?.toString(),
             firstName: member.userId.firstName,
@@ -221,7 +229,11 @@ export class StoreService {
   /**
    * Update store settings
    */
-  async update(id: string, userId: string, dto: UpdateStoreDto): Promise<IStore> {
+  async update(
+    id: string,
+    userId: string,
+    dto: UpdateStoreDto,
+  ): Promise<IStore> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(id),
       isDeleted: false,
@@ -232,13 +244,19 @@ export class StoreService {
     }
 
     // Verify user has access (at least manager role)
-    this.verifyStoreAccess(store, userId, [StoreMemberRole.OWNER, StoreMemberRole.ADMIN, StoreMemberRole.MANAGER]);
+    this.verifyStoreAccess(store, userId, [
+      StoreMemberRole.OWNER,
+      StoreMemberRole.ADMIN,
+      StoreMemberRole.MANAGER,
+    ]);
 
     // Update fields
     if (dto.name) store.name = dto.name;
     if (dto.autoSync !== undefined) store.settings.autoSync = dto.autoSync;
-    if (dto.syncInterval !== undefined) store.settings.syncInterval = dto.syncInterval;
-    if (dto.lowStockThreshold !== undefined) store.settings.lowStockThreshold = dto.lowStockThreshold;
+    if (dto.syncInterval !== undefined)
+      store.settings.syncInterval = dto.syncInterval;
+    if (dto.lowStockThreshold !== undefined)
+      store.settings.lowStockThreshold = dto.lowStockThreshold;
     if (dto.timezone) store.settings.timezone = dto.timezone;
 
     await store.save();
@@ -248,7 +266,11 @@ export class StoreService {
   /**
    * Update store credentials
    */
-  async updateCredentials(id: string, userId: string, dto: UpdateCredentialsDto): Promise<IStore> {
+  async updateCredentials(
+    id: string,
+    userId: string,
+    dto: UpdateCredentialsDto,
+  ): Promise<IStore> {
     const store = await this.storeModel
       .findOne({
         _id: new Types.ObjectId(id),
@@ -261,15 +283,21 @@ export class StoreService {
     }
 
     // Only owner and admin can update credentials
-    this.verifyStoreAccess(store, userId, [StoreMemberRole.OWNER, StoreMemberRole.ADMIN]);
+    this.verifyStoreAccess(store, userId, [
+      StoreMemberRole.OWNER,
+      StoreMemberRole.ADMIN,
+    ]);
 
     // Update credentials
     if (dto.consumerKey) store.credentials.consumerKey = dto.consumerKey;
-    if (dto.consumerSecret) store.credentials.consumerSecret = dto.consumerSecret;
+    if (dto.consumerSecret)
+      store.credentials.consumerSecret = dto.consumerSecret;
 
     // Update WordPress credentials for media management (allow empty string to clear)
-    if (dto.wpUsername !== undefined) store.credentials.wpUsername = dto.wpUsername || undefined;
-    if (dto.wpAppPassword !== undefined) store.credentials.wpAppPassword = dto.wpAppPassword || undefined;
+    if (dto.wpUsername !== undefined)
+      store.credentials.wpUsername = dto.wpUsername || undefined;
+    if (dto.wpAppPassword !== undefined)
+      store.credentials.wpAppPassword = dto.wpAppPassword || undefined;
 
     // Reset status to connecting after WooCommerce credential update
     if (dto.consumerKey || dto.consumerSecret) {
@@ -283,7 +311,10 @@ export class StoreService {
   /**
    * Test store connection
    */
-  async testConnection(id: string, userId: string): Promise<IConnectionTestResult> {
+  async testConnection(
+    id: string,
+    userId: string,
+  ): Promise<IConnectionTestResult> {
     const store = await this.storeModel
       .findOne({
         _id: new Types.ObjectId(id),
@@ -335,7 +366,11 @@ export class StoreService {
   /**
    * Update store status
    */
-  async updateStatus(id: string, status: StoreStatus, error?: string): Promise<void> {
+  async updateStatus(
+    id: string,
+    status: StoreStatus,
+    error?: string,
+  ): Promise<void> {
     await this.storeModel.updateOne(
       { _id: new Types.ObjectId(id) },
       {
@@ -373,7 +408,10 @@ export class StoreService {
       updateData[`syncStatus.${entityType}.error`] = error;
     }
 
-    await this.storeModel.updateOne({ _id: new Types.ObjectId(id) }, updateData);
+    await this.storeModel.updateOne(
+      { _id: new Types.ObjectId(id) },
+      updateData,
+    );
   }
 
   /**
@@ -402,7 +440,10 @@ export class StoreService {
   /**
    * Get webhook configuration for a store
    */
-  async getWebhookConfig(id: string, userId: string): Promise<{
+  async getWebhookConfig(
+    id: string,
+    userId: string,
+  ): Promise<{
     webhookUrl: string;
     webhookSecret: string;
     topics: string[];
@@ -458,7 +499,10 @@ Create webhooks for all the topics you want to sync in real-time.`,
   /**
    * Regenerate webhook secret for a store
    */
-  async regenerateWebhookSecret(id: string, userId: string): Promise<{
+  async regenerateWebhookSecret(
+    id: string,
+    userId: string,
+  ): Promise<{
     webhookSecret: string;
     message: string;
   }> {
@@ -471,14 +515,18 @@ Create webhooks for all the topics you want to sync in real-time.`,
       throw new NotFoundException('Store not found');
     }
 
-    this.verifyStoreAccess(store, userId, [StoreMemberRole.OWNER, StoreMemberRole.ADMIN]);
+    this.verifyStoreAccess(store, userId, [
+      StoreMemberRole.OWNER,
+      StoreMemberRole.ADMIN,
+    ]);
 
     store.webhookSecret = this.generateWebhookSecret();
     await store.save();
 
     return {
       webhookSecret: store.webhookSecret,
-      message: 'Webhook secret regenerated. Update your WooCommerce webhook settings with the new secret.',
+      message:
+        'Webhook secret regenerated. Update your WooCommerce webhook settings with the new secret.',
     };
   }
 
@@ -533,11 +581,16 @@ Create webhooks for all the topics you want to sync in real-time.`,
     }
 
     // Only owner and admin can add members
-    this.verifyStoreAccess(store, userId, [StoreMemberRole.OWNER, StoreMemberRole.ADMIN]);
+    this.verifyStoreAccess(store, userId, [
+      StoreMemberRole.OWNER,
+      StoreMemberRole.ADMIN,
+    ]);
 
     // Cannot add owner role via this method
     if (role === StoreMemberRole.OWNER) {
-      throw new BadRequestException('Cannot add a member with owner role. Use transferOwnership instead.');
+      throw new BadRequestException(
+        'Cannot add a member with owner role. Use transferOwnership instead.',
+      );
     }
 
     // Check if user is already owner
@@ -568,7 +621,11 @@ Create webhooks for all the topics you want to sync in real-time.`,
   /**
    * Remove a member from the store
    */
-  async removeMember(storeId: string, userId: string, memberUserId: string): Promise<IStore> {
+  async removeMember(
+    storeId: string,
+    userId: string,
+    memberUserId: string,
+  ): Promise<IStore> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       isDeleted: false,
@@ -579,11 +636,16 @@ Create webhooks for all the topics you want to sync in real-time.`,
     }
 
     // Only owner and admin can remove members
-    this.verifyStoreAccess(store, userId, [StoreMemberRole.OWNER, StoreMemberRole.ADMIN]);
+    this.verifyStoreAccess(store, userId, [
+      StoreMemberRole.OWNER,
+      StoreMemberRole.ADMIN,
+    ]);
 
     // Cannot remove owner
     if (store.ownerId.toString() === memberUserId) {
-      throw new BadRequestException('Cannot remove the store owner. Use transferOwnership first.');
+      throw new BadRequestException(
+        'Cannot remove the store owner. Use transferOwnership first.',
+      );
     }
 
     // Find and remove member
@@ -627,12 +689,16 @@ Create webhooks for all the topics you want to sync in real-time.`,
 
     // Only owner can change roles
     if (store.ownerId.toString() !== userId) {
-      throw new ForbiddenException('Only the store owner can change member roles');
+      throw new ForbiddenException(
+        'Only the store owner can change member roles',
+      );
     }
 
     // Cannot change owner role via this method
     if (newRole === StoreMemberRole.OWNER) {
-      throw new BadRequestException('Cannot assign owner role. Use transferOwnership instead.');
+      throw new BadRequestException(
+        'Cannot assign owner role. Use transferOwnership instead.',
+      );
     }
 
     // Find member
@@ -669,7 +735,9 @@ Create webhooks for all the topics you want to sync in real-time.`,
 
     // Only current owner can transfer ownership
     if (store.ownerId.toString() !== currentOwnerId) {
-      throw new ForbiddenException('Only the store owner can transfer ownership');
+      throw new ForbiddenException(
+        'Only the store owner can transfer ownership',
+      );
     }
 
     // Cannot transfer to self
@@ -774,7 +842,9 @@ Create webhooks for all the topics you want to sync in real-time.`,
 
     // Owner cannot leave, must transfer ownership first
     if (store.ownerId.toString() === userId) {
-      throw new BadRequestException('Owner cannot leave the store. Transfer ownership first.');
+      throw new BadRequestException(
+        'Owner cannot leave the store. Transfer ownership first.',
+      );
     }
 
     // Find and remove member
@@ -795,7 +865,10 @@ Create webhooks for all the topics you want to sync in real-time.`,
   /**
    * Generate or get public API key for a store
    */
-  async getPublicApiKey(storeId: string, userId: string): Promise<{
+  async getPublicApiKey(
+    storeId: string,
+    userId: string,
+  ): Promise<{
     publicApiKey: string;
     isNew: boolean;
   }> {
@@ -808,7 +881,10 @@ Create webhooks for all the topics you want to sync in real-time.`,
       throw new NotFoundException('Store not found');
     }
 
-    this.verifyStoreAccess(store, userId, [StoreMemberRole.OWNER, StoreMemberRole.ADMIN]);
+    this.verifyStoreAccess(store, userId, [
+      StoreMemberRole.OWNER,
+      StoreMemberRole.ADMIN,
+    ]);
 
     if (store.publicApiKey) {
       return { publicApiKey: store.publicApiKey, isNew: false };
@@ -824,7 +900,10 @@ Create webhooks for all the topics you want to sync in real-time.`,
   /**
    * Regenerate public API key for a store
    */
-  async regeneratePublicApiKey(storeId: string, userId: string): Promise<{
+  async regeneratePublicApiKey(
+    storeId: string,
+    userId: string,
+  ): Promise<{
     publicApiKey: string;
     message: string;
   }> {
@@ -837,14 +916,18 @@ Create webhooks for all the topics you want to sync in real-time.`,
       throw new NotFoundException('Store not found');
     }
 
-    this.verifyStoreAccess(store, userId, [StoreMemberRole.OWNER, StoreMemberRole.ADMIN]);
+    this.verifyStoreAccess(store, userId, [
+      StoreMemberRole.OWNER,
+      StoreMemberRole.ADMIN,
+    ]);
 
     store.publicApiKey = this.generatePublicApiKey();
     await store.save();
 
     return {
       publicApiKey: store.publicApiKey,
-      message: 'Public API key regenerated. Update your widget/integration with the new key.',
+      message:
+        'Public API key regenerated. Update your widget/integration with the new key.',
     };
   }
 
@@ -886,7 +969,9 @@ Create webhooks for all the topics you want to sync in real-time.`,
     const isOwner = ownerIdStr === userId;
 
     // Handle both populated and non-populated member userIds
-    const member = store.members.find((m) => this.getIdString(m.userId) === userId);
+    const member = store.members.find(
+      (m) => this.getIdString(m.userId) === userId,
+    );
 
     if (!isOwner && !member) {
       throw new ForbiddenException('You do not have access to this store');
@@ -900,7 +985,9 @@ Create webhooks for all the topics you want to sync in real-time.`,
       if (member && allowedRoles.includes(member.role)) {
         return; // Member has required role
       }
-      throw new ForbiddenException('You do not have sufficient permissions for this action');
+      throw new ForbiddenException(
+        'You do not have sufficient permissions for this action',
+      );
     }
   }
 
@@ -924,7 +1011,9 @@ Create webhooks for all the topics you want to sync in real-time.`,
     if (this.getIdString(store.ownerId) === userId) {
       return StoreMemberRole.OWNER;
     }
-    const member = store.members.find((m) => this.getIdString(m.userId) === userId);
+    const member = store.members.find(
+      (m) => this.getIdString(m.userId) === userId,
+    );
     return member?.role || null;
   }
 

@@ -1,5 +1,10 @@
 import * as Joi from 'joi';
-import { ReviewStatus, ReviewSource, ReviewType, ModerationStatus } from './enum';
+import {
+  ReviewStatus,
+  ReviewSource,
+  ReviewType,
+  ModerationStatus,
+} from './enum';
 
 export class QueryReviewDto {
   storeId?: string;

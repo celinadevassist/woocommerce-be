@@ -2,7 +2,12 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { RunningCostsController } from './controller';
 import { RunningCostsService } from './service';
-import { CostTemplate, CostTemplateSchema, CostEntry, CostEntrySchema } from './schema';
+import {
+  CostTemplate,
+  CostTemplateSchema,
+  CostEntry,
+  CostEntrySchema,
+} from './schema';
 import { Store, StoreSchema } from '../store/schema';
 
 @Module({

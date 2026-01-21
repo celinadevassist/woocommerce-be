@@ -4,10 +4,20 @@ import { OrderItemStockStatus, OrderItemSource } from './enum';
 
 @Schema({ timestamps: true, versionKey: false, collection: 'order_items' })
 export class OrderItem extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Order', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Order',
+    required: true,
+    index: true,
+  })
   orderId: MongooseSchema.Types.ObjectId;
 
   // Product references
@@ -63,7 +73,10 @@ export class OrderItem extends Document {
   })
   stockStatus: OrderItemStockStatus;
 
-  @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'ProductUnit' }], default: [] })
+  @Prop({
+    type: [{ type: MongooseSchema.Types.ObjectId, ref: 'ProductUnit' }],
+    default: [],
+  })
   fulfilledUnits: MongooseSchema.Types.ObjectId[];
 
   @Prop({ default: 0 })

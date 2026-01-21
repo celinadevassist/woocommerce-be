@@ -3,7 +3,12 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { PassportModule } from '@nestjs/passport';
 import { InventoryMaterialsController } from './controller';
 import { InventoryMaterialsService } from './service';
-import { Material, MaterialSchema, MaterialTransaction, MaterialTransactionSchema } from './schema';
+import {
+  Material,
+  MaterialSchema,
+  MaterialTransaction,
+  MaterialTransactionSchema,
+} from './schema';
 import { Store, StoreSchema } from '../store/schema';
 
 @Module({

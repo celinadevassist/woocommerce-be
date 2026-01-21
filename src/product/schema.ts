@@ -1,6 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { ProductType, ProductStatus, StockStatus, CatalogVisibility, TaxStatus, BackorderStatus } from './enum';
+import {
+  ProductType,
+  ProductStatus,
+  StockStatus,
+  CatalogVisibility,
+  TaxStatus,
+  BackorderStatus,
+} from './enum';
 
 // Sub-schema for product images
 @Schema({ _id: false })
@@ -36,7 +43,8 @@ export class ProductDownload {
   file: string;
 }
 
-export const ProductDownloadSchema = SchemaFactory.createForClass(ProductDownload);
+export const ProductDownloadSchema =
+  SchemaFactory.createForClass(ProductDownload);
 
 // Sub-schema for default attributes (for variable products)
 @Schema({ _id: false })
@@ -51,7 +59,9 @@ export class ProductDefaultAttribute {
   option?: string;
 }
 
-export const ProductDefaultAttributeSchema = SchemaFactory.createForClass(ProductDefaultAttribute);
+export const ProductDefaultAttributeSchema = SchemaFactory.createForClass(
+  ProductDefaultAttribute,
+);
 
 // Sub-schema for meta data
 @Schema({ _id: false })
@@ -66,7 +76,8 @@ export class ProductMetaData {
   value?: string;
 }
 
-export const ProductMetaDataSchema = SchemaFactory.createForClass(ProductMetaData);
+export const ProductMetaDataSchema =
+  SchemaFactory.createForClass(ProductMetaData);
 
 // Sub-schema for product categories
 @Schema({ _id: false })
@@ -81,7 +92,8 @@ export class ProductCategory {
   slug?: string;
 }
 
-export const ProductCategorySchema = SchemaFactory.createForClass(ProductCategory);
+export const ProductCategorySchema =
+  SchemaFactory.createForClass(ProductCategory);
 
 // Sub-schema for product tags
 @Schema({ _id: false })
@@ -120,7 +132,8 @@ export class ProductAttribute {
   options: string[];
 }
 
-export const ProductAttributeSchema = SchemaFactory.createForClass(ProductAttribute);
+export const ProductAttributeSchema =
+  SchemaFactory.createForClass(ProductAttribute);
 
 // Sub-schema for product dimensions
 @Schema({ _id: false })
@@ -135,11 +148,17 @@ export class ProductDimensions {
   height?: string;
 }
 
-export const ProductDimensionsSchema = SchemaFactory.createForClass(ProductDimensions);
+export const ProductDimensionsSchema =
+  SchemaFactory.createForClass(ProductDimensions);
 
 @Schema({ timestamps: true, versionKey: false, collection: 'products' })
 export class Product extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true, index: true })
@@ -157,16 +176,28 @@ export class Product extends Document {
   @Prop()
   permalink?: string;
 
-  @Prop({ type: String, enum: Object.values(ProductType), default: ProductType.SIMPLE })
+  @Prop({
+    type: String,
+    enum: Object.values(ProductType),
+    default: ProductType.SIMPLE,
+  })
   type: ProductType;
 
-  @Prop({ type: String, enum: Object.values(ProductStatus), default: ProductStatus.PUBLISH })
+  @Prop({
+    type: String,
+    enum: Object.values(ProductStatus),
+    default: ProductStatus.PUBLISH,
+  })
   status: ProductStatus;
 
   @Prop({ default: false })
   featured: boolean;
 
-  @Prop({ type: String, enum: Object.values(CatalogVisibility), default: CatalogVisibility.VISIBLE })
+  @Prop({
+    type: String,
+    enum: Object.values(CatalogVisibility),
+    default: CatalogVisibility.VISIBLE,
+  })
   catalogVisibility: CatalogVisibility;
 
   @Prop()
@@ -234,7 +265,11 @@ export class Product extends Document {
   buttonText?: string;
 
   // Tax fields
-  @Prop({ type: String, enum: Object.values(TaxStatus), default: TaxStatus.TAXABLE })
+  @Prop({
+    type: String,
+    enum: Object.values(TaxStatus),
+    default: TaxStatus.TAXABLE,
+  })
   taxStatus: TaxStatus;
 
   @Prop()
@@ -246,11 +281,19 @@ export class Product extends Document {
   @Prop({ default: null })
   stockQuantity: number | null;
 
-  @Prop({ type: String, enum: Object.values(StockStatus), default: StockStatus.IN_STOCK })
+  @Prop({
+    type: String,
+    enum: Object.values(StockStatus),
+    default: StockStatus.IN_STOCK,
+  })
   stockStatus: StockStatus;
 
   // Backorder fields
-  @Prop({ type: String, enum: Object.values(BackorderStatus), default: BackorderStatus.NO })
+  @Prop({
+    type: String,
+    enum: Object.values(BackorderStatus),
+    default: BackorderStatus.NO,
+  })
   backorders: BackorderStatus;
 
   @Prop({ default: false })

@@ -1,4 +1,9 @@
-import { StorePlatform, StoreStatus, SyncStatus, StoreMemberRole } from './enum';
+import {
+  StorePlatform,
+  StoreStatus,
+  SyncStatus,
+  StoreMemberRole,
+} from './enum';
 
 export interface IStoreCredentials {
   consumerKey: string;

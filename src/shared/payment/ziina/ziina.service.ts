@@ -11,7 +11,13 @@ export interface IPaymentIntent {
   fee_amount: number;
   currency_code: string;
   created_at: string;
-  status: 'requires_payment_instrument' | 'requires_user_action' | 'pending' | 'completed' | 'failed' | 'canceled';
+  status:
+    | 'requires_payment_instrument'
+    | 'requires_user_action'
+    | 'pending'
+    | 'completed'
+    | 'failed'
+    | 'canceled';
   operation_id: string;
   message?: string;
   redirect_url?: string;
@@ -33,7 +39,13 @@ export interface ICreatePaymentIntentRequest {
   cancel_url?: string;
   failure_url?: string;
   test?: boolean;
-  transaction_source?: 'directApi' | 'graphqlApi' | 'shopify' | 'woocommerce' | 'wix' | 'pos';
+  transaction_source?:
+    | 'directApi'
+    | 'graphqlApi'
+    | 'shopify'
+    | 'woocommerce'
+    | 'wix'
+    | 'pos';
   expiry?: string;
   allow_tips?: boolean;
   metadata?: Record<string, any>;
@@ -66,7 +78,10 @@ export class ZiinaService {
 
   constructor(private configService: ConfigService) {
     this.axiosInstance = axios.create({
-      baseURL: this.configService.get('ZIINA_API_URL', 'https://api-v2.ziina.com/api'),
+      baseURL: this.configService.get(
+        'ZIINA_API_URL',
+        'https://api-v2.ziina.com/api',
+      ),
       timeout: 30000,
     });
 
@@ -81,7 +96,7 @@ export class ZiinaService {
           url: config.url,
           method: config.method,
           hasToken: !!token,
-          tokenLength: token?.length
+          tokenLength: token?.length,
         });
 
         return config;
@@ -89,7 +104,7 @@ export class ZiinaService {
       (error) => {
         this.logger.error('Request interceptor error:', error);
         return Promise.reject(error);
-      }
+      },
     );
 
     // Add response interceptor for error handling
@@ -102,34 +117,46 @@ export class ZiinaService {
         this.logger.error(`Method: ${error.config?.method?.toUpperCase()}`);
         this.logger.error(`Status: ${error.response?.status}`);
         this.logger.error(`Status Text: ${error.response?.statusText}`);
-        this.logger.error(`Response Data: ${JSON.stringify(error.response?.data, null, 2)}`);
+        this.logger.error(
+          `Response Data: ${JSON.stringify(error.response?.data, null, 2)}`,
+        );
         this.logger.error(`Error Message: ${error.message}`);
-        this.logger.error(`Request Headers: ${JSON.stringify(error.config?.headers, null, 2)}`);
-        this.logger.error(`Request Data: ${JSON.stringify(error.config?.data, null, 2)}`);
+        this.logger.error(
+          `Request Headers: ${JSON.stringify(error.config?.headers, null, 2)}`,
+        );
+        this.logger.error(
+          `Request Data: ${JSON.stringify(error.config?.data, null, 2)}`,
+        );
         this.logger.error('='.repeat(80));
 
         // Extract error message from Ziina response
-        const ziinaMessage = error.response?.data?.message
-          || error.response?.data?.error
-          || error.response?.data?.error_description
-          || error.message
-          || 'Payment service error';
+        const ziinaMessage =
+          error.response?.data?.message ||
+          error.response?.data?.error ||
+          error.response?.data?.error_description ||
+          error.message ||
+          'Payment service error';
 
         throw new HttpException(
           {
-            statusCode: error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR,
+            statusCode:
+              error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR,
             message: `Ziina API Error: ${ziinaMessage}`,
             error: error.response?.statusText || 'Payment Service Error',
-            details: error.response?.data
+            details: error.response?.data,
           },
-          error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR
+          error.response?.status || HttpStatus.INTERNAL_SERVER_ERROR,
         );
-      }
+      },
     );
   }
 
   private async getValidToken(): Promise<string> {
-    if (this.accessToken && this.tokenExpiresAt && new Date() < this.tokenExpiresAt) {
+    if (
+      this.accessToken &&
+      this.tokenExpiresAt &&
+      new Date() < this.tokenExpiresAt
+    ) {
       return this.accessToken;
     }
 
@@ -142,7 +169,7 @@ export class ZiinaService {
 
   async createPaymentIntent(
     amount: number,
-    currency: string = 'USD',
+    currency = 'USD',
     options: {
       message?: string;
       successUrl?: string;
@@ -152,7 +179,7 @@ export class ZiinaService {
       expiry?: string;
       allowTips?: boolean;
       metadata?: Record<string, any>;
-    } = {}
+    } = {},
   ): Promise<IPaymentIntent> {
     try {
       const request: ICreatePaymentIntentRequest = {
@@ -166,22 +193,25 @@ export class ZiinaService {
         transaction_source: 'directApi',
         expiry: options.expiry,
         allow_tips: options.allowTips || false,
-        metadata: options.metadata
+        metadata: options.metadata,
       };
 
       this.logger.log('Creating payment intent:', {
         amount: request.amount,
         currency: request.currency_code,
         test: request.test,
-        apiUrl: this.configService.get('ZIINA_API_URL')
+        apiUrl: this.configService.get('ZIINA_API_URL'),
       });
 
-      const response = await this.axiosInstance.post('/payment_intent', request);
+      const response = await this.axiosInstance.post(
+        '/payment_intent',
+        request,
+      );
 
       this.logger.log('Payment intent created:', {
         id: response.data.id,
         status: response.data.status,
-        redirect_url: response.data.redirect_url
+        redirect_url: response.data.redirect_url,
       });
 
       return response.data;
@@ -196,18 +226,22 @@ export class ZiinaService {
     amount: number,
     description: string,
     successUrl?: string,
-    cancelUrl?: string
+    cancelUrl?: string,
   ): Promise<IPaymentLink> {
     try {
       // Remove trailing slash from base URL
-      const baseUrl = this.configService.get('APP_URL', 'http://localhost:3000').replace(/\/+$/, '');
+      const baseUrl = this.configService
+        .get('APP_URL', 'http://localhost:3000')
+        .replace(/\/+$/, '');
 
       const response = await this.axiosInstance.post('/payment_links', {
         amount: Math.round(amount * 100), // Convert to cents
         currency: 'USD',
         description,
-        success_url: successUrl || `${baseUrl}/payments/success?invoice=${invoiceId}`,
-        cancel_url: cancelUrl || `${baseUrl}/payments/cancel?invoice=${invoiceId}`,
+        success_url:
+          successUrl || `${baseUrl}/payments/success?invoice=${invoiceId}`,
+        cancel_url:
+          cancelUrl || `${baseUrl}/payments/cancel?invoice=${invoiceId}`,
         metadata: {
           invoiceId,
           type: 'invoice_payment',
@@ -224,7 +258,7 @@ export class ZiinaService {
   async confirmPayment(paymentIntentId: string): Promise<IPaymentIntent> {
     try {
       const response = await this.axiosInstance.post(
-        `/payment_intents/${paymentIntentId}/confirm`
+        `/payment_intents/${paymentIntentId}/confirm`,
       );
 
       return response.data;
@@ -237,7 +271,7 @@ export class ZiinaService {
   async refundPayment(
     paymentId: string,
     amount?: number,
-    reason: string = 'requested_by_customer'
+    reason = 'requested_by_customer',
   ): Promise<IRefund> {
     try {
       const data: any = {
@@ -263,7 +297,9 @@ export class ZiinaService {
 
   async getPaymentIntent(paymentIntentId: string): Promise<IPaymentIntent> {
     try {
-      const response = await this.axiosInstance.get(`/payment_intent/${paymentIntentId}`);
+      const response = await this.axiosInstance.get(
+        `/payment_intent/${paymentIntentId}`,
+      );
       return response.data;
     } catch (error) {
       this.logger.error('Failed to get payment intent:', error);
@@ -273,7 +309,9 @@ export class ZiinaService {
 
   async getPaymentLink(paymentLinkId: string): Promise<IPaymentLink> {
     try {
-      const response = await this.axiosInstance.get(`/payment_links/${paymentLinkId}`);
+      const response = await this.axiosInstance.get(
+        `/payment_links/${paymentLinkId}`,
+      );
       return response.data;
     } catch (error) {
       this.logger.error('Failed to get payment link:', error);
@@ -302,7 +340,7 @@ export class ZiinaService {
       receivedSignature: signature,
       expectedSignature: expectedSignature,
       payloadLength: payloadString.length,
-      secretLength: webhookSecret.length
+      secretLength: webhookSecret.length,
     });
 
     // Handle both hex string comparison and buffer comparison
@@ -315,7 +353,7 @@ export class ZiinaService {
       // If not equal as strings, try timing-safe buffer comparison
       return crypto.timingSafeEqual(
         new Uint8Array(Buffer.from(signature, 'hex')),
-        new Uint8Array(Buffer.from(expectedSignature, 'hex'))
+        new Uint8Array(Buffer.from(expectedSignature, 'hex')),
       );
     } catch (error) {
       this.logger.error('Error comparing signatures:', error);
@@ -331,13 +369,18 @@ export class ZiinaService {
   async verifyPaymentStatus(paymentIntentId: string): Promise<any> {
     try {
       const response = await this.axiosInstance.get(
-        `/payment_intent/${paymentIntentId}`
+        `/payment_intent/${paymentIntentId}`,
       );
 
-      this.logger.log(`Verified payment status for ${paymentIntentId}: ${response.data.status}`);
+      this.logger.log(
+        `Verified payment status for ${paymentIntentId}: ${response.data.status}`,
+      );
       return response.data;
     } catch (error) {
-      this.logger.error(`Failed to verify payment status for ${paymentIntentId}:`, error);
+      this.logger.error(
+        `Failed to verify payment status for ${paymentIntentId}:`,
+        error,
+      );
       throw new Error(`Failed to verify payment status: ${error.message}`);
     }
   }
@@ -386,7 +429,7 @@ export class ZiinaService {
   }
 
   // Helper method to format amount for display
-  formatAmount(amount: number, currency: string = 'USD'): string {
+  formatAmount(amount: number, currency = 'USD'): string {
     return new Intl.NumberFormat('en-AE', {
       style: 'currency',
       currency,

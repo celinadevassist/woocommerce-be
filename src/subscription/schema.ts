@@ -11,19 +11,29 @@ export enum SubscriptionStatus {
 
 // Invoice Status
 export enum InvoiceStatus {
-  PENDING = 'pending',     // Generated, awaiting payment
-  PAID = 'paid',           // Payment received
-  OVERDUE = 'overdue',     // Past due date, not paid
+  PENDING = 'pending', // Generated, awaiting payment
+  PAID = 'paid', // Payment received
+  OVERDUE = 'overdue', // Past due date, not paid
   CANCELLED = 'cancelled', // Invoice cancelled
 }
 
 // Store Subscription Schema
 @Schema({ timestamps: true, versionKey: false, collection: 'subscriptions' })
 export class Subscription extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, unique: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    unique: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: String, enum: Object.values(SubscriptionStatus), default: SubscriptionStatus.ACTIVE })
+  @Prop({
+    type: String,
+    enum: Object.values(SubscriptionStatus),
+    default: SubscriptionStatus.ACTIVE,
+  })
   status: SubscriptionStatus;
 
   // Plan info - customizable per store deal
@@ -83,20 +93,28 @@ export const SubscriptionSchema = SchemaFactory.createForClass(Subscription);
 SubscriptionSchema.index({ storeId: 1, status: 1 });
 SubscriptionSchema.index({ nextInvoiceDate: 1, status: 1 }); // For cron job to find due invoices
 
-
 // Invoice Schema
 @Schema({ timestamps: true, versionKey: false, collection: 'invoices' })
 export class Invoice extends Document {
   @Prop({ required: true, unique: true, index: true })
   invoiceNumber: string; // e.g., INV-2024-00001
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Subscription' })
   subscriptionId?: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: String, enum: Object.values(InvoiceStatus), default: InvoiceStatus.PENDING })
+  @Prop({
+    type: String,
+    enum: Object.values(InvoiceStatus),
+    default: InvoiceStatus.PENDING,
+  })
   status: InvoiceStatus;
 
   // Billing period

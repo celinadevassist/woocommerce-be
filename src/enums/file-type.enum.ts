@@ -1,4 +1,4 @@
 export enum FileTypeEnum {
-    chat = 'chat',
-    profile = 'profile',
+  chat = 'chat',
+  profile = 'profile',
 }

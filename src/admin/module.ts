@@ -5,7 +5,12 @@ import { AdminController } from './controller';
 import { AdminService } from './service';
 import { User, UserSchema } from '../schema/user.schema';
 import { Store, StoreSchema } from '../store/schema';
-import { Subscription, SubscriptionSchema, Invoice, InvoiceSchema } from '../subscription/schema';
+import {
+  Subscription,
+  SubscriptionSchema,
+  Invoice,
+  InvoiceSchema,
+} from '../subscription/schema';
 import { RoleModule } from '../modules/roles.module';
 
 @Module({

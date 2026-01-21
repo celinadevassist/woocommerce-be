@@ -1,6 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { OrderStatus, PaymentStatus, FulfillmentStatus, OrderSource } from './enum';
+import {
+  OrderStatus,
+  PaymentStatus,
+  FulfillmentStatus,
+  OrderSource,
+} from './enum';
 
 // Sub-schema for address
 @Schema({ _id: false })
@@ -90,7 +95,10 @@ export class OrderLineItem {
   metaData?: Record<string, any>;
 
   // Unit tracking for fulfillment
-  @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'ProductUnit' }], default: [] })
+  @Prop({
+    type: [{ type: MongooseSchema.Types.ObjectId, ref: 'ProductUnit' }],
+    default: [],
+  })
   fulfilledUnits: MongooseSchema.Types.ObjectId[];
 
   @Prop({ default: 0 })
@@ -197,7 +205,12 @@ export const OrderNoteSchema = SchemaFactory.createForClass(OrderNote);
 
 @Schema({ timestamps: true, versionKey: false, collection: 'orders' })
 export class Order extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   // For WooCommerce orders - required for synced orders
@@ -226,13 +239,25 @@ export class Order extends Document {
   @Prop()
   orderKey?: string;
 
-  @Prop({ type: String, enum: Object.values(OrderStatus), default: OrderStatus.PENDING })
+  @Prop({
+    type: String,
+    enum: Object.values(OrderStatus),
+    default: OrderStatus.PENDING,
+  })
   status: OrderStatus;
 
-  @Prop({ type: String, enum: Object.values(PaymentStatus), default: PaymentStatus.PENDING })
+  @Prop({
+    type: String,
+    enum: Object.values(PaymentStatus),
+    default: PaymentStatus.PENDING,
+  })
   paymentStatus: PaymentStatus;
 
-  @Prop({ type: String, enum: Object.values(FulfillmentStatus), default: FulfillmentStatus.UNFULFILLED })
+  @Prop({
+    type: String,
+    enum: Object.values(FulfillmentStatus),
+    default: FulfillmentStatus.UNFULFILLED,
+  })
   fulfillmentStatus: FulfillmentStatus;
 
   @Prop({ required: true })
@@ -387,7 +412,7 @@ export const OrderSchema = SchemaFactory.createForClass(Order);
 // Unique constraint only for WooCommerce orders (where externalId exists)
 OrderSchema.index(
   { storeId: 1, externalId: 1 },
-  { unique: true, partialFilterExpression: { externalId: { $exists: true } } }
+  { unique: true, partialFilterExpression: { externalId: { $exists: true } } },
 );
 OrderSchema.index({ storeId: 1, orderNumber: 1 }, { unique: true });
 OrderSchema.index({ storeId: 1, internalOrderNumber: 1 });

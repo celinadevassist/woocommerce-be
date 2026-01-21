@@ -10,7 +10,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { PhoneService } from './service';
 import { User } from '../decorators/user.decorator';
 import { PhoneStatus } from './schema';
@@ -57,7 +64,9 @@ export class PhoneController {
   }
 
   @Get('store/:storeId/campaign')
-  @ApiOperation({ summary: 'Get phones ready for SMS campaign (verified, opted-in, active)' })
+  @ApiOperation({
+    summary: 'Get phones ready for SMS campaign (verified, opted-in, active)',
+  })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'storeId', description: 'Store ID' })
   async getCampaignPhones(@Param('storeId') storeId: string) {
@@ -81,7 +90,10 @@ export class PhoneController {
     @Param('storeId') storeId: string,
     @Param('phone') phone: string,
   ) {
-    const customer = await this.phoneService.findCustomerByPhone(storeId, decodeURIComponent(phone));
+    const customer = await this.phoneService.findCustomerByPhone(
+      storeId,
+      decodeURIComponent(phone),
+    );
     return { customer };
   }
 
@@ -89,7 +101,8 @@ export class PhoneController {
   @ApiOperation({ summary: 'Add a new phone' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   async addPhone(
-    @Body() dto: {
+    @Body()
+    dto: {
       storeId: string;
       phone: string;
       customerId?: string;
@@ -108,10 +121,7 @@ export class PhoneController {
   @ApiOperation({ summary: 'Verify a phone number' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Phone ID' })
-  async verify(
-    @Param('id') id: string,
-    @User('_id') userId: string,
-  ) {
+  async verify(@Param('id') id: string, @User('_id') userId: string) {
     return this.phoneService.verify(id, userId);
   }
 
@@ -143,10 +153,7 @@ export class PhoneController {
   @ApiOperation({ summary: 'Block a phone number' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Phone ID' })
-  async block(
-    @Param('id') id: string,
-    @Body() dto: { reason?: string },
-  ) {
+  async block(@Param('id') id: string, @Body() dto: { reason?: string }) {
     return this.phoneService.block(id, dto.reason);
   }
 

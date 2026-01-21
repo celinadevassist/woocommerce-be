@@ -1,4 +1,9 @@
-import { ProductType, ProductStatus, StockStatus, CatalogVisibility } from './enum';
+import {
+  ProductType,
+  ProductStatus,
+  StockStatus,
+  CatalogVisibility,
+} from './enum';
 
 export interface IProductImage {
   externalId?: number;

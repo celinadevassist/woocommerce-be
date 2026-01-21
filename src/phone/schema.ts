@@ -21,7 +21,12 @@ export class Phone extends Document {
   number: string; // Format: +201273215943
 
   // Store reference
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   // Current owner
@@ -39,10 +44,18 @@ export class Phone extends Document {
   verifiedBy?: string; // User ID or 'system'
 
   // Status
-  @Prop({ type: String, enum: Object.values(PhoneStatus), default: PhoneStatus.ACTIVE })
+  @Prop({
+    type: String,
+    enum: Object.values(PhoneStatus),
+    default: PhoneStatus.ACTIVE,
+  })
   status: PhoneStatus;
 
-  @Prop({ type: String, enum: Object.values(PhoneType), default: PhoneType.MOBILE })
+  @Prop({
+    type: String,
+    enum: Object.values(PhoneType),
+    default: PhoneType.MOBILE,
+  })
   type: PhoneType;
 
   // SMS opt-in/out
@@ -71,12 +84,14 @@ export class Phone extends Document {
 
   // History of owners (for tracking transfers)
   @Prop({
-    type: [{
-      customerId: { type: MongooseSchema.Types.ObjectId, ref: 'Customer' },
-      assignedAt: { type: Date, default: Date.now },
-      removedAt: Date,
-      source: String,
-    }],
+    type: [
+      {
+        customerId: { type: MongooseSchema.Types.ObjectId, ref: 'Customer' },
+        assignedAt: { type: Date, default: Date.now },
+        removedAt: Date,
+        source: String,
+      },
+    ],
     default: [],
   })
   ownerHistory: {

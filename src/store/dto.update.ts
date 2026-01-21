@@ -2,7 +2,10 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import * as Joi from 'joi';
 
 export class UpdateStoreDto {
-  @ApiPropertyOptional({ description: 'Store name', example: 'My Updated Store' })
+  @ApiPropertyOptional({
+    description: 'Store name',
+    example: 'My Updated Store',
+  })
   name?: string;
 
   @ApiPropertyOptional({ description: 'Enable auto sync', example: true })
@@ -14,7 +17,10 @@ export class UpdateStoreDto {
   @ApiPropertyOptional({ description: 'Low stock threshold', example: 10 })
   lowStockThreshold?: number;
 
-  @ApiPropertyOptional({ description: 'Store timezone', example: 'Africa/Cairo' })
+  @ApiPropertyOptional({
+    description: 'Store timezone',
+    example: 'Africa/Cairo',
+  })
   timezone?: string;
 }
 
@@ -33,16 +39,22 @@ export class UpdateCredentialsDto {
   @ApiPropertyOptional({ description: 'WooCommerce Consumer Secret' })
   consumerSecret?: string;
 
-  @ApiPropertyOptional({ description: 'WordPress username for media management' })
+  @ApiPropertyOptional({
+    description: 'WordPress username for media management',
+  })
   wpUsername?: string;
 
-  @ApiPropertyOptional({ description: 'WordPress application password for media management' })
+  @ApiPropertyOptional({
+    description: 'WordPress application password for media management',
+  })
   wpAppPassword?: string;
 }
 
-export const UpdateCredentialsSchema = Joi.object().keys({
-  consumerKey: Joi.string().optional(),
-  consumerSecret: Joi.string().optional(),
-  wpUsername: Joi.string().allow('').optional(),
-  wpAppPassword: Joi.string().allow('').optional(),
-}).or('consumerKey', 'consumerSecret', 'wpUsername', 'wpAppPassword'); // At least one required
+export const UpdateCredentialsSchema = Joi.object()
+  .keys({
+    consumerKey: Joi.string().optional(),
+    consumerSecret: Joi.string().optional(),
+    wpUsername: Joi.string().allow('').optional(),
+    wpAppPassword: Joi.string().allow('').optional(),
+  })
+  .or('consumerKey', 'consumerSecret', 'wpUsername', 'wpAppPassword'); // At least one required

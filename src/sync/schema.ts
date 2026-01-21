@@ -4,7 +4,12 @@ import { SyncJobType, SyncJobStatus, SyncEntityType, SyncMode } from './enum';
 
 @Schema({ timestamps: true, versionKey: false, collection: 'sync_jobs' })
 export class SyncJob extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: String, enum: Object.values(SyncEntityType), required: true })
@@ -13,7 +18,11 @@ export class SyncJob extends Document {
   @Prop({ type: String, enum: Object.values(SyncJobType), required: true })
   type: SyncJobType;
 
-  @Prop({ type: String, enum: Object.values(SyncJobStatus), default: SyncJobStatus.PENDING })
+  @Prop({
+    type: String,
+    enum: Object.values(SyncJobStatus),
+    default: SyncJobStatus.PENDING,
+  })
   status: SyncJobStatus;
 
   @Prop({ type: String, enum: Object.values(SyncMode), default: SyncMode.FULL })

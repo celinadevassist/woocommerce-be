@@ -11,7 +11,13 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { ShippingService } from './service';
 import {
   CreateShippingZoneDto,
@@ -48,7 +54,10 @@ export class ShippingController {
 
   @Get('methods')
   @ApiOperation({ summary: 'Get available shipping method types' })
-  @ApiResponse({ status: 200, description: 'Shipping methods retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Shipping methods retrieved successfully',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
     new JoiValidationPipe({
@@ -60,14 +69,19 @@ export class ShippingController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.shippingService.getAvailableMethods(storeId, user._id.toString());
+    return await this.shippingService.getAvailableMethods(
+      storeId,
+      user._id.toString(),
+    );
   }
 
   // ============== COUNTRIES & STATES ==============
   // NOTE: These must be defined BEFORE zones/:zoneId routes
 
   @Get('countries')
-  @ApiOperation({ summary: 'Get all countries with their states from WooCommerce' })
+  @ApiOperation({
+    summary: 'Get all countries with their states from WooCommerce',
+  })
   @ApiResponse({ status: 200, description: 'Countries retrieved successfully' })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
@@ -80,12 +94,18 @@ export class ShippingController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.shippingService.getCountries(storeId, user._id.toString());
+    return await this.shippingService.getCountries(
+      storeId,
+      user._id.toString(),
+    );
   }
 
   @Get('countries/:countryCode')
   @ApiOperation({ summary: 'Get states for a specific country' })
-  @ApiResponse({ status: 200, description: 'Country states retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Country states retrieved successfully',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
     new JoiValidationPipe({
@@ -98,14 +118,23 @@ export class ShippingController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.shippingService.getCountryStates(storeId, user._id.toString(), countryCode);
+    return await this.shippingService.getCountryStates(
+      storeId,
+      user._id.toString(),
+      countryCode,
+    );
   }
 
   // ============== SHIPPING ZONES ==============
 
   @Get('zones')
-  @ApiOperation({ summary: 'Get all shipping zones with locations and methods' })
-  @ApiResponse({ status: 200, description: 'Shipping zones retrieved successfully' })
+  @ApiOperation({
+    summary: 'Get all shipping zones with locations and methods',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Shipping zones retrieved successfully',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
     new JoiValidationPipe({
@@ -122,7 +151,10 @@ export class ShippingController {
 
   @Get('zones/:zoneId')
   @ApiOperation({ summary: 'Get a single shipping zone with details' })
-  @ApiResponse({ status: 200, description: 'Shipping zone retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Shipping zone retrieved successfully',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
     new JoiValidationPipe({
@@ -135,12 +167,19 @@ export class ShippingController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.shippingService.getZone(storeId, user._id.toString(), parseInt(zoneId, 10));
+    return await this.shippingService.getZone(
+      storeId,
+      user._id.toString(),
+      parseInt(zoneId, 10),
+    );
   }
 
   @Post('zones')
   @ApiOperation({ summary: 'Create a new shipping zone' })
-  @ApiResponse({ status: 201, description: 'Shipping zone created successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Shipping zone created successfully',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
     new JoiValidationPipe({
@@ -154,12 +193,19 @@ export class ShippingController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.shippingService.createZone(storeId, user._id.toString(), dto);
+    return await this.shippingService.createZone(
+      storeId,
+      user._id.toString(),
+      dto,
+    );
   }
 
   @Put('zones/:zoneId')
   @ApiOperation({ summary: 'Update a shipping zone' })
-  @ApiResponse({ status: 200, description: 'Shipping zone updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Shipping zone updated successfully',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
     new JoiValidationPipe({
@@ -184,7 +230,10 @@ export class ShippingController {
 
   @Delete('zones/:zoneId')
   @ApiOperation({ summary: 'Delete a shipping zone' })
-  @ApiResponse({ status: 200, description: 'Shipping zone deleted successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Shipping zone deleted successfully',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
     new JoiValidationPipe({
@@ -197,7 +246,11 @@ export class ShippingController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    await this.shippingService.deleteZone(storeId, user._id.toString(), parseInt(zoneId, 10));
+    await this.shippingService.deleteZone(
+      storeId,
+      user._id.toString(),
+      parseInt(zoneId, 10),
+    );
     return { success: true, message: 'Shipping zone deleted' };
   }
 
@@ -205,7 +258,10 @@ export class ShippingController {
 
   @Get('zones/:zoneId/locations')
   @ApiOperation({ summary: 'Get locations for a shipping zone' })
-  @ApiResponse({ status: 200, description: 'Zone locations retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Zone locations retrieved successfully',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
     new JoiValidationPipe({
@@ -226,8 +282,13 @@ export class ShippingController {
   }
 
   @Put('zones/:zoneId/locations')
-  @ApiOperation({ summary: 'Update locations for a shipping zone (replaces all)' })
-  @ApiResponse({ status: 200, description: 'Zone locations updated successfully' })
+  @ApiOperation({
+    summary: 'Update locations for a shipping zone (replaces all)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Zone locations updated successfully',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
     new JoiValidationPipe({
@@ -254,7 +315,10 @@ export class ShippingController {
 
   @Get('zones/:zoneId/methods')
   @ApiOperation({ summary: 'Get methods for a shipping zone' })
-  @ApiResponse({ status: 200, description: 'Zone methods retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Zone methods retrieved successfully',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
     new JoiValidationPipe({
@@ -355,7 +419,10 @@ export class ShippingController {
 
   @Get('custom-states')
   @ApiOperation({ summary: 'Get all custom states from CartFlow plugin' })
-  @ApiResponse({ status: 200, description: 'Custom states retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Custom states retrieved successfully',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
     new JoiValidationPipe({
@@ -367,7 +434,10 @@ export class ShippingController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.shippingService.getCustomStates(storeId, user._id.toString());
+    return await this.shippingService.getCustomStates(
+      storeId,
+      user._id.toString(),
+    );
   }
 
   @Post('custom-states')
@@ -397,7 +467,10 @@ export class ShippingController {
 
   @Put('custom-states/:countryCode/:stateCode')
   @ApiOperation({ summary: 'Update a custom state via CartFlow plugin' })
-  @ApiResponse({ status: 200, description: 'Custom state updated successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Custom state updated successfully',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
     new JoiValidationPipe({
@@ -424,7 +497,10 @@ export class ShippingController {
 
   @Delete('custom-states/:countryCode/:stateCode')
   @ApiOperation({ summary: 'Delete a custom state via CartFlow plugin' })
-  @ApiResponse({ status: 200, description: 'Custom state deleted successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Custom state deleted successfully',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
     new JoiValidationPipe({
@@ -448,7 +524,9 @@ export class ShippingController {
   }
 
   @Post('custom-states/:countryCode/bulk')
-  @ApiOperation({ summary: 'Bulk update states for a country via CartFlow plugin' })
+  @ApiOperation({
+    summary: 'Bulk update states for a country via CartFlow plugin',
+  })
   @ApiResponse({ status: 200, description: 'States updated successfully' })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
@@ -473,7 +551,9 @@ export class ShippingController {
   }
 
   @Get('countries-with-custom')
-  @ApiOperation({ summary: 'Get all countries with custom states (via CartFlow plugin)' })
+  @ApiOperation({
+    summary: 'Get all countries with custom states (via CartFlow plugin)',
+  })
   @ApiResponse({ status: 200, description: 'Countries retrieved successfully' })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(
@@ -486,6 +566,9 @@ export class ShippingController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.shippingService.getCountriesWithCustomStates(storeId, user._id.toString());
+    return await this.shippingService.getCountriesWithCustomStates(
+      storeId,
+      user._id.toString(),
+    );
   }
 }

@@ -11,8 +11,17 @@ import { Customer, CustomerDocument } from './schema';
 import { CustomerSegment, CustomerSegmentDocument } from './segment.schema';
 import { UpdateCustomerDto, AddCustomerNoteDto } from './dto.update';
 import { QueryCustomerDto } from './dto.query';
-import { CreateSegmentDto, UpdateSegmentDto, ICustomerSegment } from './segment.dto';
-import { ICustomer, ICustomerResponse, ICustomerAggregateStats, ICustomerNote } from './interface';
+import {
+  CreateSegmentDto,
+  UpdateSegmentDto,
+  ICustomerSegment,
+} from './segment.dto';
+import {
+  ICustomer,
+  ICustomerResponse,
+  ICustomerAggregateStats,
+  ICustomerNote,
+} from './interface';
 import { CustomerStatus, CustomerSource } from './enum';
 import { Store, StoreDocument } from '../store/schema';
 import { Order, OrderDocument } from '../order/schema';
@@ -24,7 +33,8 @@ import { EmailService } from '../email/service';
 export class CustomerService {
   constructor(
     @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
-    @InjectModel(CustomerSegment.name) private segmentModel: Model<CustomerSegmentDocument>,
+    @InjectModel(CustomerSegment.name)
+    private segmentModel: Model<CustomerSegmentDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     @Inject(forwardRef(() => PhoneService))
@@ -37,20 +47,25 @@ export class CustomerService {
    * Get store IDs that user has access to (owner or member)
    */
   private async getUserStoreIds(userId: string): Promise<Types.ObjectId[]> {
-    const stores = await this.storeModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    }).select('_id');
+    const stores = await this.storeModel
+      .find({
+        isDeleted: false,
+        $or: [
+          { ownerId: new Types.ObjectId(userId) },
+          { 'members.userId': new Types.ObjectId(userId) },
+        ],
+      })
+      .select('_id');
     return stores.map((store) => store._id);
   }
 
   /**
    * Verify user has access to a specific store
    */
-  private async verifyStoreAccess(storeId: string, userId: string): Promise<StoreDocument> {
+  private async verifyStoreAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<StoreDocument> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       isDeleted: false,
@@ -76,7 +91,10 @@ export class CustomerService {
    * Converts Arabic numerals to English
    * Handles Egyptian numbers: converts 01xxx to +201xxx
    */
-  normalizePhoneNumber(phone: string, defaultCountryCode: string = '20'): string | null {
+  normalizePhoneNumber(
+    phone: string,
+    defaultCountryCode = '20',
+  ): string | null {
     if (!phone) return null;
 
     // Convert Arabic/Persian numerals to English
@@ -84,12 +102,18 @@ export class CustomerService {
     const persianNumerals = '۰۱۲۳۴۵۶۷۸۹';
     let converted = phone;
     for (let i = 0; i < 10; i++) {
-      converted = converted.replace(new RegExp(arabicNumerals[i], 'g'), String(i));
-      converted = converted.replace(new RegExp(persianNumerals[i], 'g'), String(i));
+      converted = converted.replace(
+        new RegExp(arabicNumerals[i], 'g'),
+        String(i),
+      );
+      converted = converted.replace(
+        new RegExp(persianNumerals[i], 'g'),
+        String(i),
+      );
     }
 
     // Remove all non-digit characters except +
-    let normalized = converted.replace(/[^\d+]/g, '');
+    const normalized = converted.replace(/[^\d+]/g, '');
 
     // If empty after cleanup, return null
     if (!normalized || normalized.replace(/\+/g, '').length === 0) {
@@ -136,7 +160,9 @@ export class CustomerService {
       {
         $match: {
           localCustomerId: new Types.ObjectId(customerId),
-          status: { $nin: ['cancelled', 'canceled', 'refunded', 'failed', 'trash'] },
+          status: {
+            $nin: ['cancelled', 'canceled', 'refunded', 'failed', 'trash'],
+          },
           isDeleted: { $ne: true },
         },
       },
@@ -165,7 +191,8 @@ export class CustomerService {
     return {
       ordersCount: stats.ordersCount || 0,
       totalSpent: stats.totalSpent || 0,
-      averageOrderValue: stats.ordersCount > 0 ? stats.totalSpent / stats.ordersCount : 0,
+      averageOrderValue:
+        stats.ordersCount > 0 ? stats.totalSpent / stats.ordersCount : 0,
       lastOrderDate: stats.lastOrderDate || null,
       firstOrderDate: stats.firstOrderDate || null,
     };
@@ -174,20 +201,29 @@ export class CustomerService {
   /**
    * Calculate stats for multiple customers at once (for list views)
    */
-  async calculateBulkCustomerStats(customerIds: (string | Types.ObjectId)[]): Promise<Map<string, {
-    ordersCount: number;
-    totalSpent: number;
-    averageOrderValue: number;
-    lastOrderDate: Date | null;
-    firstOrderDate: Date | null;
-  }>> {
-    const objectIds = customerIds.map(id => new Types.ObjectId(id));
+  async calculateBulkCustomerStats(
+    customerIds: (string | Types.ObjectId)[],
+  ): Promise<
+    Map<
+      string,
+      {
+        ordersCount: number;
+        totalSpent: number;
+        averageOrderValue: number;
+        lastOrderDate: Date | null;
+        firstOrderDate: Date | null;
+      }
+    >
+  > {
+    const objectIds = customerIds.map((id) => new Types.ObjectId(id));
 
     const results = await this.orderModel.aggregate([
       {
         $match: {
           localCustomerId: { $in: objectIds },
-          status: { $nin: ['cancelled', 'canceled', 'refunded', 'failed', 'trash'] },
+          status: {
+            $nin: ['cancelled', 'canceled', 'refunded', 'failed', 'trash'],
+          },
           isDeleted: { $ne: true },
         },
       },
@@ -221,7 +257,8 @@ export class CustomerService {
       statsMap.set(customerId, {
         ordersCount: result.ordersCount || 0,
         totalSpent: result.totalSpent || 0,
-        averageOrderValue: result.ordersCount > 0 ? result.totalSpent / result.ordersCount : 0,
+        averageOrderValue:
+          result.ordersCount > 0 ? result.totalSpent / result.ordersCount : 0,
         lastOrderDate: result.lastOrderDate || null,
         firstOrderDate: result.firstOrderDate || null,
       });
@@ -233,7 +270,10 @@ export class CustomerService {
   /**
    * Get customers with filtering and pagination
    */
-  async findAll(userId: string, query: QueryCustomerDto): Promise<ICustomerResponse> {
+  async findAll(
+    userId: string,
+    query: QueryCustomerDto,
+  ): Promise<ICustomerResponse> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
@@ -297,7 +337,7 @@ export class CustomerService {
     ]);
 
     // Calculate dynamic stats for all customers in bulk
-    const customerIds = customers.map(c => c._id);
+    const customerIds = customers.map((c) => c._id);
     const statsMap = await this.calculateBulkCustomerStats(customerIds);
 
     // Map customers with their dynamic stats
@@ -315,16 +355,24 @@ export class CustomerService {
 
     // Apply stats-based filters (post-fetch filtering)
     if (query.minOrders !== undefined) {
-      customersWithStats = customersWithStats.filter(c => c.stats.ordersCount >= query.minOrders);
+      customersWithStats = customersWithStats.filter(
+        (c) => c.stats.ordersCount >= query.minOrders,
+      );
     }
     if (query.maxOrders !== undefined) {
-      customersWithStats = customersWithStats.filter(c => c.stats.ordersCount <= query.maxOrders);
+      customersWithStats = customersWithStats.filter(
+        (c) => c.stats.ordersCount <= query.maxOrders,
+      );
     }
     if (query.minSpent !== undefined) {
-      customersWithStats = customersWithStats.filter(c => c.stats.totalSpent >= query.minSpent);
+      customersWithStats = customersWithStats.filter(
+        (c) => c.stats.totalSpent >= query.minSpent,
+      );
     }
     if (query.maxSpent !== undefined) {
-      customersWithStats = customersWithStats.filter(c => c.stats.totalSpent <= query.maxSpent);
+      customersWithStats = customersWithStats.filter(
+        (c) => c.stats.totalSpent <= query.maxSpent,
+      );
     }
 
     return {
@@ -365,7 +413,10 @@ export class CustomerService {
   /**
    * Get customer by email for a store
    */
-  async findByEmail(storeId: string, email: string): Promise<CustomerDocument | null> {
+  async findByEmail(
+    storeId: string,
+    email: string,
+  ): Promise<CustomerDocument | null> {
     return this.customerModel.findOne({
       storeId: new Types.ObjectId(storeId),
       email: email.toLowerCase(),
@@ -376,7 +427,11 @@ export class CustomerService {
   /**
    * Update customer (internal fields only)
    */
-  async update(id: string, userId: string, dto: UpdateCustomerDto): Promise<ICustomer> {
+  async update(
+    id: string,
+    userId: string,
+    dto: UpdateCustomerDto,
+  ): Promise<ICustomer> {
     const customer = await this.customerModel.findOne({
       _id: new Types.ObjectId(id),
       isDeleted: false,
@@ -400,7 +455,12 @@ export class CustomerService {
   /**
    * Add note to customer
    */
-  async addNote(id: string, userId: string, userName: string, dto: AddCustomerNoteDto): Promise<ICustomer> {
+  async addNote(
+    id: string,
+    userId: string,
+    userName: string,
+    dto: AddCustomerNoteDto,
+  ): Promise<ICustomer> {
     const customer = await this.customerModel.findOne({
       _id: new Types.ObjectId(id),
       isDeleted: false,
@@ -429,7 +489,11 @@ export class CustomerService {
   /**
    * Delete note from customer
    */
-  async deleteNote(id: string, noteId: string, userId: string): Promise<ICustomer> {
+  async deleteNote(
+    id: string,
+    noteId: string,
+    userId: string,
+  ): Promise<ICustomer> {
     const customer = await this.customerModel.findOne({
       _id: new Types.ObjectId(id),
       isDeleted: false,
@@ -476,14 +540,18 @@ export class CustomerService {
     if (stats.totalSpent !== undefined) {
       customer.stats.totalSpent = stats.totalSpent;
       if (customer.stats.ordersCount > 0) {
-        customer.stats.averageOrderValue = stats.totalSpent / customer.stats.ordersCount;
+        customer.stats.averageOrderValue =
+          stats.totalSpent / customer.stats.ordersCount;
       }
     }
     if (stats.lastOrderDate) {
       customer.stats.lastOrderDate = stats.lastOrderDate;
     }
     if (stats.firstOrderDate) {
-      if (!customer.stats.firstOrderDate || stats.firstOrderDate < customer.stats.firstOrderDate) {
+      if (
+        !customer.stats.firstOrderDate ||
+        stats.firstOrderDate < customer.stats.firstOrderDate
+      ) {
         customer.stats.firstOrderDate = stats.firstOrderDate;
       }
     }
@@ -495,16 +563,23 @@ export class CustomerService {
    * Recalculate stats endpoint (deprecated - stats are now calculated dynamically from orders)
    * This method is kept for backwards compatibility but stats are always fresh from orders
    */
-  async recalculateAllStats(userId: string, storeId?: string): Promise<{ message: string }> {
+  async recalculateAllStats(
+    userId: string,
+    storeId?: string,
+  ): Promise<{ message: string }> {
     return {
-      message: 'Stats are now calculated dynamically from orders. No recalculation needed - stats are always up-to-date.'
+      message:
+        'Stats are now calculated dynamically from orders. No recalculation needed - stats are always up-to-date.',
     };
   }
 
   /**
    * Get customer statistics (calculated dynamically from orders)
    */
-  async getStats(userId: string, storeId?: string): Promise<ICustomerAggregateStats> {
+  async getStats(
+    userId: string,
+    storeId?: string,
+  ): Promise<ICustomerAggregateStats> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const customerFilter: any = {
@@ -514,7 +589,9 @@ export class CustomerService {
 
     const orderFilter: any = {
       storeId: { $in: storeIds },
-      status: { $nin: ['cancelled', 'canceled', 'refunded', 'failed', 'trash'] },
+      status: {
+        $nin: ['cancelled', 'canceled', 'refunded', 'failed', 'trash'],
+      },
       isDeleted: { $ne: true },
     };
 
@@ -535,8 +612,14 @@ export class CustomerService {
       customerOrderStats,
     ] = await Promise.all([
       this.customerModel.countDocuments(customerFilter),
-      this.customerModel.countDocuments({ ...customerFilter, status: CustomerStatus.ACTIVE }),
-      this.customerModel.countDocuments({ ...customerFilter, createdAt: { $gte: startOfMonth } }),
+      this.customerModel.countDocuments({
+        ...customerFilter,
+        status: CustomerStatus.ACTIVE,
+      }),
+      this.customerModel.countDocuments({
+        ...customerFilter,
+        createdAt: { $gte: startOfMonth },
+      }),
       // Calculate order stats directly from orders collection
       this.orderModel.aggregate([
         { $match: orderFilter },
@@ -550,7 +633,12 @@ export class CustomerService {
       ]),
       // Calculate per-customer stats from orders (for repeat customers and averages)
       this.orderModel.aggregate([
-        { $match: { ...orderFilter, localCustomerId: { $exists: true, $ne: null } } },
+        {
+          $match: {
+            ...orderFilter,
+            localCustomerId: { $exists: true, $ne: null },
+          },
+        },
         {
           $group: {
             _id: '$localCustomerId',
@@ -561,7 +649,9 @@ export class CustomerService {
         {
           $group: {
             _id: null,
-            repeatCustomers: { $sum: { $cond: [{ $gte: ['$ordersCount', 2] }, 1, 0] } },
+            repeatCustomers: {
+              $sum: { $cond: [{ $gte: ['$ordersCount', 2] }, 1, 0] },
+            },
             avgOrdersPerCustomer: { $avg: '$ordersCount' },
             avgSpentPerCustomer: { $avg: '$totalSpent' },
           },
@@ -570,11 +660,20 @@ export class CustomerService {
     ]);
 
     const stats = orderStats[0] || { totalOrders: 0, totalRevenue: 0 };
-    const custStats = customerOrderStats[0] || { repeatCustomers: 0, avgOrdersPerCustomer: 0, avgSpentPerCustomer: 0 };
+    const custStats = customerOrderStats[0] || {
+      repeatCustomers: 0,
+      avgOrdersPerCustomer: 0,
+      avgSpentPerCustomer: 0,
+    };
 
     // Get top customers by calculating their total spent from orders
     const topCustomersAgg = await this.orderModel.aggregate([
-      { $match: { ...orderFilter, localCustomerId: { $exists: true, $ne: null } } },
+      {
+        $match: {
+          ...orderFilter,
+          localCustomerId: { $exists: true, $ne: null },
+        },
+      },
       {
         $group: {
           _id: '$localCustomerId',
@@ -587,25 +686,32 @@ export class CustomerService {
     ]);
 
     // Fetch customer details for top customers
-    const topCustomerIds = topCustomersAgg.map(c => c._id);
-    const topCustomerDocs = await this.customerModel.find({ _id: { $in: topCustomerIds } });
-    const topCustomerMap = new Map(topCustomerDocs.map(c => [c._id.toString(), c]));
+    const topCustomerIds = topCustomersAgg.map((c) => c._id);
+    const topCustomerDocs = await this.customerModel.find({
+      _id: { $in: topCustomerIds },
+    });
+    const topCustomerMap = new Map(
+      topCustomerDocs.map((c) => [c._id.toString(), c]),
+    );
 
-    const topCustomers = topCustomersAgg.map(agg => {
-      const customer = topCustomerMap.get(agg._id.toString());
-      if (customer) {
-        const customerInterface = this.toInterface(customer);
-        customerInterface.stats = {
-          ordersCount: agg.ordersCount,
-          totalSpent: agg.totalSpent,
-          averageOrderValue: agg.ordersCount > 0 ? agg.totalSpent / agg.ordersCount : 0,
-          lastOrderDate: null,
-          firstOrderDate: null,
-        };
-        return customerInterface;
-      }
-      return null;
-    }).filter(Boolean);
+    const topCustomers = topCustomersAgg
+      .map((agg) => {
+        const customer = topCustomerMap.get(agg._id.toString());
+        if (customer) {
+          const customerInterface = this.toInterface(customer);
+          customerInterface.stats = {
+            ordersCount: agg.ordersCount,
+            totalSpent: agg.totalSpent,
+            averageOrderValue:
+              agg.ordersCount > 0 ? agg.totalSpent / agg.ordersCount : 0,
+            lastOrderDate: null,
+            firstOrderDate: null,
+          };
+          return customerInterface;
+        }
+        return null;
+      })
+      .filter(Boolean);
 
     return {
       totalCustomers,
@@ -614,7 +720,8 @@ export class CustomerService {
       repeatCustomers: custStats.repeatCustomers || 0,
       totalRevenue: stats.totalRevenue || 0,
       totalOrders: stats.totalOrders || 0,
-      averageOrderValue: stats.totalOrders > 0 ? stats.totalRevenue / stats.totalOrders : 0,
+      averageOrderValue:
+        stats.totalOrders > 0 ? stats.totalRevenue / stats.totalOrders : 0,
       averageOrdersPerCustomer: custStats.avgOrdersPerCustomer || 0,
       averageSpentPerCustomer: custStats.avgSpentPerCustomer || 0,
       topCustomers: topCustomers as ICustomer[],
@@ -648,7 +755,9 @@ export class CustomerService {
 
     const orderFilter: any = {
       storeId: { $in: storeIds },
-      status: { $nin: ['cancelled', 'canceled', 'refunded', 'failed', 'trash'] },
+      status: {
+        $nin: ['cancelled', 'canceled', 'refunded', 'failed', 'trash'],
+      },
       isDeleted: { $ne: true },
     };
 
@@ -677,7 +786,12 @@ export class CustomerService {
 
     // Calculate per-customer stats from orders
     const customerOrderStats = await this.orderModel.aggregate([
-      { $match: { ...orderFilter, localCustomerId: { $exists: true, $ne: null } } },
+      {
+        $match: {
+          ...orderFilter,
+          localCustomerId: { $exists: true, $ne: null },
+        },
+      },
       {
         $group: {
           _id: '$localCustomerId',
@@ -688,7 +802,10 @@ export class CustomerService {
     ]);
 
     // Create a map of customer stats
-    const customerStatsMap = new Map<string, { ordersCount: number; totalSpent: number }>();
+    const customerStatsMap = new Map<
+      string,
+      { ordersCount: number; totalSpent: number }
+    >();
     for (const stat of customerOrderStats) {
       customerStatsMap.set(stat._id.toString(), {
         ordersCount: stat.ordersCount,
@@ -697,8 +814,10 @@ export class CustomerService {
     }
 
     // Get all customers
-    const allCustomers = await this.customerModel.find(customerFilter).select('_id billing.country');
-    const customerIds = allCustomers.map(c => c._id.toString());
+    const allCustomers = await this.customerModel
+      .find(customerFilter)
+      .select('_id billing.country');
+    const customerIds = allCustomers.map((c) => c._id.toString());
 
     // Calculate repeat customers (2+ orders) from order stats
     let repeatCustomers = 0;
@@ -709,17 +828,22 @@ export class CustomerService {
     }
 
     // Overview stats
-    const [
-      totalCustomers,
-      activeCustomers,
-      newInPeriod,
-      payingCustomers,
-    ] = await Promise.all([
-      this.customerModel.countDocuments(customerFilter),
-      this.customerModel.countDocuments({ ...customerFilter, status: CustomerStatus.ACTIVE }),
-      this.customerModel.countDocuments({ ...customerFilter, createdAt: { $gte: startDate } }),
-      this.customerModel.countDocuments({ ...customerFilter, isPayingCustomer: true }),
-    ]);
+    const [totalCustomers, activeCustomers, newInPeriod, payingCustomers] =
+      await Promise.all([
+        this.customerModel.countDocuments(customerFilter),
+        this.customerModel.countDocuments({
+          ...customerFilter,
+          status: CustomerStatus.ACTIVE,
+        }),
+        this.customerModel.countDocuments({
+          ...customerFilter,
+          createdAt: { $gte: startDate },
+        }),
+        this.customerModel.countDocuments({
+          ...customerFilter,
+          isPayingCustomer: true,
+        }),
+      ]);
 
     // Customer growth trend
     const growthTrend = await this.customerModel.aggregate([
@@ -784,16 +908,21 @@ export class CustomerService {
     ]);
 
     // Geographic distribution with spending from orders
-    const customersWithCountry = await this.customerModel.find({
-      ...customerFilter,
-      'billing.country': { $exists: true, $nin: [null, ''] },
-    }).select('_id billing.country');
+    const customersWithCountry = await this.customerModel
+      .find({
+        ...customerFilter,
+        'billing.country': { $exists: true, $nin: [null, ''] },
+      })
+      .select('_id billing.country');
 
     const geoMap = new Map<string, { count: number; totalSpent: number }>();
     for (const customer of customersWithCountry) {
       const country = customer.billing?.country;
       if (country) {
-        const stats = customerStatsMap.get(customer._id.toString()) || { ordersCount: 0, totalSpent: 0 };
+        const stats = customerStatsMap.get(customer._id.toString()) || {
+          ordersCount: 0,
+          totalSpent: 0,
+        };
         const existing = geoMap.get(country) || { count: 0, totalSpent: 0 };
         geoMap.set(country, {
           count: existing.count + 1,
@@ -802,7 +931,11 @@ export class CustomerService {
       }
     }
     const geoDistribution = Array.from(geoMap.entries())
-      .map(([country, data]) => ({ country, count: data.count, totalSpent: data.totalSpent }))
+      .map(([country, data]) => ({
+        country,
+        count: data.count,
+        totalSpent: data.totalSpent,
+      }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
 
@@ -825,11 +958,19 @@ export class CustomerService {
       else if (spent < 10000) spendingBuckets[4].count++;
       else spendingBuckets[5].count++;
     }
-    const spendingDistribution = spendingBuckets.map(({ range, count }) => ({ range, count }));
+    const spendingDistribution = spendingBuckets.map(({ range, count }) => ({
+      range,
+      count,
+    }));
 
     // Top customers by spending from orders
     const topCustomersAgg = await this.orderModel.aggregate([
-      { $match: { ...orderFilter, localCustomerId: { $exists: true, $ne: null } } },
+      {
+        $match: {
+          ...orderFilter,
+          localCustomerId: { $exists: true, $ne: null },
+        },
+      },
       {
         $group: {
           _id: '$localCustomerId',
@@ -841,15 +982,22 @@ export class CustomerService {
       { $limit: 10 },
     ]);
 
-    const topCustomerIds = topCustomersAgg.map(c => c._id);
-    const topCustomerDocs = await this.customerModel.find({ _id: { $in: topCustomerIds } });
-    const topCustomerMap = new Map(topCustomerDocs.map(c => [c._id.toString(), c]));
+    const topCustomerIds = topCustomersAgg.map((c) => c._id);
+    const topCustomerDocs = await this.customerModel.find({
+      _id: { $in: topCustomerIds },
+    });
+    const topCustomerMap = new Map(
+      topCustomerDocs.map((c) => [c._id.toString(), c]),
+    );
 
-    const topCustomers = topCustomersAgg.map(agg => {
+    const topCustomers = topCustomersAgg.map((agg) => {
       const customer = topCustomerMap.get(agg._id.toString());
       return {
         customerId: agg._id.toString(),
-        name: customer ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() || customer.email : 'Unknown',
+        name: customer
+          ? `${customer.firstName || ''} ${customer.lastName || ''}`.trim() ||
+            customer.email
+          : 'Unknown',
         email: customer?.email || '',
         totalSpent: agg.totalSpent,
         ordersCount: agg.ordersCount,
@@ -909,7 +1057,10 @@ export class CustomerService {
       },
     ]);
 
-    const orderTotalsData = orderTotals[0] || { totalOrders: 0, totalRevenue: 0 };
+    const orderTotalsData = orderTotals[0] || {
+      totalOrders: 0,
+      totalRevenue: 0,
+    };
     const customersWithOrders = customerOrderStats.length;
 
     // Calculate max values
@@ -920,9 +1071,18 @@ export class CustomerService {
       if (stat.totalSpent > maxSpent) maxSpent = stat.totalSpent;
     }
 
-    const avgOrdersPerCustomer = customersWithOrders > 0 ? orderTotalsData.totalOrders / customersWithOrders : 0;
-    const avgSpentPerCustomer = customersWithOrders > 0 ? orderTotalsData.totalRevenue / customersWithOrders : 0;
-    const avgOrderValue = orderTotalsData.totalOrders > 0 ? orderTotalsData.totalRevenue / orderTotalsData.totalOrders : 0;
+    const avgOrdersPerCustomer =
+      customersWithOrders > 0
+        ? orderTotalsData.totalOrders / customersWithOrders
+        : 0;
+    const avgSpentPerCustomer =
+      customersWithOrders > 0
+        ? orderTotalsData.totalRevenue / customersWithOrders
+        : 0;
+    const avgOrderValue =
+      orderTotalsData.totalOrders > 0
+        ? orderTotalsData.totalRevenue / orderTotalsData.totalOrders
+        : 0;
 
     // New vs repeat customers breakdown
     let newCustomersCount = 0;
@@ -968,7 +1128,10 @@ export class CustomerService {
         newInPeriod,
         repeatCustomers,
         payingCustomers,
-        repeatRate: totalCustomers > 0 ? Math.round((repeatCustomers / totalCustomers) * 100) : 0,
+        repeatRate:
+          totalCustomers > 0
+            ? Math.round((repeatCustomers / totalCustomers) * 100)
+            : 0,
       },
       growthTrend,
       tierDistribution,
@@ -1015,7 +1178,9 @@ export class CustomerService {
     storeId: string,
     wooCustomer: WooCustomer,
   ): Promise<CustomerDocument | null> {
-    const normalizedPhone = this.normalizePhoneNumber(wooCustomer.billing?.phone);
+    const normalizedPhone = this.normalizePhoneNumber(
+      wooCustomer.billing?.phone,
+    );
 
     const existingCustomer = await this.customerModel.findOne({
       storeId: new Types.ObjectId(storeId),
@@ -1024,7 +1189,9 @@ export class CustomerService {
 
     // Skip creating new customers without a phone number
     if (!existingCustomer && !normalizedPhone) {
-      console.log(`Skipping WooCommerce customer ${wooCustomer.id} - no valid phone number`);
+      console.log(
+        `Skipping WooCommerce customer ${wooCustomer.id} - no valid phone number`,
+      );
       return null;
     }
 
@@ -1108,15 +1275,19 @@ export class CustomerService {
       postcode?: string;
       country?: string;
     },
-    customerId: number = 0,
+    customerId = 0,
     orderDate?: Date | string,
   ): Promise<CustomerDocument | null> {
-    const normalizedPhone = billing.phone ? this.normalizePhoneNumber(billing.phone) : null;
+    const normalizedPhone = billing.phone
+      ? this.normalizePhoneNumber(billing.phone)
+      : null;
     const normalizedEmail = billing.email?.toLowerCase()?.trim() || null;
 
     // Skip customers without a valid phone number
     if (!normalizedPhone) {
-      console.log(`Skipping customer creation - no valid phone number provided`);
+      console.log(
+        `Skipping customer creation - no valid phone number provided`,
+      );
       return null;
     }
 
@@ -1149,7 +1320,10 @@ export class CustomerService {
     // Step 3: If still not found, try to find customer via separate phone collection
     if (!customer && normalizedPhone) {
       try {
-        const customerFromPhone = await this.phoneService.findCustomerByPhone(storeId, normalizedPhone);
+        const customerFromPhone = await this.phoneService.findCustomerByPhone(
+          storeId,
+          normalizedPhone,
+        );
         if (customerFromPhone) {
           customer = customerFromPhone as CustomerDocument;
           // If found by phone and email is provided, add email to customer
@@ -1160,20 +1334,27 @@ export class CustomerService {
         }
       } catch (error) {
         // Log but continue - this is an optimization
-        console.warn(`Failed to lookup customer by phone collection: ${error.message}`);
+        console.warn(
+          `Failed to lookup customer by phone collection: ${error.message}`,
+        );
       }
     }
 
     // Step 4: If still not found, try to find customer via separate email collection
     if (!customer && normalizedEmail) {
       try {
-        const customerFromEmail = await this.emailService.findCustomerByEmail(storeId, normalizedEmail);
+        const customerFromEmail = await this.emailService.findCustomerByEmail(
+          storeId,
+          normalizedEmail,
+        );
         if (customerFromEmail) {
           customer = customerFromEmail as CustomerDocument;
         }
       } catch (error) {
         // Log but continue - this is an optimization
-        console.warn(`Failed to lookup customer by email collection: ${error.message}`);
+        console.warn(
+          `Failed to lookup customer by email collection: ${error.message}`,
+        );
       }
     }
 
@@ -1253,7 +1434,8 @@ export class CustomerService {
       firstName: billing.firstName,
       lastName: billing.lastName,
       phone: normalizedPhone,
-      source: customerId > 0 ? CustomerSource.WOOCOMMERCE : CustomerSource.GUEST,
+      source:
+        customerId > 0 ? CustomerSource.WOOCOMMERCE : CustomerSource.GUEST,
       billing: {
         firstName: billing.firstName,
         lastName: billing.lastName,
@@ -1294,7 +1476,9 @@ export class CustomerService {
     }
 
     if (primary.storeId.toString() !== secondary.storeId.toString()) {
-      throw new ForbiddenException('Cannot merge customers from different stores');
+      throw new ForbiddenException(
+        'Cannot merge customers from different stores',
+      );
     }
 
     // Merge email (prefer primary, fallback to secondary)
@@ -1317,9 +1501,15 @@ export class CustomerService {
 
     // Transfer phones from secondary to primary in phones collection
     try {
-      const secondaryPhones = await this.phoneService.getCustomerPhones(secondaryCustomerId);
+      const secondaryPhones = await this.phoneService.getCustomerPhones(
+        secondaryCustomerId,
+      );
       for (const phone of secondaryPhones) {
-        await this.phoneService.transferToCustomer(phone._id.toString(), primaryCustomerId, 'customer_merge');
+        await this.phoneService.transferToCustomer(
+          phone._id.toString(),
+          primaryCustomerId,
+          'customer_merge',
+        );
       }
     } catch (error) {
       console.warn(`Failed to transfer phones during merge: ${error.message}`);
@@ -1327,38 +1517,56 @@ export class CustomerService {
 
     // Transfer emails from secondary to primary in emails collection
     try {
-      const secondaryEmails = await this.emailService.getCustomerEmails(secondaryCustomerId);
+      const secondaryEmails = await this.emailService.getCustomerEmails(
+        secondaryCustomerId,
+      );
       for (const email of secondaryEmails) {
-        await this.emailService.transferToCustomer(email._id.toString(), primaryCustomerId, 'customer_merge');
+        await this.emailService.transferToCustomer(
+          email._id.toString(),
+          primaryCustomerId,
+          'customer_merge',
+        );
       }
     } catch (error) {
       console.warn(`Failed to transfer emails during merge: ${error.message}`);
     }
 
     // Merge tags - combine unique tags
-    const allTags = new Set([...(primary.tags || []), ...(secondary.tags || [])]);
+    const allTags = new Set([
+      ...(primary.tags || []),
+      ...(secondary.tags || []),
+    ]);
     primary.tags = Array.from(allTags);
 
     // Merge notes
     primary.notes = [...(primary.notes || []), ...(secondary.notes || [])];
 
     // Merge stats
-    primary.stats.ordersCount = (primary.stats.ordersCount || 0) + (secondary.stats.ordersCount || 0);
-    primary.stats.totalSpent = (primary.stats.totalSpent || 0) + (secondary.stats.totalSpent || 0);
+    primary.stats.ordersCount =
+      (primary.stats.ordersCount || 0) + (secondary.stats.ordersCount || 0);
+    primary.stats.totalSpent =
+      (primary.stats.totalSpent || 0) + (secondary.stats.totalSpent || 0);
     if (primary.stats.ordersCount > 0) {
-      primary.stats.averageOrderValue = primary.stats.totalSpent / primary.stats.ordersCount;
+      primary.stats.averageOrderValue =
+        primary.stats.totalSpent / primary.stats.ordersCount;
     }
 
     // Keep earliest first order date
     if (secondary.stats.firstOrderDate) {
-      if (!primary.stats.firstOrderDate || secondary.stats.firstOrderDate < primary.stats.firstOrderDate) {
+      if (
+        !primary.stats.firstOrderDate ||
+        secondary.stats.firstOrderDate < primary.stats.firstOrderDate
+      ) {
         primary.stats.firstOrderDate = secondary.stats.firstOrderDate;
       }
     }
 
     // Keep latest last order date
     if (secondary.stats.lastOrderDate) {
-      if (!primary.stats.lastOrderDate || secondary.stats.lastOrderDate > primary.stats.lastOrderDate) {
+      if (
+        !primary.stats.lastOrderDate ||
+        secondary.stats.lastOrderDate > primary.stats.lastOrderDate
+      ) {
         primary.stats.lastOrderDate = secondary.stats.lastOrderDate;
       }
     }
@@ -1398,14 +1606,17 @@ export class CustomerService {
 
     // Find the phone in phones collection
     const phones = await this.phoneService.getCustomerPhones(customerId);
-    const phoneRecord = phones.find(p => p.number === normalizedPhone);
+    const phoneRecord = phones.find((p) => p.number === normalizedPhone);
     if (!phoneRecord) {
       throw new NotFoundException('Phone number not found for this customer');
     }
 
     // Update verification in phones collection
     if (isVerified) {
-      await this.phoneService.verify(phoneRecord._id.toString(), verifiedBy || 'system');
+      await this.phoneService.verify(
+        phoneRecord._id.toString(),
+        verifiedBy || 'system',
+      );
       // Set as primary phone if verified
       customer.phone = normalizedPhone;
       await customer.save();
@@ -1422,7 +1633,7 @@ export class CustomerService {
   async addPhoneNumber(
     customerId: string,
     phoneNumber: string,
-    source: string = 'manual',
+    source = 'manual',
   ): Promise<CustomerDocument> {
     const customer = await this.customerModel.findById(customerId);
     if (!customer) {
@@ -1470,16 +1681,19 @@ export class CustomerService {
 
     // Find and delete the phone from collection
     const phones = await this.phoneService.getCustomerPhones(customerId);
-    const phoneRecord = phones.find(p => p.number === normalizedPhone);
+    const phoneRecord = phones.find((p) => p.number === normalizedPhone);
     if (phoneRecord) {
       await this.phoneService.delete(phoneRecord._id.toString());
     }
 
     // If removed phone was primary, set new primary from verified phones
     if (customer.phone === normalizedPhone) {
-      const remainingPhones = phones.filter(p => p.number !== normalizedPhone);
-      const verifiedPhone = remainingPhones.find(p => p.isVerified);
-      customer.phone = verifiedPhone?.number || remainingPhones[0]?.number || null;
+      const remainingPhones = phones.filter(
+        (p) => p.number !== normalizedPhone,
+      );
+      const verifiedPhone = remainingPhones.find((p) => p.isVerified);
+      customer.phone =
+        verifiedPhone?.number || remainingPhones[0]?.number || null;
       await customer.save();
     }
 
@@ -1505,7 +1719,7 @@ export class CustomerService {
 
     // Verify phone exists in phones collection
     const phones = await this.phoneService.getCustomerPhones(customerId);
-    const phoneExists = phones.some(p => p.number === normalizedPhone);
+    const phoneExists = phones.some((p) => p.number === normalizedPhone);
     if (!phoneExists) {
       throw new NotFoundException('Phone number not found for this customer');
     }
@@ -1596,7 +1810,9 @@ export class CustomerService {
         customer.billing?.city || '',
         customer.billing?.country || '',
         customer.source || '',
-        customer.createdAt ? new Date(customer.createdAt).toISOString().split('T')[0] : '',
+        customer.createdAt
+          ? new Date(customer.createdAt).toISOString().split('T')[0]
+          : '',
         (customer.tags || []).join('; '),
       ];
     });
@@ -1612,10 +1828,12 @@ export class CustomerService {
 
     // Build CSV with UTF-8 BOM for Arabic text support
     const BOM = '\uFEFF';
-    const csvContent = BOM + [
-      headers.map(escapeValue).join(','),
-      ...rows.map((row) => row.map(escapeValue).join(',')),
-    ].join('\n');
+    const csvContent =
+      BOM +
+      [
+        headers.map(escapeValue).join(','),
+        ...rows.map((row) => row.map(escapeValue).join(',')),
+      ].join('\n');
 
     return csvContent;
   }
@@ -1641,7 +1859,10 @@ export class CustomerService {
   /**
    * Create a customer segment
    */
-  async createSegment(userId: string, dto: CreateSegmentDto): Promise<ICustomerSegment> {
+  async createSegment(
+    userId: string,
+    dto: CreateSegmentDto,
+  ): Promise<ICustomerSegment> {
     const storeIds = await this.getUserStoreIds(userId);
     if (storeIds.length === 0) {
       throw new ForbiddenException('No store found');
@@ -1728,8 +1949,8 @@ export class CustomerService {
   async getSegmentCustomers(
     segmentId: string,
     userId: string,
-    page: number = 1,
-    size: number = 20,
+    page = 1,
+    size = 20,
   ): Promise<ICustomerResponse> {
     const segment = await this.segmentModel.findOne({
       _id: new Types.ObjectId(segmentId),
@@ -1749,7 +1970,11 @@ export class CustomerService {
     const skip = (page - 1) * size;
 
     const [customers, total] = await Promise.all([
-      this.customerModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(size),
+      this.customerModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(size),
       this.customerModel.countDocuments(filter),
     ]);
 

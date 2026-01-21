@@ -10,7 +10,12 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { SKU, SKUDocument } from './schema';
 import { CreateSKUDto, UpdateSKUDto, QuerySKUDto } from './dto';
-import { ISKU, ISKUResponse, ISKUCostBreakdown, IBOMMaterial } from './interface';
+import {
+  ISKU,
+  ISKUResponse,
+  ISKUCostBreakdown,
+  IBOMMaterial,
+} from './interface';
 import { SKUStatus } from './enum';
 import { Material, MaterialDocument } from '../inventory-materials/schema';
 import { Store, StoreDocument } from '../store/schema';
@@ -28,7 +33,11 @@ export class InventorySKUsService {
   /**
    * Create a new SKU
    */
-  async create(userId: string, storeId: string, dto: CreateSKUDto): Promise<ISKU> {
+  async create(
+    userId: string,
+    storeId: string,
+    dto: CreateSKUDto,
+  ): Promise<ISKU> {
     await this.getStoreWithAccess(storeId, userId);
 
     // Check for duplicate SKU (active)
@@ -63,12 +72,13 @@ export class InventorySKUsService {
       deletedSKU.specs = dto.specs || {};
       deletedSKU.category = dto.category || '';
       deletedSKU.status = dto.status || SKUStatus.DRAFT;
-      deletedSKU.materials = dto.materials?.map((m) => ({
-        materialId: new Types.ObjectId(m.materialId),
-        quantity: m.quantity,
-        unit: m.unit,
-        notes: m.notes || '',
-      })) as any || [];
+      deletedSKU.materials =
+        (dto.materials?.map((m) => ({
+          materialId: new Types.ObjectId(m.materialId),
+          quantity: m.quantity,
+          unit: m.unit,
+          notes: m.notes || '',
+        })) as any) || [];
       deletedSKU.laborCost = dto.laborCost || 0;
       deletedSKU.overheadCost = dto.overheadCost || 0;
       deletedSKU.fixedCost = dto.fixedCost || false;
@@ -88,12 +98,13 @@ export class InventorySKUsService {
         specs: dto.specs || {},
         category: dto.category || '',
         status: dto.status || 'draft',
-        materials: dto.materials?.map((m) => ({
-          materialId: new Types.ObjectId(m.materialId),
-          quantity: m.quantity,
-          unit: m.unit,
-          notes: m.notes || '',
-        })) || [],
+        materials:
+          dto.materials?.map((m) => ({
+            materialId: new Types.ObjectId(m.materialId),
+            quantity: m.quantity,
+            unit: m.unit,
+            notes: m.notes || '',
+          })) || [],
         laborCost: dto.laborCost || 0,
         overheadCost: dto.overheadCost || 0,
         fixedCost: dto.fixedCost || false,
@@ -158,7 +169,9 @@ export class InventorySKUsService {
     ]);
 
     // Enrich with material details
-    const enrichedSKUs = await Promise.all(skus.map((s) => this.enrichSKUWithMaterials(s)));
+    const enrichedSKUs = await Promise.all(
+      skus.map((s) => this.enrichSKUWithMaterials(s)),
+    );
 
     return {
       skus: enrichedSKUs,
@@ -191,7 +204,11 @@ export class InventorySKUsService {
   /**
    * Update a SKU
    */
-  async update(userId: string, skuId: string, dto: UpdateSKUDto): Promise<ISKU> {
+  async update(
+    userId: string,
+    skuId: string,
+    dto: UpdateSKUDto,
+  ): Promise<ISKU> {
     const sku = await this.skuModel.findOne({
       _id: new Types.ObjectId(skuId),
       isDeleted: false,
@@ -262,7 +279,10 @@ export class InventorySKUsService {
   /**
    * Get cost breakdown for a SKU
    */
-  async getCostBreakdown(userId: string, skuId: string): Promise<ISKUCostBreakdown> {
+  async getCostBreakdown(
+    userId: string,
+    skuId: string,
+  ): Promise<ISKUCostBreakdown> {
     const sku = await this.skuModel.findOne({
       _id: new Types.ObjectId(skuId),
       isDeleted: false,
@@ -321,7 +341,9 @@ export class InventorySKUsService {
     sku.calculatedCost = await this.calculateCost(sku);
     await sku.save();
 
-    this.logger.log(`SKU cost recalculated: ${sku.sku} = ${sku.calculatedCost}`);
+    this.logger.log(
+      `SKU cost recalculated: ${sku.sku} = ${sku.calculatedCost}`,
+    );
     return this.enrichSKUWithMaterials(sku);
   }
 
@@ -356,7 +378,10 @@ export class InventorySKUsService {
     return Math.round(totalCost * 100) / 100;
   }
 
-  private async validateMaterials(storeId: string, materials: { materialId: string }[]): Promise<void> {
+  private async validateMaterials(
+    storeId: string,
+    materials: { materialId: string }[],
+  ): Promise<void> {
     for (const m of materials) {
       const material = await this.materialModel.findOne({
         _id: new Types.ObjectId(m.materialId),
@@ -416,7 +441,10 @@ export class InventorySKUsService {
     };
   }
 
-  private async getStoreWithAccess(storeId: string, userId: string): Promise<StoreDocument> {
+  private async getStoreWithAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<StoreDocument> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       isDeleted: false,

@@ -18,26 +18,26 @@ import { MetadataModule } from 'src/common_metadata_module/module';
 import { ConfigModule } from '@nestjs/config';
 
 @Module({
-    imports: [
-        ConfigModule,
-        RoleModule,
-        MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
-        PassportModule.register({ defaultStrategy: 'jwt' }),
-        HttpModule,
-        forwardRef(() => LoggerModule),
-        forwardRef(() => ImageModule),
-        forwardRef(() => MetadataModule),
-    ],
-    controllers: [AuthController],
-    providers: [
-        AuthService,
-        JwtStrategy,
-        SMSService,
-        EmailService,
-        MailrelayService,
-        MailerService,
-        LoggerService
-    ],
-    exports: [JwtStrategy, AuthService],
+  imports: [
+    ConfigModule,
+    RoleModule,
+    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    HttpModule,
+    forwardRef(() => LoggerModule),
+    forwardRef(() => ImageModule),
+    forwardRef(() => MetadataModule),
+  ],
+  controllers: [AuthController],
+  providers: [
+    AuthService,
+    JwtStrategy,
+    SMSService,
+    EmailService,
+    MailrelayService,
+    MailerService,
+    LoggerService,
+  ],
+  exports: [JwtStrategy, AuthService],
 })
-export class AuthModule { }
+export class AuthModule {}

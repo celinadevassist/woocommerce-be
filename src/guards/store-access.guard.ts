@@ -54,9 +54,7 @@ export class StoreAccessGuard implements CanActivate {
     }
 
     // Find user's membership in store
-    const member = store.members?.find(
-      (m) => m.userId.toString() === userId,
-    );
+    const member = store.members?.find((m) => m.userId.toString() === userId);
 
     if (!member) {
       throw new ForbiddenException('You do not have access to this store');

@@ -1,6 +1,10 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
 
@@ -35,12 +39,16 @@ export class S3UploadService {
 
   constructor(private configService: ConfigService) {
     const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
+    const secretAccessKey = this.configService.get<string>(
+      'AWS_SECRET_ACCESS_KEY',
+    );
     this.region = this.configService.get<string>('AWS_REGION') || 'us-east-1';
     this.bucket = this.configService.get<string>('AWS_S3_BUCKET');
 
     if (!accessKeyId || !secretAccessKey || !this.bucket) {
-      console.warn('AWS S3 credentials not fully configured. S3 upload will not work.');
+      console.warn(
+        'AWS S3 credentials not fully configured. S3 upload will not work.',
+      );
     }
 
     if (accessKeyId && secretAccessKey) {
@@ -68,18 +76,22 @@ export class S3UploadService {
   async uploadFile(
     file: Buffer | UploadedFile,
     originalName: string,
-    options: UploadOptions = {}
+    options: UploadOptions = {},
   ): Promise<UploadResult> {
     // Extract buffer and size from file
     const fileBuffer = Buffer.isBuffer(file) ? file : file.buffer;
     const fileSize = fileBuffer.length;
-    const fileMimeType = Buffer.isBuffer(file) ? options.contentType : (file as UploadedFile).mimetype;
+    const fileMimeType = Buffer.isBuffer(file)
+      ? options.contentType
+      : (file as UploadedFile).mimetype;
 
     // Validate file size
     const maxSize = options.maxSizeBytes || 10 * 1024 * 1024; // Default 10MB
     if (fileSize > maxSize) {
       throw new BadRequestException(
-        `File size exceeds maximum allowed size of ${Math.round(maxSize / 1024 / 1024)}MB`
+        `File size exceeds maximum allowed size of ${Math.round(
+          maxSize / 1024 / 1024,
+        )}MB`,
       );
     }
 
@@ -87,13 +99,16 @@ export class S3UploadService {
     if (options.allowedMimeTypes && options.allowedMimeTypes.length > 0) {
       if (!fileMimeType || !options.allowedMimeTypes.includes(fileMimeType)) {
         throw new BadRequestException(
-          `File type not allowed. Allowed types: ${options.allowedMimeTypes.join(', ')}`
+          `File type not allowed. Allowed types: ${options.allowedMimeTypes.join(
+            ', ',
+          )}`,
         );
       }
     }
 
     // Generate unique filename
-    const fileExtension = path.extname(originalName) || this.getExtensionFromMimeType(fileMimeType);
+    const fileExtension =
+      path.extname(originalName) || this.getExtensionFromMimeType(fileMimeType);
     const uniqueFilename = `${randomUUID()}${fileExtension}`;
 
     // Build S3 key with folder
@@ -101,7 +116,8 @@ export class S3UploadService {
     const key = `${folder}/${uniqueFilename}`;
 
     // Determine content type
-    const contentType = fileMimeType || options.contentType || 'application/octet-stream';
+    const contentType =
+      fileMimeType || options.contentType || 'application/octet-stream';
 
     // Upload to S3
     // Note: ACL removed - use bucket policy for public access instead
@@ -115,7 +131,9 @@ export class S3UploadService {
     try {
       console.log(`[S3Upload] Starting upload: ${key}`);
       console.log(`[S3Upload] Bucket: ${this.bucket}, Region: ${this.region}`);
-      console.log(`[S3Upload] File size: ${fileSize} bytes, Content-Type: ${contentType}`);
+      console.log(
+        `[S3Upload] File size: ${fileSize} bytes, Content-Type: ${contentType}`,
+      );
 
       await this.s3Client.send(command);
 
@@ -135,10 +153,16 @@ export class S3UploadService {
       console.error(`[S3Upload] Error uploading file: ${key}`);
       console.error(`[S3Upload] Error name: ${s3Error.name}`);
       console.error(`[S3Upload] Error message: ${s3Error.message}`);
-      console.error(`[S3Upload] Error code: ${s3Error.Code || s3Error.$metadata?.httpStatusCode}`);
+      console.error(
+        `[S3Upload] Error code: ${
+          s3Error.Code || s3Error.$metadata?.httpStatusCode
+        }`,
+      );
 
       if (s3Error.$metadata) {
-        console.error(`[S3Upload] HTTP Status: ${s3Error.$metadata.httpStatusCode}`);
+        console.error(
+          `[S3Upload] HTTP Status: ${s3Error.$metadata.httpStatusCode}`,
+        );
         console.error(`[S3Upload] Request ID: ${s3Error.$metadata.requestId}`);
       }
 
@@ -147,13 +171,20 @@ export class S3UploadService {
 
       if (s3Error.name === 'NoSuchBucket') {
         userMessage = `S3 bucket '${this.bucket}' does not exist`;
-      } else if (s3Error.name === 'AccessDenied' || s3Error.Code === 'AccessDenied') {
-        userMessage = 'Access denied. Check AWS credentials and bucket permissions';
+      } else if (
+        s3Error.name === 'AccessDenied' ||
+        s3Error.Code === 'AccessDenied'
+      ) {
+        userMessage =
+          'Access denied. Check AWS credentials and bucket permissions';
       } else if (s3Error.name === 'InvalidAccessKeyId') {
         userMessage = 'Invalid AWS Access Key ID';
       } else if (s3Error.name === 'SignatureDoesNotMatch') {
         userMessage = 'Invalid AWS Secret Access Key';
-      } else if (s3Error.name === 'NetworkingError' || s3Error.code === 'ENOTFOUND') {
+      } else if (
+        s3Error.name === 'NetworkingError' ||
+        s3Error.code === 'ENOTFOUND'
+      ) {
         userMessage = 'Network error. Check your internet connection';
       } else if (s3Error.$metadata?.httpStatusCode === 403) {
         userMessage = 'Forbidden. Check bucket policy and ACL permissions';
@@ -169,7 +200,7 @@ export class S3UploadService {
   async uploadImage(
     file: Buffer | UploadedFile,
     originalName: string,
-    folder: string = 'images'
+    folder = 'images',
   ): Promise<UploadResult> {
     return this.uploadFile(file, originalName, {
       folder,
@@ -190,7 +221,7 @@ export class S3UploadService {
   async uploadDocument(
     file: Buffer | UploadedFile,
     originalName: string,
-    folder: string = 'documents'
+    folder = 'documents',
   ): Promise<UploadResult> {
     return this.uploadFile(file, originalName, {
       folder,
@@ -212,16 +243,12 @@ export class S3UploadService {
   async uploadProfileImage(
     file: Buffer | UploadedFile,
     originalName: string,
-    userId: string
+    userId: string,
   ): Promise<UploadResult> {
     return this.uploadFile(file, originalName, {
       folder: `profiles/${userId}`,
       maxSizeBytes: 2 * 1024 * 1024, // 2MB for profile images
-      allowedMimeTypes: [
-        'image/jpeg',
-        'image/png',
-        'image/webp',
-      ],
+      allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
     });
   }
 
@@ -255,15 +282,23 @@ export class S3UploadService {
       console.error(`[S3Delete] Error deleting file: ${key}`);
       console.error(`[S3Delete] Error name: ${s3Error.name}`);
       console.error(`[S3Delete] Error message: ${s3Error.message}`);
-      console.error(`[S3Delete] Error code: ${s3Error.Code || s3Error.$metadata?.httpStatusCode}`);
+      console.error(
+        `[S3Delete] Error code: ${
+          s3Error.Code || s3Error.$metadata?.httpStatusCode
+        }`,
+      );
 
       if (s3Error.$metadata) {
-        console.error(`[S3Delete] HTTP Status: ${s3Error.$metadata.httpStatusCode}`);
+        console.error(
+          `[S3Delete] HTTP Status: ${s3Error.$metadata.httpStatusCode}`,
+        );
         console.error(`[S3Delete] Request ID: ${s3Error.$metadata.requestId}`);
       }
 
       // Re-throw with more context
-      throw new BadRequestException(`Failed to delete file from S3: ${s3Error.message}`);
+      throw new BadRequestException(
+        `Failed to delete file from S3: ${s3Error.message}`,
+      );
     }
   }
 
@@ -279,9 +314,11 @@ export class S3UploadService {
       'image/svg+xml': '.svg',
       'application/pdf': '.pdf',
       'application/msword': '.doc',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        '.docx',
       'application/vnd.ms-excel': '.xls',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':
+        '.xlsx',
       'text/plain': '.txt',
     };
 
@@ -293,7 +330,9 @@ export class S3UploadService {
    */
   isConfigured(): boolean {
     const accessKeyId = this.configService.get<string>('AWS_ACCESS_KEY_ID');
-    const secretAccessKey = this.configService.get<string>('AWS_SECRET_ACCESS_KEY');
+    const secretAccessKey = this.configService.get<string>(
+      'AWS_SECRET_ACCESS_KEY',
+    );
     return !!(accessKeyId && secretAccessKey && this.bucket);
   }
 }

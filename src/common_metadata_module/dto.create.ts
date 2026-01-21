@@ -6,7 +6,7 @@ import { ModuleType } from './enum';
 export class CreateMetadataDto {
   @ApiProperty({
     description: 'ID of the user this metadata belongs to',
-    example: '60d21b4667d0d8992e610c85'
+    example: '60d21b4667d0d8992e610c85',
   })
   @IsMongoId()
   @IsNotEmpty()
@@ -15,7 +15,7 @@ export class CreateMetadataDto {
   @ApiProperty({
     description: 'Module this metadata is for',
     enum: ModuleType,
-    example: ModuleType.EMAIL_MARKETING
+    example: ModuleType.EMAIL_MARKETING,
   })
   @IsEnum(ModuleType)
   @IsNotEmpty()
@@ -23,17 +23,17 @@ export class CreateMetadataDto {
 
   @ApiProperty({
     description: 'Metadata object containing flexible key-value pairs',
-    example: { 
+    example: {
       erpnext: {
-        baseUrl: "https://erpnext-marketing.sys-track-overview.site",
-        token: "de668493e4344b0:38d508b26d63eba",
-        communication_doctype: "User",
-        communication_name: "Administrator",
-        default_sender: "support@2zpoint.com",
-        test_email: "test@example.com"
-  }
+        baseUrl: 'https://erpnext-marketing.sys-track-overview.site',
+        token: 'de668493e4344b0:38d508b26d63eba',
+        communication_doctype: 'User',
+        communication_name: 'Administrator',
+        default_sender: 'support@2zpoint.com',
+        test_email: 'test@example.com',
+      },
     },
-    type: 'object'
+    type: 'object',
   })
   @IsObject()
   @IsNotEmpty()
@@ -42,6 +42,8 @@ export class CreateMetadataDto {
 
 export const CreateMetadataSchema = Joi.object({
   userId: Joi.string().required(),
-  forModule: Joi.string().valid(...Object.values(ModuleType)).required(),
+  forModule: Joi.string()
+    .valid(...Object.values(ModuleType))
+    .required(),
   meta: Joi.object().required(),
-}); 
+});

@@ -2,9 +2,19 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
 import { ReviewRequestTrigger, ReviewRequestChannel } from './enum';
 
-@Schema({ timestamps: true, versionKey: false, collection: 'review_request_settings' })
+@Schema({
+  timestamps: true,
+  versionKey: false,
+  collection: 'review_request_settings',
+})
 export class ReviewRequestSettings extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, unique: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    unique: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   // Enable/disable
@@ -12,7 +22,11 @@ export class ReviewRequestSettings extends Document {
   enabled: boolean;
 
   // Trigger settings
-  @Prop({ type: String, enum: Object.values(ReviewRequestTrigger), default: ReviewRequestTrigger.DELIVERED })
+  @Prop({
+    type: String,
+    enum: Object.values(ReviewRequestTrigger),
+    default: ReviewRequestTrigger.DELIVERED,
+  })
   triggerOn: ReviewRequestTrigger;
 
   @Prop({ default: 24 })
@@ -22,7 +36,11 @@ export class ReviewRequestSettings extends Document {
   linkExpirationDays: number;
 
   // Channel settings
-  @Prop({ type: String, enum: Object.values(ReviewRequestChannel), default: ReviewRequestChannel.SMS })
+  @Prop({
+    type: String,
+    enum: Object.values(ReviewRequestChannel),
+    default: ReviewRequestChannel.SMS,
+  })
   channel: ReviewRequestChannel;
 
   // Reminder settings
@@ -37,12 +55,14 @@ export class ReviewRequestSettings extends Document {
 
   // SMS Templates
   @Prop({
-    default: 'Hi {customer_name}! Thank you for your order #{order_number}. We\'d love to hear your feedback! Click here to leave a review: {review_link}',
+    default:
+      "Hi {customer_name}! Thank you for your order #{order_number}. We'd love to hear your feedback! Click here to leave a review: {review_link}",
   })
   smsTemplate: string;
 
   @Prop({
-    default: 'Hi {customer_name}! Just a reminder - we\'d still love to hear your thoughts on your recent order #{order_number}. {review_link}',
+    default:
+      "Hi {customer_name}! Just a reminder - we'd still love to hear your thoughts on your recent order #{order_number}. {review_link}",
   })
   reminderTemplate: string;
 
@@ -72,4 +92,6 @@ export class ReviewRequestSettings extends Document {
 
 export type ReviewRequestSettingsDocument = ReviewRequestSettings & Document;
 
-export const ReviewRequestSettingsSchema = SchemaFactory.createForClass(ReviewRequestSettings);
+export const ReviewRequestSettingsSchema = SchemaFactory.createForClass(
+  ReviewRequestSettings,
+);

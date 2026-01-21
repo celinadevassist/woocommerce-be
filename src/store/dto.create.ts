@@ -6,7 +6,11 @@ export class CreateStoreDto {
   @ApiProperty({ description: 'Store name', example: 'My WooCommerce Store' })
   name: string;
 
-  @ApiPropertyOptional({ description: 'E-commerce platform', enum: StorePlatform, default: StorePlatform.WOOCOMMERCE })
+  @ApiPropertyOptional({
+    description: 'E-commerce platform',
+    enum: StorePlatform,
+    default: StorePlatform.WOOCOMMERCE,
+  })
   platform?: StorePlatform;
 
   @ApiProperty({ description: 'Store URL', example: 'https://mystore.com' })
@@ -18,16 +22,23 @@ export class CreateStoreDto {
   @ApiProperty({ description: 'WooCommerce Consumer Secret' })
   consumerSecret: string;
 
-  @ApiPropertyOptional({ description: 'WordPress username for media management' })
+  @ApiPropertyOptional({
+    description: 'WordPress username for media management',
+  })
   wpUsername?: string;
 
-  @ApiPropertyOptional({ description: 'WordPress application password for media management' })
+  @ApiPropertyOptional({
+    description: 'WordPress application password for media management',
+  })
   wpAppPassword?: string;
 }
 
 export const CreateStoreSchema = Joi.object().keys({
   name: Joi.string().min(2).max(100).required(),
-  platform: Joi.string().valid(...Object.values(StorePlatform)).default(StorePlatform.WOOCOMMERCE).optional(),
+  platform: Joi.string()
+    .valid(...Object.values(StorePlatform))
+    .default(StorePlatform.WOOCOMMERCE)
+    .optional(),
   url: Joi.string().uri().required(),
   consumerKey: Joi.string().required(),
   consumerSecret: Joi.string().required(),

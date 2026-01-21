@@ -9,25 +9,51 @@ export class QueryUserDTO {
   @ApiProperty({ description: 'father Name', type: String, required: false })
   lastName: string;
 
-  @ApiProperty({ description: `user status${Object.keys(statusEnum).join()}`, enum: statusEnum, required: false })
+  @ApiProperty({
+    description: `user status${Object.keys(statusEnum).join()}`,
+    enum: statusEnum,
+    required: false,
+  })
   status?: string;
 
   @ApiProperty({ description: 'created date', type: Date, required: false })
   createdAt?: Date;
 
-  @ApiProperty({ description: 'Page number (starting from 1)', type: Number, required: false, default: 1 })
+  @ApiProperty({
+    description: 'Page number (starting from 1)',
+    type: Number,
+    required: false,
+    default: 1,
+  })
   page?: number;
 
-  @ApiProperty({ description: 'Number of items per page', type: Number, required: false, default: 20 })
+  @ApiProperty({
+    description: 'Number of items per page',
+    type: Number,
+    required: false,
+    default: 20,
+  })
   limit?: number;
 
-  @ApiProperty({ description: 'Search term to filter users', type: String, required: false })
+  @ApiProperty({
+    description: 'Search term to filter users',
+    type: String,
+    required: false,
+  })
   search?: string;
 
-  @ApiProperty({ description: 'Filter users by skill', type: String, required: false })
+  @ApiProperty({
+    description: 'Filter users by skill',
+    type: String,
+    required: false,
+  })
   skill?: string;
 
-  @ApiProperty({ description: 'Filter users by location', type: String, required: false })
+  @ApiProperty({
+    description: 'Filter users by location',
+    type: String,
+    required: false,
+  })
   location?: string;
 }
 

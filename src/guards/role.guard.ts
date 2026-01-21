@@ -4,7 +4,10 @@ import { RoleService } from '../services';
 
 @Injectable()
 export class RolesGuard implements CanActivate {
-  constructor(private readonly reflector: Reflector, private readonly roleService:RoleService) {}
+  constructor(
+    private readonly reflector: Reflector,
+    private readonly roleService: RoleService,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const scopes = this.reflector.get<string[]>('scopes', context.getHandler());
@@ -15,15 +18,18 @@ export class RolesGuard implements CanActivate {
     const user = request.user;
     const role = request.user?.role;
     const roleData = await this.roleService.getByName(role, 'en');
-    const UserScopes = roleData?.scopes
-    if(!UserScopes){
+    const UserScopes = roleData?.scopes;
+    if (!UserScopes) {
       return false;
     }
-    const hasScope = () => scopes.some((scope) => {
-      return UserScopes.includes(`*:*`) ||
-      UserScopes.includes(`${scope.split(':')[0]}:*`) ||
-      UserScopes.includes(scope);
-    });
+    const hasScope = () =>
+      scopes.some((scope) => {
+        return (
+          UserScopes.includes(`*:*`) ||
+          UserScopes.includes(`${scope.split(':')[0]}:*`) ||
+          UserScopes.includes(scope)
+        );
+      });
     return user && UserScopes && hasScope();
   }
 }

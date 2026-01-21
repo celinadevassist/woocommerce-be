@@ -10,11 +10,17 @@ export class LocalState {
   @Prop({ required: true, uppercase: true })
   countryCode: string;
 
-  @ApiProperty({ description: 'State code (WooCommerce format)', example: 'EGALX' })
+  @ApiProperty({
+    description: 'State code (WooCommerce format)',
+    example: 'EGALX',
+  })
   @Prop({ required: true })
   stateCode: string;
 
-  @ApiProperty({ description: 'Custom state name', example: 'Alexandria - الإسكندرية' })
+  @ApiProperty({
+    description: 'Custom state name',
+    example: 'Alexandria - الإسكندرية',
+  })
   @Prop({ required: true })
   stateName: string;
 
@@ -30,7 +36,9 @@ export class LocalState {
   @Prop({ type: Types.ObjectId, ref: 'User', required: true })
   ownerId: Types.ObjectId;
 
-  @ApiProperty({ description: 'Whether this is a new state (not in WooCommerce)' })
+  @ApiProperty({
+    description: 'Whether this is a new state (not in WooCommerce)',
+  })
   @Prop({ default: false })
   isNew: boolean;
 
@@ -47,5 +55,8 @@ export const LocalStateSchema = SchemaFactory.createForClass(LocalState);
 
 // Indexes
 LocalStateSchema.index({ ownerId: 1, countryCode: 1 });
-LocalStateSchema.index({ ownerId: 1, countryCode: 1, stateCode: 1 }, { unique: true });
+LocalStateSchema.index(
+  { ownerId: 1, countryCode: 1, stateCode: 1 },
+  { unique: true },
+);
 LocalStateSchema.index({ ownerId: 1, groups: 1 });

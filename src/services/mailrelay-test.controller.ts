@@ -18,7 +18,9 @@ export class MailrelayTestController {
     const success = await this.mailrelayService.testConnection();
     return {
       success,
-      message: success ? 'Mailrelay API connection successful' : 'Mailrelay API connection failed'
+      message: success
+        ? 'Mailrelay API connection successful'
+        : 'Mailrelay API connection failed',
     };
   }
 
@@ -27,10 +29,10 @@ export class MailrelayTestController {
   @UseGuards(AuthGuard())
   async sendTestEmail(
     @User() user: UserDocument,
-    @Body() data: { to?: string; tags?: string[] }
+    @Body() data: { to?: string; tags?: string[] },
   ): Promise<{ success: boolean; message: string }> {
     const to = data.to || user.email;
-    
+
     try {
       const success = await this.mailrelayService.sendMail({
         to,
@@ -44,17 +46,19 @@ export class MailrelayTestController {
           <p><strong>Sent at:</strong> ${new Date().toISOString()}</p>
           <p><strong>Service:</strong> Mailrelay.com API</p>
         `,
-        tags: data.tags || ['test', 'mailrelay']
+        tags: data.tags || ['test', 'mailrelay'],
       });
 
       return {
         success,
-        message: success ? `Test email sent to ${to}` : 'Failed to send test email'
+        message: success
+          ? `Test email sent to ${to}`
+          : 'Failed to send test email',
       };
     } catch (error) {
       return {
         success: false,
-        message: `Error: ${error.message}`
+        message: `Error: ${error.message}`,
       };
     }
   }
@@ -63,23 +67,25 @@ export class MailrelayTestController {
   @ApiOperation({ summary: 'Send test verification email via Mailrelay' })
   @UseGuards(AuthGuard())
   async sendTestVerification(
-    @User() user: UserDocument
+    @User() user: UserDocument,
   ): Promise<{ success: boolean; message: string }> {
     try {
       const success = await this.mailrelayService.sendVerificationEmail(
         user.email,
         'test-token-123456',
-        user.firstName || user.email
+        user.firstName || user.email,
       );
 
       return {
         success,
-        message: success ? 'Verification email sent via Mailrelay' : 'Failed to send verification email'
+        message: success
+          ? 'Verification email sent via Mailrelay'
+          : 'Failed to send verification email',
       };
     } catch (error) {
       return {
         success: false,
-        message: `Error: ${error.message}`
+        message: `Error: ${error.message}`,
       };
     }
   }
@@ -88,23 +94,25 @@ export class MailrelayTestController {
   @ApiOperation({ summary: 'Send test password reset email via Mailrelay' })
   @UseGuards(AuthGuard())
   async sendTestPasswordReset(
-    @User() user: UserDocument
+    @User() user: UserDocument,
   ): Promise<{ success: boolean; message: string }> {
     try {
       const success = await this.mailrelayService.sendPasswordResetEmail(
         user.email,
         'test-reset-token-123456',
-        user.firstName || user.email
+        user.firstName || user.email,
       );
 
       return {
         success,
-        message: success ? 'Password reset email sent via Mailrelay' : 'Failed to send password reset email'
+        message: success
+          ? 'Password reset email sent via Mailrelay'
+          : 'Failed to send password reset email',
       };
     } catch (error) {
       return {
         success: false,
-        message: `Error: ${error.message}`
+        message: `Error: ${error.message}`,
       };
     }
   }
@@ -113,13 +121,15 @@ export class MailrelayTestController {
   @ApiOperation({ summary: 'Send test invoice email via Mailrelay' })
   @UseGuards(AuthGuard())
   async sendTestInvoice(
-    @User() user: UserDocument
+    @User() user: UserDocument,
   ): Promise<{ success: boolean; message: string }> {
     try {
       const testInvoiceData = {
         invoiceNumber: 'INV-TEST-001',
         invoiceDate: new Date().toLocaleDateString(),
-        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+        dueDate: new Date(
+          Date.now() + 7 * 24 * 60 * 60 * 1000,
+        ).toLocaleDateString(),
         customerName: user.firstName || user.email,
         customerEmail: user.email,
         items: [
@@ -128,30 +138,32 @@ export class MailrelayTestController {
             quantity: 1,
             unitPrice: 100,
             amount: 100,
-            currency: 'USD'
-          }
+            currency: 'USD',
+          },
         ],
         currency: 'USD',
         subtotal: 100,
         tax: 5,
         taxRate: 5,
         total: 105,
-        status: 'pending'
+        status: 'pending',
       };
 
       const success = await this.mailrelayService.sendInvoiceEmail(
         user.email,
-        testInvoiceData
+        testInvoiceData,
       );
 
       return {
         success,
-        message: success ? 'Invoice email sent via Mailrelay' : 'Failed to send invoice email'
+        message: success
+          ? 'Invoice email sent via Mailrelay'
+          : 'Failed to send invoice email',
       };
     } catch (error) {
       return {
         success: false,
-        message: `Error: ${error.message}`
+        message: `Error: ${error.message}`,
       };
     }
   }
@@ -160,12 +172,15 @@ export class MailrelayTestController {
   @ApiOperation({ summary: 'Send test email with attachment via Mailrelay' })
   @UseGuards(AuthGuard())
   async sendTestWithAttachment(
-    @User() user: UserDocument
+    @User() user: UserDocument,
   ): Promise<{ success: boolean; message: string }> {
     try {
       // Create a simple text attachment
-      const textContent = Buffer.from('This is a test attachment content', 'utf-8').toString('base64');
-      
+      const textContent = Buffer.from(
+        'This is a test attachment content',
+        'utf-8',
+      ).toString('base64');
+
       const success = await this.mailrelayService.sendMail({
         to: user.email,
         subject: 'Test Email with Attachment via Mailrelay',
@@ -178,20 +193,22 @@ export class MailrelayTestController {
           {
             content: textContent,
             filename: 'test-attachment.txt',
-            contentType: 'text/plain'
-          }
+            contentType: 'text/plain',
+          },
         ],
-        tags: ['test', 'attachment', 'mailrelay']
+        tags: ['test', 'attachment', 'mailrelay'],
       });
 
       return {
         success,
-        message: success ? 'Email with attachment sent via Mailrelay' : 'Failed to send email with attachment'
+        message: success
+          ? 'Email with attachment sent via Mailrelay'
+          : 'Failed to send email with attachment',
       };
     } catch (error) {
       return {
         success: false,
-        message: `Error: ${error.message}`
+        message: `Error: ${error.message}`,
       };
     }
   }

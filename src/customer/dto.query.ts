@@ -50,7 +50,14 @@ export const QueryCustomerSchema = Joi.object({
   page: Joi.number().min(1).default(1),
   size: Joi.number().min(1).max(100).default(20),
   sortBy: Joi.string()
-    .valid('createdAt', 'email', 'firstName', 'lastName', 'stats.ordersCount', 'stats.totalSpent')
+    .valid(
+      'createdAt',
+      'email',
+      'firstName',
+      'lastName',
+      'stats.ordersCount',
+      'stats.totalSpent',
+    )
     .default('createdAt'),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
 });

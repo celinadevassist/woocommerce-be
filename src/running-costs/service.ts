@@ -1,10 +1,21 @@
-import { Injectable, Logger, NotFoundException, BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { CostTemplate, CostEntry } from './schema';
 import { Store } from '../store/schema';
 import { CostType, CostCategory } from './enum';
-import { ICostTemplate, ICostEntry, IMonthlySummary, ICostSummary } from './interface';
+import {
+  ICostTemplate,
+  ICostEntry,
+  IMonthlySummary,
+  ICostSummary,
+} from './interface';
 import {
   CreateCostTemplateDto,
   UpdateCostTemplateDto,
@@ -29,7 +40,10 @@ export class RunningCostsService {
   /**
    * Verify store access
    */
-  private async getStoreWithAccess(storeId: string, userId: string): Promise<any> {
+  private async getStoreWithAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<any> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       $or: [
@@ -50,7 +64,10 @@ export class RunningCostsService {
    */
   private getCurrentMonth(): string {
     const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
+      2,
+      '0',
+    )}`;
   }
 
   /**
@@ -59,14 +76,21 @@ export class RunningCostsService {
   private getPreviousMonth(month: string): string {
     const [year, m] = month.split('-').map(Number);
     const date = new Date(year, m - 2, 1); // m-2 because months are 0-indexed
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+      2,
+      '0',
+    )}`;
   }
 
   // ========================
   // Cost Template Methods
   // ========================
 
-  async createTemplate(storeId: string, userId: string, dto: CreateCostTemplateDto): Promise<ICostTemplate> {
+  async createTemplate(
+    storeId: string,
+    userId: string,
+    dto: CreateCostTemplateDto,
+  ): Promise<ICostTemplate> {
     await this.getStoreWithAccess(storeId, userId);
 
     const storeObjectId = new Types.ObjectId(storeId);
@@ -96,7 +120,10 @@ export class RunningCostsService {
     return template.toObject() as ICostTemplate;
   }
 
-  async getTemplates(userId: string, query: QueryCostTemplateDto): Promise<{ templates: ICostTemplate[]; total: number }> {
+  async getTemplates(
+    userId: string,
+    query: QueryCostTemplateDto,
+  ): Promise<{ templates: ICostTemplate[]; total: number }> {
     await this.getStoreWithAccess(query.storeId, userId);
 
     const filter: any = {
@@ -114,12 +141,15 @@ export class RunningCostsService {
     ]);
 
     return {
-      templates: templates.map(t => t.toObject() as ICostTemplate),
+      templates: templates.map((t) => t.toObject() as ICostTemplate),
       total,
     };
   }
 
-  async getTemplateById(userId: string, templateId: string): Promise<ICostTemplate> {
+  async getTemplateById(
+    userId: string,
+    templateId: string,
+  ): Promise<ICostTemplate> {
     const template = await this.templateModel.findOne({
       _id: new Types.ObjectId(templateId),
       isDeleted: false,
@@ -134,7 +164,11 @@ export class RunningCostsService {
     return template.toObject() as ICostTemplate;
   }
 
-  async updateTemplate(userId: string, templateId: string, dto: UpdateCostTemplateDto): Promise<ICostTemplate> {
+  async updateTemplate(
+    userId: string,
+    templateId: string,
+    dto: UpdateCostTemplateDto,
+  ): Promise<ICostTemplate> {
     const template = await this.templateModel.findOne({
       _id: new Types.ObjectId(templateId),
       isDeleted: false,
@@ -156,7 +190,9 @@ export class RunningCostsService {
       });
 
       if (existing) {
-        throw new ConflictException(`Cost template "${dto.name}" already exists`);
+        throw new ConflictException(
+          `Cost template "${dto.name}" already exists`,
+        );
       }
     }
 
@@ -164,7 +200,8 @@ export class RunningCostsService {
     if (dto.description !== undefined) template.description = dto.description;
     if (dto.type !== undefined) template.type = dto.type;
     if (dto.category !== undefined) template.category = dto.category;
-    if (dto.defaultAmount !== undefined) template.defaultAmount = dto.defaultAmount;
+    if (dto.defaultAmount !== undefined)
+      template.defaultAmount = dto.defaultAmount;
     if (dto.isActive !== undefined) template.isActive = dto.isActive;
 
     await template.save();
@@ -195,7 +232,11 @@ export class RunningCostsService {
   // Cost Entry Methods
   // ========================
 
-  async createEntry(storeId: string, userId: string, dto: CreateCostEntryDto): Promise<ICostEntry> {
+  async createEntry(
+    storeId: string,
+    userId: string,
+    dto: CreateCostEntryDto,
+  ): Promise<ICostEntry> {
     await this.getStoreWithAccess(storeId, userId);
 
     const storeObjectId = new Types.ObjectId(storeId);
@@ -203,7 +244,9 @@ export class RunningCostsService {
 
     const entry = await this.entryModel.create({
       storeId: storeObjectId,
-      templateId: dto.templateId ? new Types.ObjectId(dto.templateId) : undefined,
+      templateId: dto.templateId
+        ? new Types.ObjectId(dto.templateId)
+        : undefined,
       name: dto.name,
       type: dto.type,
       category: dto.category,
@@ -218,23 +261,29 @@ export class RunningCostsService {
     return entry.toObject() as ICostEntry;
   }
 
-  async bulkCreateEntries(storeId: string, userId: string, dto: BulkCreateEntriesDto): Promise<ICostEntry[]> {
+  async bulkCreateEntries(
+    storeId: string,
+    userId: string,
+    dto: BulkCreateEntriesDto,
+  ): Promise<ICostEntry[]> {
     await this.getStoreWithAccess(storeId, userId);
 
     const storeObjectId = new Types.ObjectId(storeId);
     const userObjectId = new Types.ObjectId(userId);
 
     // Get all templates
-    const templateIds = dto.entries.map(e => new Types.ObjectId(e.templateId));
+    const templateIds = dto.entries.map(
+      (e) => new Types.ObjectId(e.templateId),
+    );
     const templates = await this.templateModel.find({
       _id: { $in: templateIds },
       storeId: storeObjectId,
       isDeleted: false,
     });
 
-    const templateMap = new Map(templates.map(t => [t._id.toString(), t]));
+    const templateMap = new Map(templates.map((t) => [t._id.toString(), t]));
 
-    const entriesToCreate = dto.entries.map(e => {
+    const entriesToCreate = dto.entries.map((e) => {
       const template = templateMap.get(e.templateId);
       if (!template) {
         throw new BadRequestException(`Template ${e.templateId} not found`);
@@ -256,11 +305,16 @@ export class RunningCostsService {
 
     const entries = await this.entryModel.insertMany(entriesToCreate);
 
-    this.logger.log(`Bulk created ${entries.length} cost entries for ${dto.month}`);
-    return entries.map(e => e.toObject() as ICostEntry);
+    this.logger.log(
+      `Bulk created ${entries.length} cost entries for ${dto.month}`,
+    );
+    return entries.map((e) => e.toObject() as ICostEntry);
   }
 
-  async getEntries(userId: string, query: QueryCostEntryDto): Promise<{
+  async getEntries(
+    userId: string,
+    query: QueryCostEntryDto,
+  ): Promise<{
     entries: ICostEntry[];
     total: number;
     page: number;
@@ -277,22 +331,30 @@ export class RunningCostsService {
     if (query.month) filter.month = query.month;
     if (query.category) filter.category = query.category;
     if (query.type) filter.type = query.type;
-    if (query.templateId) filter.templateId = new Types.ObjectId(query.templateId);
+    if (query.templateId)
+      filter.templateId = new Types.ObjectId(query.templateId);
 
     const page = query.page || 1;
     const size = query.size || 50;
     const skip = (page - 1) * size;
 
     const [entries, total] = await Promise.all([
-      this.entryModel.find(filter).sort({ month: -1, category: 1, name: 1 }).skip(skip).limit(size),
+      this.entryModel
+        .find(filter)
+        .sort({ month: -1, category: 1, name: 1 })
+        .skip(skip)
+        .limit(size),
       this.entryModel.countDocuments(filter),
     ]);
 
     // Calculate summary for the filtered entries
-    const summary = await this.calculateMonthlySummary(query.storeId, query.month || this.getCurrentMonth());
+    const summary = await this.calculateMonthlySummary(
+      query.storeId,
+      query.month || this.getCurrentMonth(),
+    );
 
     return {
-      entries: entries.map(e => e.toObject() as ICostEntry),
+      entries: entries.map((e) => e.toObject() as ICostEntry),
       total,
       page,
       pages: Math.ceil(total / size),
@@ -315,7 +377,11 @@ export class RunningCostsService {
     return entry.toObject() as ICostEntry;
   }
 
-  async updateEntry(userId: string, entryId: string, dto: UpdateCostEntryDto): Promise<ICostEntry> {
+  async updateEntry(
+    userId: string,
+    entryId: string,
+    dto: UpdateCostEntryDto,
+  ): Promise<ICostEntry> {
     const entry = await this.entryModel.findOne({
       _id: new Types.ObjectId(entryId),
       isDeleted: false,
@@ -362,7 +428,10 @@ export class RunningCostsService {
   // Summary & Analytics
   // ========================
 
-  private async calculateMonthlySummary(storeId: string, month: string): Promise<IMonthlySummary> {
+  private async calculateMonthlySummary(
+    storeId: string,
+    month: string,
+  ): Promise<IMonthlySummary> {
     const storeObjectId = new Types.ObjectId(storeId);
 
     const result = await this.entryModel.aggregate([
@@ -381,7 +450,9 @@ export class RunningCostsService {
             $sum: { $cond: [{ $eq: ['$type', CostType.FIXED] }, '$amount', 0] },
           },
           variable: {
-            $sum: { $cond: [{ $eq: ['$type', CostType.VARIABLE] }, '$amount', 0] },
+            $sum: {
+              $cond: [{ $eq: ['$type', CostType.VARIABLE] }, '$amount', 0],
+            },
           },
           entryCount: { $sum: 1 },
         },
@@ -405,11 +476,16 @@ export class RunningCostsService {
     ]);
 
     const byCategory: Record<string, number> = {};
-    categoryResult.forEach(c => {
+    categoryResult.forEach((c) => {
       byCategory[c._id] = c.total;
     });
 
-    const data = result[0] || { total: 0, fixed: 0, variable: 0, entryCount: 0 };
+    const data = result[0] || {
+      total: 0,
+      fixed: 0,
+      variable: 0,
+      entryCount: 0,
+    };
 
     return {
       month,
@@ -421,7 +497,10 @@ export class RunningCostsService {
     };
   }
 
-  async getMonthlySummaries(userId: string, query: QueryMonthlySummaryDto): Promise<IMonthlySummary[]> {
+  async getMonthlySummaries(
+    userId: string,
+    query: QueryMonthlySummaryDto,
+  ): Promise<IMonthlySummary[]> {
     await this.getStoreWithAccess(query.storeId, userId);
 
     const storeObjectId = new Types.ObjectId(query.storeId);
@@ -451,7 +530,9 @@ export class RunningCostsService {
             $sum: { $cond: [{ $eq: ['$type', CostType.FIXED] }, '$amount', 0] },
           },
           variable: {
-            $sum: { $cond: [{ $eq: ['$type', CostType.VARIABLE] }, '$amount', 0] },
+            $sum: {
+              $cond: [{ $eq: ['$type', CostType.VARIABLE] }, '$amount', 0],
+            },
           },
           entryCount: { $sum: 1 },
         },
@@ -478,12 +559,12 @@ export class RunningCostsService {
 
     // Build category map
     const categoryMap: Record<string, Record<string, number>> = {};
-    categoryBreakdown.forEach(c => {
+    categoryBreakdown.forEach((c) => {
       if (!categoryMap[c._id.month]) categoryMap[c._id.month] = {};
       categoryMap[c._id.month][c._id.category] = c.total;
     });
 
-    return result.map(r => ({
+    return result.map((r) => ({
       month: r._id,
       total: r.total,
       fixed: r.fixed,
@@ -505,12 +586,16 @@ export class RunningCostsService {
       this.getMonthlySummaries(userId, { storeId, months: 12 }),
     ]);
 
-    const percentChange = previousSummary.total > 0
-      ? ((currentSummary.total - previousSummary.total) / previousSummary.total) * 100
-      : 0;
+    const percentChange =
+      previousSummary.total > 0
+        ? ((currentSummary.total - previousSummary.total) /
+            previousSummary.total) *
+          100
+        : 0;
 
     const totalYTD = yearSummaries.reduce((sum, s) => sum + s.total, 0);
-    const avgMonthly = yearSummaries.length > 0 ? totalYTD / yearSummaries.length : 0;
+    const avgMonthly =
+      yearSummaries.length > 0 ? totalYTD / yearSummaries.length : 0;
 
     return {
       currentMonth: currentSummary,
@@ -521,8 +606,10 @@ export class RunningCostsService {
     };
   }
 
-  async getCategories(): Promise<{ categories: { value: string; label: string }[] }> {
-    const categories = Object.values(CostCategory).map(c => ({
+  async getCategories(): Promise<{
+    categories: { value: string; label: string }[];
+  }> {
+    const categories = Object.values(CostCategory).map((c) => ({
       value: c,
       label: c.charAt(0).toUpperCase() + c.slice(1).replace('_', ' '),
     }));

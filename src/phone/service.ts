@@ -18,7 +18,10 @@ export class PhoneService {
   /**
    * Normalize phone number to unified format: +{countryCode}{number}
    */
-  normalizePhoneNumber(phone: string, defaultCountryCode: string = '20'): string | null {
+  normalizePhoneNumber(
+    phone: string,
+    defaultCountryCode = '20',
+  ): string | null {
     if (!phone) return null;
 
     // Convert Arabic/Persian numerals to English
@@ -26,12 +29,18 @@ export class PhoneService {
     const persianNumerals = '۰۱۲۳۴۵۶۷۸۹';
     let converted = phone;
     for (let i = 0; i < 10; i++) {
-      converted = converted.replace(new RegExp(arabicNumerals[i], 'g'), String(i));
-      converted = converted.replace(new RegExp(persianNumerals[i], 'g'), String(i));
+      converted = converted.replace(
+        new RegExp(arabicNumerals[i], 'g'),
+        String(i),
+      );
+      converted = converted.replace(
+        new RegExp(persianNumerals[i], 'g'),
+        String(i),
+      );
     }
 
     // Remove all non-digit characters except +
-    let normalized = converted.replace(/[^\d+]/g, '');
+    const normalized = converted.replace(/[^\d+]/g, '');
 
     // If empty after cleanup, return null
     if (!normalized || normalized.replace(/\+/g, '').length === 0) {
@@ -69,7 +78,7 @@ export class PhoneService {
     storeId: string,
     phoneNumber: string,
     customerId?: string,
-    source: string = 'order',
+    source = 'order',
     sourceOrderId?: string,
   ): Promise<PhoneDocument> {
     const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
@@ -118,11 +127,15 @@ export class PhoneService {
       type: PhoneType.MOBILE,
       smsOptIn: true,
       isVerified: false,
-      ownerHistory: customerId ? [{
-        customerId: new Types.ObjectId(customerId),
-        assignedAt: new Date(),
-        source,
-      }] : [],
+      ownerHistory: customerId
+        ? [
+            {
+              customerId: new Types.ObjectId(customerId),
+              assignedAt: new Date(),
+              source,
+            },
+          ]
+        : [],
     });
 
     // Update customer's primary phone if not set
@@ -136,7 +149,10 @@ export class PhoneService {
   /**
    * Update customer's primary phone if not set
    */
-  private async updateCustomerPrimaryPhone(customerId: string, phone: string): Promise<void> {
+  private async updateCustomerPrimaryPhone(
+    customerId: string,
+    phone: string,
+  ): Promise<void> {
     await this.customerModel.updateOne(
       { _id: new Types.ObjectId(customerId), phone: { $in: [null, ''] } },
       { phone },
@@ -147,10 +163,12 @@ export class PhoneService {
    * Get phones for a customer
    */
   async getCustomerPhones(customerId: string): Promise<PhoneDocument[]> {
-    return this.phoneModel.find({
-      customerId: new Types.ObjectId(customerId),
-      isDeleted: false,
-    }).sort({ isVerified: -1, createdAt: 1 });
+    return this.phoneModel
+      .find({
+        customerId: new Types.ObjectId(customerId),
+        isDeleted: false,
+      })
+      .sort({ isVerified: -1, createdAt: 1 });
   }
 
   /**
@@ -195,13 +213,15 @@ export class PhoneService {
    * Get phones ready for SMS campaign
    */
   async getCampaignPhones(storeId: string): Promise<PhoneDocument[]> {
-    return this.phoneModel.find({
-      storeId: new Types.ObjectId(storeId),
-      status: PhoneStatus.ACTIVE,
-      smsOptIn: true,
-      isVerified: true,
-      isDeleted: false,
-    }).populate('customerId', 'firstName lastName email');
+    return this.phoneModel
+      .find({
+        storeId: new Types.ObjectId(storeId),
+        status: PhoneStatus.ACTIVE,
+        smsOptIn: true,
+        isVerified: true,
+        isDeleted: false,
+      })
+      .populate('customerId', 'firstName lastName email');
   }
 
   /**
@@ -348,7 +368,10 @@ export class PhoneService {
   /**
    * Find customer by phone number
    */
-  async findCustomerByPhone(storeId: string, phoneNumber: string): Promise<CustomerDocument | null> {
+  async findCustomerByPhone(
+    storeId: string,
+    phoneNumber: string,
+  ): Promise<CustomerDocument | null> {
     const normalizedPhone = this.normalizePhoneNumber(phoneNumber);
     if (!normalizedPhone) return null;
 
@@ -380,7 +403,24 @@ export class PhoneService {
       isDeleted: false,
     };
 
-    const [
+    const [total, verified, unverified, smsOptIn, smsOptOut, blocked, invalid] =
+      await Promise.all([
+        this.phoneModel.countDocuments(baseFilter),
+        this.phoneModel.countDocuments({ ...baseFilter, isVerified: true }),
+        this.phoneModel.countDocuments({ ...baseFilter, isVerified: false }),
+        this.phoneModel.countDocuments({ ...baseFilter, smsOptIn: true }),
+        this.phoneModel.countDocuments({ ...baseFilter, smsOptIn: false }),
+        this.phoneModel.countDocuments({
+          ...baseFilter,
+          status: PhoneStatus.BLOCKED,
+        }),
+        this.phoneModel.countDocuments({
+          ...baseFilter,
+          status: PhoneStatus.INVALID,
+        }),
+      ]);
+
+    return {
       total,
       verified,
       unverified,
@@ -388,26 +428,13 @@ export class PhoneService {
       smsOptOut,
       blocked,
       invalid,
-    ] = await Promise.all([
-      this.phoneModel.countDocuments(baseFilter),
-      this.phoneModel.countDocuments({ ...baseFilter, isVerified: true }),
-      this.phoneModel.countDocuments({ ...baseFilter, isVerified: false }),
-      this.phoneModel.countDocuments({ ...baseFilter, smsOptIn: true }),
-      this.phoneModel.countDocuments({ ...baseFilter, smsOptIn: false }),
-      this.phoneModel.countDocuments({ ...baseFilter, status: PhoneStatus.BLOCKED }),
-      this.phoneModel.countDocuments({ ...baseFilter, status: PhoneStatus.INVALID }),
-    ]);
-
-    return { total, verified, unverified, smsOptIn, smsOptOut, blocked, invalid };
+    };
   }
 
   /**
    * Delete phone (soft delete)
    */
   async delete(phoneId: string): Promise<void> {
-    await this.phoneModel.updateOne(
-      { _id: phoneId },
-      { isDeleted: true },
-    );
+    await this.phoneModel.updateOne({ _id: phoneId }, { isDeleted: true });
   }
 }

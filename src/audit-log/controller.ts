@@ -1,12 +1,12 @@
-import {
-  Controller,
-  Get,
-  Query,
-  Param,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Get, Query, Param, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { AuditLogService } from './service';
 import { AuditAction, AuditSeverity } from './schema';
 import { User } from '../decorators/user.decorator';
@@ -21,7 +21,10 @@ export class AuditLogController {
 
   @Get('store/:storeId')
   @ApiOperation({ summary: 'Get audit logs for a store' })
-  @ApiResponse({ status: 200, description: 'Store audit logs retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Store audit logs retrieved successfully',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async getStoreAuditLogs(
@@ -41,7 +44,10 @@ export class AuditLogController {
 
   @Get('store/:storeId/recent')
   @ApiOperation({ summary: 'Get recent activity for a store' })
-  @ApiResponse({ status: 200, description: 'Recent activity retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Recent activity retrieved successfully',
+  })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async getRecentActivity(
     @Param('storeId') storeId: string,
@@ -55,7 +61,10 @@ export class AuditLogController {
 
   @Get('store/:storeId/summary')
   @ApiOperation({ summary: 'Get activity summary for a store' })
-  @ApiResponse({ status: 200, description: 'Activity summary retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Activity summary retrieved successfully',
+  })
   @ApiQuery({ name: 'days', required: false, type: Number })
   async getActivitySummary(
     @Param('storeId') storeId: string,
@@ -69,7 +78,10 @@ export class AuditLogController {
 
   @Get('user/:userId')
   @ApiOperation({ summary: 'Get audit logs for a user' })
-  @ApiResponse({ status: 200, description: 'User audit logs retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'User audit logs retrieved successfully',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   async getUserAuditLogs(

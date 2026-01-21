@@ -9,7 +9,12 @@ import {
   Logger,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiExcludeEndpoint } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiExcludeEndpoint,
+} from '@nestjs/swagger';
 import { WebhookService } from './service';
 import { Request } from 'express';
 
@@ -39,7 +44,9 @@ export class WebhookController {
     @Headers('x-wc-webhook-delivery-id') deliveryId: string,
     @Req() req: Request,
   ): Promise<{ success: boolean; message: string }> {
-    this.logger.log(`Received webhook: ${topic} for store ${storeId}, delivery: ${deliveryId}`);
+    this.logger.log(
+      `Received webhook: ${topic} for store ${storeId}, delivery: ${deliveryId}`,
+    );
 
     // Get raw body for signature verification
     const rawBody = (req as any).rawBody || JSON.stringify(req.body);
@@ -54,10 +61,18 @@ export class WebhookController {
 
     try {
       // Verify signature and get store
-      const store = await this.webhookService.verifySignature(storeId, signature, rawBody);
+      const store = await this.webhookService.verifySignature(
+        storeId,
+        signature,
+        rawBody,
+      );
 
       // Process the webhook
-      const result = await this.webhookService.processWebhook(store, topic, req.body);
+      const result = await this.webhookService.processWebhook(
+        store,
+        topic,
+        req.body,
+      );
 
       this.logger.log(`Webhook processed successfully: ${topic}`);
       return result;
@@ -73,7 +88,12 @@ export class WebhookController {
   @Post('woocommerce/:storeId/ping')
   @HttpCode(HttpStatus.OK)
   @ApiExcludeEndpoint()
-  async ping(@Param('storeId') storeId: string): Promise<{ success: boolean; message: string }> {
-    return { success: true, message: `Webhook endpoint active for store ${storeId}` };
+  async ping(
+    @Param('storeId') storeId: string,
+  ): Promise<{ success: boolean; message: string }> {
+    return {
+      success: true,
+      message: `Webhook endpoint active for store ${storeId}`,
+    };
   }
 }

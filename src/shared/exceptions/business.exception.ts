@@ -6,7 +6,7 @@ export class BusinessException extends HttpException {
     public readonly errorCode: BusinessErrorCode,
     message: string,
     public readonly details?: any,
-    statusCode: HttpStatus = HttpStatus.BAD_REQUEST
+    statusCode: HttpStatus = HttpStatus.BAD_REQUEST,
   ) {
     super(
       {
@@ -14,7 +14,7 @@ export class BusinessException extends HttpException {
         message,
         details,
       },
-      statusCode
+      statusCode,
     );
   }
 }
@@ -28,8 +28,8 @@ export class InsufficientCreditsException extends BusinessException {
       {
         required,
         available,
-        action: 'recharge_credits'
-      }
+        action: 'recharge_credits',
+      },
     );
   }
 }
@@ -40,8 +40,8 @@ export class NoActiveSubscriptionException extends BusinessException {
       BusinessErrorCode.NO_ACTIVE_SUBSCRIPTION,
       'No active subscription found',
       {
-        action: 'subscribe_plan'
-      }
+        action: 'subscribe_plan',
+      },
     );
   }
 }
@@ -55,8 +55,8 @@ export class SubscriptionLimitReachedException extends BusinessException {
         limitType,
         current,
         limit,
-        action: 'upgrade_plan'
-      }
+        action: 'upgrade_plan',
+      },
     );
   }
 }
@@ -68,8 +68,8 @@ export class PaymentRequiredException extends BusinessException {
       'Payment method required',
       {
         reason,
-        action: 'add_payment_method'
-      }
+        action: 'add_payment_method',
+      },
     );
   }
 }

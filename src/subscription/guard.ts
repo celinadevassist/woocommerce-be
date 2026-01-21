@@ -22,10 +22,10 @@ export class SubscriptionGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     // Check if this route should skip subscription check
-    const skipCheck = this.reflector.getAllAndOverride<boolean>(SKIP_SUBSCRIPTION_CHECK, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const skipCheck = this.reflector.getAllAndOverride<boolean>(
+      SKIP_SUBSCRIPTION_CHECK,
+      [context.getHandler(), context.getClass()],
+    );
 
     if (skipCheck) {
       return true;
@@ -45,7 +45,8 @@ export class SubscriptionGuard implements CanActivate {
       return true;
     }
 
-    const { active, reason, invoice } = await this.subscriptionService.isStoreActive(storeId);
+    const { active, reason, invoice } =
+      await this.subscriptionService.isStoreActive(storeId);
 
     if (!active) {
       throw new ForbiddenException({
@@ -53,13 +54,15 @@ export class SubscriptionGuard implements CanActivate {
         error: 'Subscription Suspended',
         message: reason,
         code: 'SUBSCRIPTION_SUSPENDED',
-        invoice: invoice ? {
-          invoiceNumber: invoice.invoiceNumber,
-          amount: invoice.amount,
-          currency: invoice.currency,
-          dueDate: invoice.dueDate,
-          invoiceId: invoice._id,
-        } : undefined,
+        invoice: invoice
+          ? {
+              invoiceNumber: invoice.invoiceNumber,
+              amount: invoice.amount,
+              currency: invoice.currency,
+              dueDate: invoice.dueDate,
+              invoiceId: invoice._id,
+            }
+          : undefined,
       });
     }
 
@@ -73,4 +76,5 @@ export class SubscriptionGuard implements CanActivate {
  * (e.g., viewing invoices, making payments)
  */
 import { SetMetadata } from '@nestjs/common';
-export const SkipSubscriptionCheck = () => SetMetadata(SKIP_SUBSCRIPTION_CHECK, true);
+export const SkipSubscriptionCheck = () =>
+  SetMetadata(SKIP_SUBSCRIPTION_CHECK, true);

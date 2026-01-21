@@ -23,7 +23,10 @@ export class CreateStateGroupDto {
 export const CreateStateGroupSchema = Joi.object({
   name: Joi.string().required().min(1).max(100),
   countryCode: Joi.string().required().length(2).uppercase(),
-  color: Joi.string().optional().allow('').pattern(/^#[0-9A-Fa-f]{6}$|^$/),
+  color: Joi.string()
+    .optional()
+    .allow('')
+    .pattern(/^#[0-9A-Fa-f]{6}$|^$/),
   description: Joi.string().optional().allow('').max(500),
   order: Joi.number().optional().min(0),
 });
@@ -44,7 +47,10 @@ export class UpdateStateGroupDto {
 
 export const UpdateStateGroupSchema = Joi.object({
   name: Joi.string().optional().min(1).max(100),
-  color: Joi.string().optional().allow('').pattern(/^#[0-9A-Fa-f]{6}$|^$/),
+  color: Joi.string()
+    .optional()
+    .allow('')
+    .pattern(/^#[0-9A-Fa-f]{6}$|^$/),
   description: Joi.string().optional().allow('').max(500),
   order: Joi.number().optional().min(0),
 });
@@ -155,12 +161,19 @@ export class SyncToStoreDto {
   @ApiProperty({ example: 'EG' })
   countryCode: string;
 
-  @ApiPropertyOptional({ example: ['stateId1', 'stateId2'], description: 'Specific state IDs to sync. If empty, syncs all states for the country.' })
+  @ApiPropertyOptional({
+    example: ['stateId1', 'stateId2'],
+    description:
+      'Specific state IDs to sync. If empty, syncs all states for the country.',
+  })
   stateIds?: string[];
 }
 
 export const SyncToStoreSchema = Joi.object({
   storeId: Joi.string().required().hex().length(24),
   countryCode: Joi.string().required().length(2).uppercase(),
-  stateIds: Joi.array().items(Joi.string().hex().length(24)).optional().allow(null),
+  stateIds: Joi.array()
+    .items(Joi.string().hex().length(24))
+    .optional()
+    .allow(null),
 });

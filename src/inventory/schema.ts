@@ -4,13 +4,23 @@ import { InventoryChangeType, AlertType, AlertStatus } from './enum';
 
 @Schema({ timestamps: true, versionKey: false, collection: 'inventory_logs' })
 export class InventoryLog extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Product', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Product',
+    required: true,
+    index: true,
+  })
   productId: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ProductVariant' })
   variantId?: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true })
@@ -22,7 +32,11 @@ export class InventoryLog extends Document {
   @Prop()
   quantityChange: number;
 
-  @Prop({ type: String, enum: Object.values(InventoryChangeType), required: true })
+  @Prop({
+    type: String,
+    enum: Object.values(InventoryChangeType),
+    required: true,
+  })
   changeType: InventoryChangeType;
 
   @Prop()
@@ -56,19 +70,33 @@ InventoryLogSchema.index({ changeType: 1, createdAt: -1 });
 // Stock Alert schema
 @Schema({ timestamps: true, versionKey: false, collection: 'stock_alerts' })
 export class StockAlert extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Product', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Product',
+    required: true,
+    index: true,
+  })
   productId: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ProductVariant' })
   variantId?: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: String, enum: Object.values(AlertType), required: true })
   alertType: AlertType;
 
-  @Prop({ type: String, enum: Object.values(AlertStatus), default: AlertStatus.ACTIVE })
+  @Prop({
+    type: String,
+    enum: Object.values(AlertStatus),
+    default: AlertStatus.ACTIVE,
+  })
   status: AlertStatus;
 
   @Prop({ required: true })
@@ -102,4 +130,7 @@ export const StockAlertSchema = SchemaFactory.createForClass(StockAlert);
 
 // Indexes
 StockAlertSchema.index({ storeId: 1, status: 1 });
-StockAlertSchema.index({ productId: 1, alertType: 1, status: 1 }, { unique: true });
+StockAlertSchema.index(
+  { productId: 1, alertType: 1, status: 1 },
+  { unique: true },
+);

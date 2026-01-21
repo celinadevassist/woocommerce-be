@@ -69,11 +69,13 @@ export class ShippingService {
     const settings: IShippingMethodSettings = {};
 
     if (method.settings) {
-      Object.entries(method.settings).forEach(([key, setting]: [string, any]) => {
-        if (setting && typeof setting === 'object' && 'value' in setting) {
-          settings[key] = setting.value;
-        }
-      });
+      Object.entries(method.settings).forEach(
+        ([key, setting]: [string, any]) => {
+          if (setting && typeof setting === 'object' && 'value' in setting) {
+            settings[key] = setting.value;
+          }
+        },
+      );
     }
 
     return {
@@ -104,13 +106,29 @@ export class ShippingService {
       const zonesWithDetails = await Promise.all(
         zones.map(async (zone) => {
           const [locations, methods] = await Promise.all([
-            this.wooCommerceService.getShippingZoneLocations(credentials, zone.id),
-            this.wooCommerceService.getShippingZoneMethods(credentials, zone.id),
+            this.wooCommerceService.getShippingZoneLocations(
+              credentials,
+              zone.id,
+            ),
+            this.wooCommerceService.getShippingZoneMethods(
+              credentials,
+              zone.id,
+            ),
           ]);
 
-          this.logger.log(`[Shipping] Zone ${zone.id} (${zone.name}): ${locations.length} locations, ${methods.length} methods`);
+          this.logger.log(
+            `[Shipping] Zone ${zone.id} (${zone.name}): ${locations.length} locations, ${methods.length} methods`,
+          );
           if (methods.length > 0) {
-            this.logger.log(`[Shipping] Zone ${zone.id} methods: ${JSON.stringify(methods.map(m => ({ id: m.instance_id, method_id: m.method_id, title: m.title })))}`);
+            this.logger.log(
+              `[Shipping] Zone ${zone.id} methods: ${JSON.stringify(
+                methods.map((m) => ({
+                  id: m.instance_id,
+                  method_id: m.method_id,
+                  title: m.title,
+                })),
+              )}`,
+            );
           }
 
           return {
@@ -125,15 +143,24 @@ export class ShippingService {
 
       return zonesWithDetails;
     } catch (error) {
-      this.logger.error(`Failed to fetch shipping zones: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to fetch shipping zones: ${error.message}`);
+      this.logger.error(
+        `Failed to fetch shipping zones: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to fetch shipping zones: ${error.message}`,
+      );
     }
   }
 
   /**
    * Get a single shipping zone with details
    */
-  async getZone(storeId: string, userId: string, zoneId: number): Promise<IShippingZone> {
+  async getZone(
+    storeId: string,
+    userId: string,
+    zoneId: number,
+  ): Promise<IShippingZone> {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
@@ -151,8 +178,13 @@ export class ShippingService {
         methods: methods.map((m) => this.transformZoneMethod(m)),
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch shipping zone: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to fetch shipping zone: ${error.message}`);
+      this.logger.error(
+        `Failed to fetch shipping zone: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to fetch shipping zone: ${error.message}`,
+      );
     }
   }
 
@@ -167,10 +199,13 @@ export class ShippingService {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
-      const zone = await this.wooCommerceService.createShippingZone(credentials, {
-        name: dto.name,
-        order: dto.order,
-      });
+      const zone = await this.wooCommerceService.createShippingZone(
+        credentials,
+        {
+          name: dto.name,
+          order: dto.order,
+        },
+      );
 
       return {
         id: zone.id,
@@ -180,8 +215,13 @@ export class ShippingService {
         methods: [],
       };
     } catch (error) {
-      this.logger.error(`Failed to create shipping zone: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to create shipping zone: ${error.message}`);
+      this.logger.error(
+        `Failed to create shipping zone: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to create shipping zone: ${error.message}`,
+      );
     }
   }
 
@@ -197,10 +237,14 @@ export class ShippingService {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
-      const zone = await this.wooCommerceService.updateShippingZone(credentials, zoneId, {
-        name: dto.name,
-        order: dto.order,
-      });
+      const zone = await this.wooCommerceService.updateShippingZone(
+        credentials,
+        zoneId,
+        {
+          name: dto.name,
+          order: dto.order,
+        },
+      );
 
       // Fetch current locations and methods
       const [locations, methods] = await Promise.all([
@@ -216,22 +260,40 @@ export class ShippingService {
         methods: methods.map((m) => this.transformZoneMethod(m)),
       };
     } catch (error) {
-      this.logger.error(`Failed to update shipping zone: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to update shipping zone: ${error.message}`);
+      this.logger.error(
+        `Failed to update shipping zone: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to update shipping zone: ${error.message}`,
+      );
     }
   }
 
   /**
    * Delete a shipping zone
    */
-  async deleteZone(storeId: string, userId: string, zoneId: number): Promise<void> {
+  async deleteZone(
+    storeId: string,
+    userId: string,
+    zoneId: number,
+  ): Promise<void> {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
-      await this.wooCommerceService.deleteShippingZone(credentials, zoneId, true);
+      await this.wooCommerceService.deleteShippingZone(
+        credentials,
+        zoneId,
+        true,
+      );
     } catch (error) {
-      this.logger.error(`Failed to delete shipping zone: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to delete shipping zone: ${error.message}`);
+      this.logger.error(
+        `Failed to delete shipping zone: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to delete shipping zone: ${error.message}`,
+      );
     }
   }
 
@@ -248,11 +310,19 @@ export class ShippingService {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
-      const locations = await this.wooCommerceService.getShippingZoneLocations(credentials, zoneId);
+      const locations = await this.wooCommerceService.getShippingZoneLocations(
+        credentials,
+        zoneId,
+      );
       return locations as IShippingZoneLocation[];
     } catch (error) {
-      this.logger.error(`Failed to fetch zone locations: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to fetch zone locations: ${error.message}`);
+      this.logger.error(
+        `Failed to fetch zone locations: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to fetch zone locations: ${error.message}`,
+      );
     }
   }
 
@@ -268,15 +338,21 @@ export class ShippingService {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
-      const locations = await this.wooCommerceService.updateShippingZoneLocations(
-        credentials,
-        zoneId,
-        dto.locations,
-      );
+      const locations =
+        await this.wooCommerceService.updateShippingZoneLocations(
+          credentials,
+          zoneId,
+          dto.locations,
+        );
       return locations as IShippingZoneLocation[];
     } catch (error) {
-      this.logger.error(`Failed to update zone locations: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to update zone locations: ${error.message}`);
+      this.logger.error(
+        `Failed to update zone locations: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to update zone locations: ${error.message}`,
+      );
     }
   }
 
@@ -293,11 +369,19 @@ export class ShippingService {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
-      const methods = await this.wooCommerceService.getShippingZoneMethods(credentials, zoneId);
+      const methods = await this.wooCommerceService.getShippingZoneMethods(
+        credentials,
+        zoneId,
+      );
       return methods.map((m) => this.transformZoneMethod(m));
     } catch (error) {
-      this.logger.error(`Failed to fetch zone methods: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to fetch zone methods: ${error.message}`);
+      this.logger.error(
+        `Failed to fetch zone methods: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to fetch zone methods: ${error.message}`,
+      );
     }
   }
 
@@ -313,16 +397,25 @@ export class ShippingService {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
-      const method = await this.wooCommerceService.createShippingZoneMethod(credentials, zoneId, {
-        method_id: dto.methodId,
-        order: dto.order,
-        enabled: dto.enabled ?? true,
-        settings: dto.settings,
-      });
+      const method = await this.wooCommerceService.createShippingZoneMethod(
+        credentials,
+        zoneId,
+        {
+          method_id: dto.methodId,
+          order: dto.order,
+          enabled: dto.enabled ?? true,
+          settings: dto.settings,
+        },
+      );
       return this.transformZoneMethod(method);
     } catch (error) {
-      this.logger.error(`Failed to add zone method: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to add zone method: ${error.message}`);
+      this.logger.error(
+        `Failed to add zone method: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to add zone method: ${error.message}`,
+      );
     }
   }
 
@@ -351,8 +444,13 @@ export class ShippingService {
       );
       return this.transformZoneMethod(method);
     } catch (error) {
-      this.logger.error(`Failed to update zone method: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to update zone method: ${error.message}`);
+      this.logger.error(
+        `Failed to update zone method: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to update zone method: ${error.message}`,
+      );
     }
   }
 
@@ -368,10 +466,20 @@ export class ShippingService {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
-      await this.wooCommerceService.deleteShippingZoneMethod(credentials, zoneId, instanceId, true);
+      await this.wooCommerceService.deleteShippingZoneMethod(
+        credentials,
+        zoneId,
+        instanceId,
+        true,
+      );
     } catch (error) {
-      this.logger.error(`Failed to delete zone method: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to delete zone method: ${error.message}`);
+      this.logger.error(
+        `Failed to delete zone method: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to delete zone method: ${error.message}`,
+      );
     }
   }
 
@@ -380,19 +488,29 @@ export class ShippingService {
   /**
    * Get available shipping method types
    */
-  async getAvailableMethods(storeId: string, userId: string): Promise<IShippingMethod[]> {
+  async getAvailableMethods(
+    storeId: string,
+    userId: string,
+  ): Promise<IShippingMethod[]> {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
-      const methods = await this.wooCommerceService.getShippingMethods(credentials);
+      const methods = await this.wooCommerceService.getShippingMethods(
+        credentials,
+      );
       return methods.map((m) => ({
         id: m.id,
         title: m.title,
         description: m.description,
       }));
     } catch (error) {
-      this.logger.error(`Failed to fetch shipping methods: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to fetch shipping methods: ${error.message}`);
+      this.logger.error(
+        `Failed to fetch shipping methods: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to fetch shipping methods: ${error.message}`,
+      );
     }
   }
 
@@ -412,27 +530,44 @@ export class ShippingService {
         states: c.states || [],
       }));
     } catch (error) {
-      this.logger.error(`Failed to fetch countries: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to fetch countries: ${error.message}`);
+      this.logger.error(
+        `Failed to fetch countries: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to fetch countries: ${error.message}`,
+      );
     }
   }
 
   /**
    * Get states for a specific country
    */
-  async getCountryStates(storeId: string, userId: string, countryCode: string): Promise<any> {
+  async getCountryStates(
+    storeId: string,
+    userId: string,
+    countryCode: string,
+  ): Promise<any> {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
-      const country = await this.wooCommerceService.getCountry(credentials, countryCode);
+      const country = await this.wooCommerceService.getCountry(
+        credentials,
+        countryCode,
+      );
       return {
         code: country.code,
         name: country.name,
         states: country.states || [],
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch country states: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to fetch country states: ${error.message}`);
+      this.logger.error(
+        `Failed to fetch country states: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to fetch country states: ${error.message}`,
+      );
     }
   }
 
@@ -441,7 +576,10 @@ export class ShippingService {
   /**
    * Get all custom states added via CartFlow plugin
    */
-  async getCustomStates(storeId: string, userId: string): Promise<Record<string, Record<string, string>>> {
+  async getCustomStates(
+    storeId: string,
+    userId: string,
+  ): Promise<Record<string, Record<string, string>>> {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
@@ -452,8 +590,13 @@ export class ShippingService {
         this.logger.warn('CartFlow Locations plugin not installed on store');
         return {};
       }
-      this.logger.error(`Failed to fetch custom states: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to fetch custom states: ${error.message}`);
+      this.logger.error(
+        `Failed to fetch custom states: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to fetch custom states: ${error.message}`,
+      );
     }
   }
 
@@ -478,13 +621,22 @@ export class ShippingService {
       );
     } catch (error) {
       if (error.response?.status === 404) {
-        throw new BadRequestException('CartFlow Locations plugin is not installed on the store');
+        throw new BadRequestException(
+          'CartFlow Locations plugin is not installed on the store',
+        );
       }
       if (error.response?.status === 409) {
-        throw new BadRequestException('State already exists. Use update to modify it.');
+        throw new BadRequestException(
+          'State already exists. Use update to modify it.',
+        );
       }
-      this.logger.error(`Failed to add custom state: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to add custom state: ${error.message}`);
+      this.logger.error(
+        `Failed to add custom state: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to add custom state: ${error.message}`,
+      );
     }
   }
 
@@ -509,10 +661,17 @@ export class ShippingService {
       );
     } catch (error) {
       if (error.response?.status === 404) {
-        throw new NotFoundException('State not found or CartFlow Locations plugin is not installed');
+        throw new NotFoundException(
+          'State not found or CartFlow Locations plugin is not installed',
+        );
       }
-      this.logger.error(`Failed to update custom state: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to update custom state: ${error.message}`);
+      this.logger.error(
+        `Failed to update custom state: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to update custom state: ${error.message}`,
+      );
     }
   }
 
@@ -535,10 +694,17 @@ export class ShippingService {
       );
     } catch (error) {
       if (error.response?.status === 404) {
-        throw new NotFoundException('State not found or CartFlow Locations plugin is not installed');
+        throw new NotFoundException(
+          'State not found or CartFlow Locations plugin is not installed',
+        );
       }
-      this.logger.error(`Failed to delete custom state: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to delete custom state: ${error.message}`);
+      this.logger.error(
+        `Failed to delete custom state: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to delete custom state: ${error.message}`,
+      );
     }
   }
 
@@ -551,7 +717,12 @@ export class ShippingService {
     countryCode: string,
     states: Array<{ code: string; name: string; groups?: string[] }>,
     groups?: Array<{ name: string; color?: string; description?: string }>,
-  ): Promise<{ success: boolean; message: string; states: Record<string, string>; groups_synced?: number }> {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    states: Record<string, string>;
+    groups_synced?: number;
+  }> {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
@@ -563,29 +734,48 @@ export class ShippingService {
       );
     } catch (error) {
       if (error.response?.status === 404) {
-        throw new BadRequestException('CartFlow Locations plugin is not installed on the store');
+        throw new BadRequestException(
+          'CartFlow Locations plugin is not installed on the store',
+        );
       }
-      this.logger.error(`Failed to bulk update states: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to bulk update states: ${error.message}`);
+      this.logger.error(
+        `Failed to bulk update states: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to bulk update states: ${error.message}`,
+      );
     }
   }
 
   /**
    * Get all countries with custom states (uses CartFlow plugin endpoint)
    */
-  async getCountriesWithCustomStates(storeId: string, userId: string): Promise<any[]> {
+  async getCountriesWithCustomStates(
+    storeId: string,
+    userId: string,
+  ): Promise<any[]> {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
-      return await this.wooCommerceService.getCountriesWithCustomStates(credentials);
+      return await this.wooCommerceService.getCountriesWithCustomStates(
+        credentials,
+      );
     } catch (error) {
       // Fallback to standard WooCommerce countries if plugin is not installed
       if (error.response?.status === 404) {
-        this.logger.warn('CartFlow Locations plugin not installed, falling back to WooCommerce countries');
+        this.logger.warn(
+          'CartFlow Locations plugin not installed, falling back to WooCommerce countries',
+        );
         return this.getCountries(storeId, userId);
       }
-      this.logger.error(`Failed to fetch countries with custom states: ${error.message}`, error.stack);
-      throw new BadRequestException(`Failed to fetch countries: ${error.message}`);
+      this.logger.error(
+        `Failed to fetch countries with custom states: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Failed to fetch countries: ${error.message}`,
+      );
     }
   }
 }

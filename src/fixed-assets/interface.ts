@@ -1,5 +1,10 @@
 import { Types } from 'mongoose';
-import { AssetCategory, AssetStatus, MaintenanceType, DepreciationMethod } from './enum';
+import {
+  AssetCategory,
+  AssetStatus,
+  MaintenanceType,
+  DepreciationMethod,
+} from './enum';
 
 export interface IWarranty {
   expiresAt: Date;

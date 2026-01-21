@@ -11,7 +11,12 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { CategoryService } from './service';
 import {
   CreateCategoryDto,
@@ -36,7 +41,10 @@ export class CategoryController {
   @Post(':storeId')
   @ApiOperation({ summary: 'Create a new category' })
   @ApiResponse({ status: 201, description: 'Category created successfully' })
-  @ApiResponse({ status: 404, description: 'Store or parent category not found' })
+  @ApiResponse({
+    status: 404,
+    description: 'Store or parent category not found',
+  })
   @UsePipes(
     new JoiValidationPipe({
       body: CreateCategorySchema,
@@ -54,7 +62,10 @@ export class CategoryController {
 
   @Get()
   @ApiOperation({ summary: 'Get categories for a store' })
-  @ApiResponse({ status: 200, description: 'Categories retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Categories retrieved successfully',
+  })
   @UsePipes(
     new JoiValidationPipe({
       query: QueryCategorySchema,
@@ -90,7 +101,10 @@ export class CategoryController {
   @ApiOperation({ summary: 'Update a category' })
   @ApiResponse({ status: 200, description: 'Category updated successfully' })
   @ApiResponse({ status: 404, description: 'Category not found' })
-  @ApiResponse({ status: 409, description: 'Circular reference or self-parent' })
+  @ApiResponse({
+    status: 409,
+    description: 'Circular reference or self-parent',
+  })
   @UsePipes(
     new JoiValidationPipe({
       body: UpdateCategorySchema,
@@ -139,6 +153,9 @@ export class CategoryController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.categoryService.syncFromWooCommerce(user._id.toString(), storeId);
+    return await this.categoryService.syncFromWooCommerce(
+      user._id.toString(),
+      storeId,
+    );
   }
 }

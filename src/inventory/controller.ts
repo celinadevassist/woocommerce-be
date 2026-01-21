@@ -8,7 +8,13 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { InventoryService } from './service';
 import { InventoryChangeType, AlertType, AlertStatus } from './enum';
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
@@ -37,7 +43,10 @@ export class InventoryController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.inventoryService.getOverview(user._id.toString(), storeId);
+    return await this.inventoryService.getOverview(
+      user._id.toString(),
+      storeId,
+    );
   }
 
   @Get('alerts')
@@ -57,8 +66,8 @@ export class InventoryController {
     @Query('storeId') storeId: string,
     @Query('status') status: AlertStatus,
     @Query('alertType') alertType: AlertType,
-    @Query('page') page: number = 1,
-    @Query('size') size: number = 20,
+    @Query('page') page = 1,
+    @Query('size') size = 20,
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
@@ -73,7 +82,10 @@ export class InventoryController {
 
   @Get('alerts/count')
   @ApiOperation({ summary: 'Get alert counts for dashboard' })
-  @ApiResponse({ status: 200, description: 'Alert counts retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Alert counts retrieved successfully',
+  })
   @ApiQuery({ name: 'storeId', required: false })
   @UsePipes(
     new JoiValidationPipe({
@@ -85,7 +97,10 @@ export class InventoryController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.inventoryService.getAlertCount(user._id.toString(), storeId);
+    return await this.inventoryService.getAlertCount(
+      user._id.toString(),
+      storeId,
+    );
   }
 
   @Post('alerts/:alertId/dismiss')
@@ -102,7 +117,10 @@ export class InventoryController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.inventoryService.dismissAlert(alertId, user._id.toString());
+    return await this.inventoryService.dismissAlert(
+      alertId,
+      user._id.toString(),
+    );
   }
 
   @Get('logs')
@@ -126,8 +144,8 @@ export class InventoryController {
     @Query('changeType') changeType: InventoryChangeType,
     @Query('startDate') startDate: string,
     @Query('endDate') endDate: string,
-    @Query('page') page: number = 1,
-    @Query('size') size: number = 20,
+    @Query('page') page = 1,
+    @Query('size') size = 20,
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
@@ -154,8 +172,8 @@ export class InventoryController {
   )
   async getProductLogs(
     @Param('productId') productId: string,
-    @Query('page') page: number = 1,
-    @Query('size') size: number = 20,
+    @Query('page') page = 1,
+    @Query('size') size = 20,
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {

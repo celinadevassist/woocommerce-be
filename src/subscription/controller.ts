@@ -14,7 +14,12 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Request, Response } from 'express';
@@ -93,7 +98,12 @@ export class InvoiceController {
   @Get()
   @SkipSubscriptionCheck()
   @ApiOperation({ summary: 'Get all invoices for a store or all user stores' })
-  @ApiQuery({ name: 'storeId', required: false, description: 'Optional: filter by store ID. If not provided, returns invoices for all user stores' })
+  @ApiQuery({
+    name: 'storeId',
+    required: false,
+    description:
+      'Optional: filter by store ID. If not provided, returns invoices for all user stores',
+  })
   @ApiQuery({ name: 'status', required: false, enum: InvoiceStatus })
   @ApiQuery({ name: 'page', required: false })
   @ApiQuery({ name: 'limit', required: false })
@@ -116,18 +126,21 @@ export class InvoiceController {
     }
 
     // Otherwise, get invoices for all user's stores
-    const userStores = await this.storeModel.find({
-      $or: [
-        { ownerId: user._id },
-        { 'members.userId': user._id },
-      ],
-      isDeleted: false,
-    }).select('_id');
+    const userStores = await this.storeModel
+      .find({
+        $or: [{ ownerId: user._id }, { 'members.userId': user._id }],
+        isDeleted: false,
+      })
+      .select('_id');
 
-    const storeIds = userStores.map(s => s._id.toString());
+    const storeIds = userStores.map((s) => s._id.toString());
 
     if (storeIds.length === 0) {
-      return { invoices: [], total: 0, pagination: { page: 1, limit: 50, totalPages: 0 } };
+      return {
+        invoices: [],
+        total: 0,
+        pagination: { page: 1, limit: 50, totalPages: 0 },
+      };
     }
 
     return this.subscriptionService.getInvoicesByStoreIds(
@@ -145,21 +158,21 @@ export class InvoiceController {
   @SkipSubscriptionCheck()
   @ApiOperation({ summary: 'Get all pending invoices for user stores' })
   async getAllPendingInvoices(@User() user: UserDocument) {
-    const userStores = await this.storeModel.find({
-      $or: [
-        { ownerId: user._id },
-        { 'members.userId': user._id },
-      ],
-      isDeleted: false,
-    }).select('_id');
+    const userStores = await this.storeModel
+      .find({
+        $or: [{ ownerId: user._id }, { 'members.userId': user._id }],
+        isDeleted: false,
+      })
+      .select('_id');
 
-    const storeIds = userStores.map(s => s._id.toString());
+    const storeIds = userStores.map((s) => s._id.toString());
 
     if (storeIds.length === 0) {
       return { invoices: [] };
     }
 
-    const invoices = await this.subscriptionService.getPendingInvoicesByStoreIds(storeIds);
+    const invoices =
+      await this.subscriptionService.getPendingInvoicesByStoreIds(storeIds);
     return { invoices };
   }
 
@@ -238,9 +251,13 @@ export class InvoiceController {
    */
   @Post(':invoiceId/verify-payment')
   @SkipSubscriptionCheck()
-  @ApiOperation({ summary: 'Verify payment status with payment provider and update invoice' })
+  @ApiOperation({
+    summary: 'Verify payment status with payment provider and update invoice',
+  })
   async verifyPayment(@Param('invoiceId') invoiceId: string) {
-    const result = await this.subscriptionService.verifySingleInvoicePayment(invoiceId);
+    const result = await this.subscriptionService.verifySingleInvoicePayment(
+      invoiceId,
+    );
     return {
       success: true,
       updated: result.updated,
@@ -281,10 +298,15 @@ export class PaymentWebhookController {
     try {
       // Verify webhook signature
       if (signature) {
-        const isValid = this.subscriptionService.verifyWebhookSignature(payload, signature);
+        const isValid = this.subscriptionService.verifyWebhookSignature(
+          payload,
+          signature,
+        );
         if (!isValid) {
           this.logger.warn('Invalid webhook signature');
-          return res.status(HttpStatus.UNAUTHORIZED).json({ error: 'Invalid signature' });
+          return res
+            .status(HttpStatus.UNAUTHORIZED)
+            .json({ error: 'Invalid signature' });
         }
       }
 
@@ -326,7 +348,9 @@ export class PaymentWebhookController {
       return res.status(HttpStatus.OK).json({ received: true });
     } catch (error) {
       this.logger.error('Webhook processing error:', error);
-      return res.status(HttpStatus.INTERNAL_SERVER_ERROR).json({ error: 'Webhook processing failed' });
+      return res
+        .status(HttpStatus.INTERNAL_SERVER_ERROR)
+        .json({ error: 'Webhook processing failed' });
     }
   }
 }

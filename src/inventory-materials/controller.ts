@@ -11,7 +11,13 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { InventoryMaterialsService } from './service';
 import {
   CreateMaterialDto,
@@ -42,7 +48,11 @@ export class InventoryMaterialsController {
   @Get()
   @ApiOperation({ summary: 'Get all materials for a store' })
   @ApiQuery({ name: 'storeId', required: true, description: 'Store ID' })
-  @ApiQuery({ name: 'category', required: false, description: 'Filter by category' })
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    description: 'Filter by category',
+  })
   @ApiQuery({ name: 'keyword', required: false, description: 'Search keyword' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number' })
   @ApiQuery({ name: 'size', required: false, description: 'Page size' })
@@ -66,14 +76,20 @@ export class InventoryMaterialsController {
   @Get('low-stock')
   @ApiOperation({ summary: 'Get materials with low stock' })
   @ApiQuery({ name: 'storeId', required: true, description: 'Store ID' })
-  async getLowStock(@User('_id') userId: string, @Query('storeId') storeId: string) {
+  async getLowStock(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+  ) {
     return this.materialsService.getLowStock(userId, storeId);
   }
 
   @Get('categories')
   @ApiOperation({ summary: 'Get unique material categories' })
   @ApiQuery({ name: 'storeId', required: true, description: 'Store ID' })
-  async getCategories(@User('_id') userId: string, @Query('storeId') storeId: string) {
+  async getCategories(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+  ) {
     return this.materialsService.getCategories(userId, storeId);
   }
 

@@ -1,7 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
 import { StockStatus } from './enum';
-import { ProductImage, ProductImageSchema, ProductDimensions, ProductDimensionsSchema } from './schema';
+import {
+  ProductImage,
+  ProductImageSchema,
+  ProductDimensions,
+  ProductDimensionsSchema,
+} from './schema';
 
 // Sub-schema for variation attributes
 @Schema({ _id: false })
@@ -16,14 +21,25 @@ export class VariationAttribute {
   option: string;
 }
 
-export const VariationAttributeSchema = SchemaFactory.createForClass(VariationAttribute);
+export const VariationAttributeSchema =
+  SchemaFactory.createForClass(VariationAttribute);
 
 @Schema({ timestamps: true, versionKey: false, collection: 'product_variants' })
 export class ProductVariant extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Product', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Product',
+    required: true,
+    index: true,
+  })
   productId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true, index: true })
@@ -71,7 +87,11 @@ export class ProductVariant extends Document {
   @Prop({ default: null })
   stockQuantity: number | null;
 
-  @Prop({ type: String, enum: Object.values(StockStatus), default: StockStatus.IN_STOCK })
+  @Prop({
+    type: String,
+    enum: Object.values(StockStatus),
+    default: StockStatus.IN_STOCK,
+  })
   stockStatus: StockStatus;
 
   @Prop()
@@ -110,7 +130,8 @@ export class ProductVariant extends Document {
 
 export type ProductVariantDocument = ProductVariant & Document;
 
-export const ProductVariantSchema = SchemaFactory.createForClass(ProductVariant);
+export const ProductVariantSchema =
+  SchemaFactory.createForClass(ProductVariant);
 
 // Indexes
 ProductVariantSchema.index({ storeId: 1, externalId: 1 }, { unique: true });

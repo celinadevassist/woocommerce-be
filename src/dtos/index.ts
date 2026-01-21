@@ -15,7 +15,3 @@ export * from './file.dto';
 export * from './lang.dto';
 export * from './profile-update.dto';
 export * from './profileImage-update.dto';
-
-
-
-

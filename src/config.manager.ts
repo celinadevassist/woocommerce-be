@@ -19,10 +19,10 @@ const configObj = {
 
 export const config = configObj[process.env.NODE_ENV] || DEFAULT;
 export const developmentConfig = (app) => {
-    // Enable CORS with desired options
+  // Enable CORS with desired options
   // Enable CORS for all environments
   const allowedOrigins = process.env.FRONTEND_URL
-    ? process.env.FRONTEND_URL.split(',').map(url => url.trim())
+    ? process.env.FRONTEND_URL.split(',').map((url) => url.trim())
     : null; // Will allow any localhost when null
 
   app.enableCors({
@@ -34,8 +34,10 @@ export const developmentConfig = (app) => {
 
       // If FRONTEND_URL is set, check against allowed origins
       if (allowedOrigins && Array.isArray(allowedOrigins)) {
-        const isAllowed = allowedOrigins.some(allowedUrl => {
-          const domain = allowedUrl.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        const isAllowed = allowedOrigins.some((allowedUrl) => {
+          const domain = allowedUrl
+            .replace(/^https?:\/\//, '')
+            .replace(/\/$/, '');
           return origin.includes(domain);
         });
         if (isAllowed) {
@@ -64,8 +66,12 @@ export const developmentConfig = (app) => {
   //   methods: 'GET, POST, PATCH, PUT, DELETE',
   //   allowedHeaders: 'Content-Type, Authorization'
   // });
-  
-  if (process.env.NODE_ENV !== 'development' && process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'default') {
+
+  if (
+    process.env.NODE_ENV !== 'development' &&
+    process.env.NODE_ENV !== 'test' &&
+    process.env.NODE_ENV !== 'default'
+  ) {
     return;
   }
   const document = SwaggerModule.createDocument(app, config);
@@ -76,5 +82,4 @@ export const developmentConfig = (app) => {
   });
 
   setUpSwagger(app);
-
 };

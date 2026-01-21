@@ -8,10 +8,31 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Material, MaterialDocument, MaterialTransaction, MaterialTransactionDocument } from './schema';
-import { CreateMaterialDto, UpdateMaterialDto, QueryMaterialDto, AddStockDto, AdjustStockDto, QueryTransactionsDto } from './dto';
-import { IMaterial, IMaterialResponse, IMaterialTransaction, IMaterialTransactionResponse, ILowStockMaterial } from './interface';
-import { MaterialTransactionType, MaterialTransactionReferenceType } from './enum';
+import {
+  Material,
+  MaterialDocument,
+  MaterialTransaction,
+  MaterialTransactionDocument,
+} from './schema';
+import {
+  CreateMaterialDto,
+  UpdateMaterialDto,
+  QueryMaterialDto,
+  AddStockDto,
+  AdjustStockDto,
+  QueryTransactionsDto,
+} from './dto';
+import {
+  IMaterial,
+  IMaterialResponse,
+  IMaterialTransaction,
+  IMaterialTransactionResponse,
+  ILowStockMaterial,
+} from './interface';
+import {
+  MaterialTransactionType,
+  MaterialTransactionReferenceType,
+} from './enum';
 import { Store, StoreDocument } from '../store/schema';
 
 @Injectable()
@@ -20,14 +41,19 @@ export class InventoryMaterialsService {
 
   constructor(
     @InjectModel(Material.name) private materialModel: Model<MaterialDocument>,
-    @InjectModel(MaterialTransaction.name) private transactionModel: Model<MaterialTransactionDocument>,
+    @InjectModel(MaterialTransaction.name)
+    private transactionModel: Model<MaterialTransactionDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
   ) {}
 
   /**
    * Create a new material
    */
-  async create(userId: string, storeId: string, dto: CreateMaterialDto): Promise<IMaterial> {
+  async create(
+    userId: string,
+    storeId: string,
+    dto: CreateMaterialDto,
+  ): Promise<IMaterial> {
     await this.getStoreWithAccess(storeId, userId);
 
     // Check for duplicate SKU
@@ -38,7 +64,9 @@ export class InventoryMaterialsService {
     });
 
     if (existingMaterial) {
-      throw new ConflictException(`Material with SKU "${dto.sku}" already exists`);
+      throw new ConflictException(
+        `Material with SKU "${dto.sku}" already exists`,
+      );
     }
 
     const material = await this.materialModel.create({
@@ -63,7 +91,10 @@ export class InventoryMaterialsService {
   /**
    * Get materials with pagination and filtering
    */
-  async findByStore(userId: string, query: QueryMaterialDto): Promise<IMaterialResponse> {
+  async findByStore(
+    userId: string,
+    query: QueryMaterialDto,
+  ): Promise<IMaterialResponse> {
     if (!query.storeId) {
       throw new BadRequestException('Store ID is required');
     }
@@ -134,7 +165,11 @@ export class InventoryMaterialsService {
   /**
    * Update a material
    */
-  async update(userId: string, materialId: string, dto: UpdateMaterialDto): Promise<IMaterial> {
+  async update(
+    userId: string,
+    materialId: string,
+    dto: UpdateMaterialDto,
+  ): Promise<IMaterial> {
     const material = await this.materialModel.findOne({
       _id: new Types.ObjectId(materialId),
       isDeleted: false,
@@ -151,9 +186,12 @@ export class InventoryMaterialsService {
     if (dto.description !== undefined) material.description = dto.description;
     if (dto.unit !== undefined) material.unit = dto.unit;
     if (dto.category !== undefined) material.category = dto.category;
-    if (dto.minStockLevel !== undefined) material.minStockLevel = dto.minStockLevel;
-    if (dto.reorderPoint !== undefined) material.reorderPoint = dto.reorderPoint;
-    if (dto.reorderQuantity !== undefined) material.reorderQuantity = dto.reorderQuantity;
+    if (dto.minStockLevel !== undefined)
+      material.minStockLevel = dto.minStockLevel;
+    if (dto.reorderPoint !== undefined)
+      material.reorderPoint = dto.reorderPoint;
+    if (dto.reorderQuantity !== undefined)
+      material.reorderQuantity = dto.reorderQuantity;
     if (dto.suppliers !== undefined) material.suppliers = dto.suppliers;
 
     await material.save();
@@ -178,7 +216,9 @@ export class InventoryMaterialsService {
 
     // Cannot delete material with stock > 0
     if (material.currentStock > 0) {
-      throw new ConflictException('Cannot delete material with existing stock. Adjust stock to zero first.');
+      throw new ConflictException(
+        'Cannot delete material with existing stock. Adjust stock to zero first.',
+      );
     }
 
     material.isDeleted = true;
@@ -190,7 +230,11 @@ export class InventoryMaterialsService {
    * Add stock (purchase)
    * Implements weighted average cost calculation
    */
-  async addStock(userId: string, materialId: string, dto: AddStockDto): Promise<IMaterial> {
+  async addStock(
+    userId: string,
+    materialId: string,
+    dto: AddStockDto,
+  ): Promise<IMaterial> {
     const material = await this.materialModel.findOne({
       _id: new Types.ObjectId(materialId),
       isDeleted: false,
@@ -208,9 +252,11 @@ export class InventoryMaterialsService {
 
     // Calculate weighted average cost
     // newAvgCost = (currentStock × currentAvgCost + newQty × newUnitCost) / (currentStock + newQty)
-    const newAvgCost = previousStock === 0 && previousAvgCost === 0
-      ? dto.unitCost
-      : (previousStock * previousAvgCost + dto.quantity * dto.unitCost) / newStock;
+    const newAvgCost =
+      previousStock === 0 && previousAvgCost === 0
+        ? dto.unitCost
+        : (previousStock * previousAvgCost + dto.quantity * dto.unitCost) /
+          newStock;
 
     const totalCost = dto.quantity * dto.unitCost;
 
@@ -237,7 +283,9 @@ export class InventoryMaterialsService {
       performedBy: new Types.ObjectId(userId),
     });
 
-    this.logger.log(`Stock added to ${material.sku}: +${dto.quantity} at ${dto.unitCost}/unit`);
+    this.logger.log(
+      `Stock added to ${material.sku}: +${dto.quantity} at ${dto.unitCost}/unit`,
+    );
     return this.toInterface(material);
   }
 
@@ -245,7 +293,11 @@ export class InventoryMaterialsService {
    * Adjust stock (correction or waste)
    * Does not affect average cost
    */
-  async adjustStock(userId: string, materialId: string, dto: AdjustStockDto): Promise<IMaterial> {
+  async adjustStock(
+    userId: string,
+    materialId: string,
+    dto: AdjustStockDto,
+  ): Promise<IMaterial> {
     const material = await this.materialModel.findOne({
       _id: new Types.ObjectId(materialId),
       isDeleted: false,
@@ -262,12 +314,20 @@ export class InventoryMaterialsService {
 
     // Stock cannot go negative
     if (newStock < 0) {
-      throw new BadRequestException(`Insufficient stock. Current: ${previousStock}, Attempted change: ${dto.quantity}`);
+      throw new BadRequestException(
+        `Insufficient stock. Current: ${previousStock}, Attempted change: ${dto.quantity}`,
+      );
     }
 
     // Determine transaction type and reference type
-    const transactionType = dto.type === 'WASTE' ? MaterialTransactionType.WASTE : MaterialTransactionType.ADJUST;
-    const referenceType = dto.type === 'WASTE' ? MaterialTransactionReferenceType.WASTE : MaterialTransactionReferenceType.MANUAL;
+    const transactionType =
+      dto.type === 'WASTE'
+        ? MaterialTransactionType.WASTE
+        : MaterialTransactionType.ADJUST;
+    const referenceType =
+      dto.type === 'WASTE'
+        ? MaterialTransactionReferenceType.WASTE
+        : MaterialTransactionReferenceType.MANUAL;
 
     // Calculate total cost for the transaction (for reporting)
     const totalCost = Math.abs(dto.quantity) * material.averageCost;
@@ -291,7 +351,11 @@ export class InventoryMaterialsService {
       performedBy: new Types.ObjectId(userId),
     });
 
-    this.logger.log(`Stock adjusted for ${material.sku}: ${dto.quantity > 0 ? '+' : ''}${dto.quantity} (${dto.type})`);
+    this.logger.log(
+      `Stock adjusted for ${material.sku}: ${dto.quantity > 0 ? '+' : ''}${
+        dto.quantity
+      } (${dto.type})`,
+    );
     return this.toInterface(material);
   }
 
@@ -319,7 +383,9 @@ export class InventoryMaterialsService {
     const newStock = previousStock - quantity;
 
     if (newStock < 0) {
-      throw new BadRequestException(`Insufficient stock for ${material.name}. Current: ${previousStock}, Required: ${quantity}`);
+      throw new BadRequestException(
+        `Insufficient stock for ${material.name}. Current: ${previousStock}, Required: ${quantity}`,
+      );
     }
 
     const totalCost = quantity * material.averageCost;
@@ -343,14 +409,20 @@ export class InventoryMaterialsService {
       performedBy: new Types.ObjectId(userId),
     });
 
-    this.logger.log(`Stock deducted from ${material.sku}: -${quantity} for production`);
+    this.logger.log(
+      `Stock deducted from ${material.sku}: -${quantity} for production`,
+    );
     return this.toInterface(material);
   }
 
   /**
    * Get transaction history for a material
    */
-  async getTransactions(userId: string, materialId: string, query: QueryTransactionsDto): Promise<IMaterialTransactionResponse> {
+  async getTransactions(
+    userId: string,
+    materialId: string,
+    query: QueryTransactionsDto,
+  ): Promise<IMaterialTransactionResponse> {
     const material = await this.materialModel.findOne({
       _id: new Types.ObjectId(materialId),
       isDeleted: false,
@@ -387,7 +459,11 @@ export class InventoryMaterialsService {
     const skip = (page - 1) * size;
 
     const [transactions, total] = await Promise.all([
-      this.transactionModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(size),
+      this.transactionModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(size),
       this.transactionModel.countDocuments(filter),
     ]);
 
@@ -405,14 +481,19 @@ export class InventoryMaterialsService {
   /**
    * Get materials with low stock
    */
-  async getLowStock(userId: string, storeId: string): Promise<ILowStockMaterial[]> {
+  async getLowStock(
+    userId: string,
+    storeId: string,
+  ): Promise<ILowStockMaterial[]> {
     await this.getStoreWithAccess(storeId, userId);
 
-    const materials = await this.materialModel.find({
-      storeId: new Types.ObjectId(storeId),
-      isDeleted: false,
-      $expr: { $lt: ['$currentStock', '$minStockLevel'] },
-    }).sort({ currentStock: 1 });
+    const materials = await this.materialModel
+      .find({
+        storeId: new Types.ObjectId(storeId),
+        isDeleted: false,
+        $expr: { $lt: ['$currentStock', '$minStockLevel'] },
+      })
+      .sort({ currentStock: 1 });
 
     return materials.map((m) => ({
       ...this.toInterface(m),
@@ -437,7 +518,10 @@ export class InventoryMaterialsService {
 
   // Helper methods
 
-  private async getStoreWithAccess(storeId: string, userId: string): Promise<StoreDocument> {
+  private async getStoreWithAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<StoreDocument> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       isDeleted: false,
@@ -480,7 +564,9 @@ export class InventoryMaterialsService {
     };
   }
 
-  private toTransactionInterface(doc: MaterialTransactionDocument): IMaterialTransaction {
+  private toTransactionInterface(
+    doc: MaterialTransactionDocument,
+  ): IMaterialTransaction {
     const obj = doc.toObject();
     return {
       _id: obj._id.toString(),

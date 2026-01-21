@@ -29,7 +29,11 @@ export class CategoryService {
   /**
    * Create a new category
    */
-  async create(userId: string, storeId: string, dto: CreateCategoryDto): Promise<ICategory> {
+  async create(
+    userId: string,
+    storeId: string,
+    dto: CreateCategoryDto,
+  ): Promise<ICategory> {
     const store = await this.getStoreWithAccess(storeId, userId);
 
     // Resolve parent category if provided
@@ -95,7 +99,10 @@ export class CategoryService {
   /**
    * Get categories with pagination and filtering
    */
-  async findByStore(userId: string, query: QueryCategoryDto): Promise<ICategoryResponse> {
+  async findByStore(
+    userId: string,
+    query: QueryCategoryDto,
+  ): Promise<ICategoryResponse> {
     if (!query.storeId) {
       throw new NotFoundException('Store ID is required');
     }
@@ -133,7 +140,9 @@ export class CategoryService {
         .find({ storeId: store._id, isDeleted: false })
         .sort({ menuOrder: 1, name: 1 });
 
-      const tree = this.buildTree(allCategories.map((c) => this.toInterface(c)));
+      const tree = this.buildTree(
+        allCategories.map((c) => this.toInterface(c)),
+      );
       return {
         categories: tree,
         pagination: {
@@ -146,7 +155,11 @@ export class CategoryService {
     }
 
     const [categories, total] = await Promise.all([
-      this.categoryModel.find(filter).sort({ menuOrder: 1, name: 1 }).skip(skip).limit(size),
+      this.categoryModel
+        .find(filter)
+        .sort({ menuOrder: 1, name: 1 })
+        .skip(skip)
+        .limit(size),
       this.categoryModel.countDocuments(filter),
     ]);
 
@@ -183,7 +196,11 @@ export class CategoryService {
   /**
    * Update a category
    */
-  async update(userId: string, categoryId: string, dto: UpdateCategoryDto): Promise<ICategory> {
+  async update(
+    userId: string,
+    categoryId: string,
+    dto: UpdateCategoryDto,
+  ): Promise<ICategory> {
     const category = await this.categoryModel.findOne({
       _id: new Types.ObjectId(categoryId),
       isDeleted: false,
@@ -193,7 +210,10 @@ export class CategoryService {
       throw new NotFoundException('Category not found');
     }
 
-    const store = await this.getStoreWithAccess(category.storeId.toString(), userId);
+    const store = await this.getStoreWithAccess(
+      category.storeId.toString(),
+      userId,
+    );
 
     // Resolve new parent if provided
     let parentCategory: CategoryDocument | null = null;
@@ -284,7 +304,10 @@ export class CategoryService {
       throw new NotFoundException('Category not found');
     }
 
-    const store = await this.getStoreWithAccess(category.storeId.toString(), userId);
+    const store = await this.getStoreWithAccess(
+      category.storeId.toString(),
+      userId,
+    );
 
     // Check for children
     const childCount = await this.categoryModel.countDocuments({
@@ -317,7 +340,10 @@ export class CategoryService {
   /**
    * Sync categories from WooCommerce
    */
-  async syncFromWooCommerce(userId: string, storeId: string): Promise<{ synced: number; created: number; updated: number }> {
+  async syncFromWooCommerce(
+    userId: string,
+    storeId: string,
+  ): Promise<{ synced: number; created: number; updated: number }> {
     const store = await this.getStoreWithAccess(storeId, userId);
 
     const credentials = {
@@ -332,7 +358,11 @@ export class CategoryService {
 
     // Fetch all categories from WooCommerce
     while (hasMore) {
-      const result = await this.wooCommerceService.getCategories(credentials, page, 100);
+      const result = await this.wooCommerceService.getCategories(
+        credentials,
+        page,
+        100,
+      );
       allCategories = allCategories.concat(result.data);
       hasMore = page < result.totalPages;
       page++;
@@ -420,7 +450,10 @@ export class CategoryService {
 
   // Helper methods
 
-  private async getStoreWithAccess(storeId: string, userId: string): Promise<StoreDocument> {
+  private async getStoreWithAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<StoreDocument> {
     const store = await this.storeModel
       .findOne({
         _id: new Types.ObjectId(storeId),
@@ -443,7 +476,10 @@ export class CategoryService {
     return store;
   }
 
-  private async isDescendant(categoryId: string, potentialDescendantId: string): Promise<boolean> {
+  private async isDescendant(
+    categoryId: string,
+    potentialDescendantId: string,
+  ): Promise<boolean> {
     const children = await this.categoryModel.find({
       parentId: new Types.ObjectId(categoryId),
       isDeleted: false,
@@ -453,7 +489,9 @@ export class CategoryService {
       if (child._id.toString() === potentialDescendantId) {
         return true;
       }
-      if (await this.isDescendant(child._id.toString(), potentialDescendantId)) {
+      if (
+        await this.isDescendant(child._id.toString(), potentialDescendantId)
+      ) {
         return true;
       }
     }

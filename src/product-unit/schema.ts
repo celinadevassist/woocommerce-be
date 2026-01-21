@@ -4,13 +4,23 @@ import { ProductUnitStatus } from './enum';
 
 @Schema({ timestamps: true, collection: 'product_units' })
 export class ProductUnit extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: String, required: true, unique: true })
   rfidCode: string;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'SKU', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'SKU',
+    required: true,
+    index: true,
+  })
   skuId: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: String, required: true, index: true })
@@ -19,7 +29,12 @@ export class ProductUnit extends Document {
   @Prop({ type: String, required: true })
   productName: string;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'ProductionBatch', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'ProductionBatch',
+    required: true,
+    index: true,
+  })
   batchId: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: String, required: true })
@@ -28,7 +43,12 @@ export class ProductUnit extends Document {
   @Prop({ type: Number, required: true })
   unitCost: number;
 
-  @Prop({ type: String, enum: Object.values(ProductUnitStatus), default: ProductUnitStatus.IN_STOCK, index: true })
+  @Prop({
+    type: String,
+    enum: Object.values(ProductUnitStatus),
+    default: ProductUnitStatus.IN_STOCK,
+    index: true,
+  })
   status: ProductUnitStatus;
 
   @Prop({ type: String, default: '' })

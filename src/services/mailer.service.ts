@@ -21,7 +21,12 @@ export interface EmailOptions {
   // Email tracking
   tracking?: {
     trackingId?: string; // Optional pre-existing tracking ID (skip creation if provided)
-    emailType: 'registration_confirmation' | 'payment_pending' | 'payment_reminder' | 'payment_confirmed' | 'zoom_reminder';
+    emailType:
+      | 'registration_confirmation'
+      | 'payment_pending'
+      | 'payment_reminder'
+      | 'payment_confirmed'
+      | 'zoom_reminder';
     userId?: string;
     registrationId?: string;
     sessionId?: string;
@@ -35,11 +40,10 @@ export class MailerService {
   private readonly logger = new Logger(MailerService.name);
   private readonly templatesPath: string;
 
-  constructor(
-    private configService: ConfigService,
-  ) {
+  constructor(private configService: ConfigService) {
     // Set templates path based on environment
-    const isDevelopment = this.configService.get<string>('NODE_ENV') === 'development';
+    const isDevelopment =
+      this.configService.get<string>('NODE_ENV') === 'development';
     if (isDevelopment) {
       this.templatesPath = path.join(process.cwd(), 'src/templates/emails');
     } else {
@@ -83,10 +87,18 @@ export class MailerService {
       this.logger.log('\n🚀 [MAILER SERVICE] Starting email send process');
       this.logger.log('='.repeat(60));
 
-      const from = options.from || `${this.configService.get('EMAIL_FROM_NAME')} <${this.configService.get('EMAIL_FROM')}>`;
+      const from =
+        options.from ||
+        `${this.configService.get('EMAIL_FROM_NAME')} <${this.configService.get(
+          'EMAIL_FROM',
+        )}>`;
 
       this.logger.log('📧 [STEP 1] Email Configuration:');
-      this.logger.log(`   To: ${Array.isArray(options.to) ? options.to.join(', ') : options.to}`);
+      this.logger.log(
+        `   To: ${
+          Array.isArray(options.to) ? options.to.join(', ') : options.to
+        }`,
+      );
       this.logger.log(`   From: ${from}`);
       this.logger.log(`   Subject: ${options.subject}`);
       this.logger.log(`   Template: ${options.template || 'No template'}`);
@@ -97,7 +109,9 @@ export class MailerService {
         this.logger.log('\n📝 [STEP 2] Rendering Template:');
         this.logger.log(`   Template Name: ${options.template}`);
         html = await this.renderTemplate(options.template, options.context);
-        this.logger.log(`   ✅ Template rendered (${(html.length / 1024).toFixed(2)} KB)`);
+        this.logger.log(
+          `   ✅ Template rendered (${(html.length / 1024).toFixed(2)} KB)`,
+        );
       }
 
       // Email tracking - use existing tracking ID or create new one
@@ -109,13 +123,18 @@ export class MailerService {
             trackingId = options.tracking.trackingId;
             this.logger.log(`   📊 Using existing tracking ID: ${trackingId}`);
           } else {
-            const recipientEmail = Array.isArray(options.to) ? options.to[0] : options.to;
+            const recipientEmail = Array.isArray(options.to)
+              ? options.to[0]
+              : options.to;
 
             this.logger.log(`   📊 Created new tracking ID: ${trackingId}`);
           }
 
           if (trackingId) {
-            const backendUrl = this.configService.get('BACKEND_URL', 'http://localhost:3041');
+            const backendUrl = this.configService.get(
+              'BACKEND_URL',
+              'http://localhost:3041',
+            );
             const trackingPixelUrl = `${backendUrl}/api/email-tracking/pixel/${trackingId}`;
             const trackingPixel = `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none;" alt="" />`;
 
@@ -151,7 +170,11 @@ export class MailerService {
       this.logger.log(`   Port: ${this.configService.get('SMTP_PORT')}`);
       this.logger.log(`   Secure: ${this.configService.get('SMTP_SECURE')}`);
       this.logger.log(`   User: ${this.configService.get('SMTP_USER')}`);
-      this.logger.log(`   Password: ${this.configService.get('SMTP_PASSWORD') ? '***SET***' : '❌ NOT SET'}`);
+      this.logger.log(
+        `   Password: ${
+          this.configService.get('SMTP_PASSWORD') ? '***SET***' : '❌ NOT SET'
+        }`,
+      );
 
       this.logger.log('\n📤 [STEP 4] Sending Email...');
       const startTime = Date.now();
@@ -174,13 +197,17 @@ export class MailerService {
       this.logger.error(`   Error Command: ${error.command || 'none'}`);
 
       if (error.code === 'ECONNREFUSED') {
-        this.logger.error('   🔌 CONNECTION REFUSED: Cannot connect to SMTP server');
+        this.logger.error(
+          '   🔌 CONNECTION REFUSED: Cannot connect to SMTP server',
+        );
         this.logger.error('   Check: SMTP_HOST and SMTP_PORT are correct');
       } else if (error.code === 'EAUTH') {
         this.logger.error('   🔒 AUTHENTICATION FAILED: Invalid credentials');
         this.logger.error('   Check: SMTP_USER and SMTP_PASSWORD');
       } else if (error.code === 'ETIMEDOUT') {
-        this.logger.error('   ⏰ CONNECTION TIMEOUT: SMTP server not responding');
+        this.logger.error(
+          '   ⏰ CONNECTION TIMEOUT: SMTP server not responding',
+        );
         this.logger.error('   Check: Firewall, network connectivity');
       }
 
@@ -190,7 +217,10 @@ export class MailerService {
     }
   }
 
-  private async renderTemplate(templateName: string, context: any): Promise<string> {
+  private async renderTemplate(
+    templateName: string,
+    context: any,
+  ): Promise<string> {
     try {
       const templatePath = path.join(this.templatesPath, `${templateName}.hbs`);
       const templateContent = fs.readFileSync(templatePath, 'utf-8');
@@ -202,8 +232,14 @@ export class MailerService {
     }
   }
 
-  async sendVerificationEmail(email: string, token: string, userName?: string): Promise<boolean> {
-    const verificationUrl = `${this.configService.get('EMAIL_VERIFICATION_URL')}?token=${token}`;
+  async sendVerificationEmail(
+    email: string,
+    token: string,
+    userName?: string,
+  ): Promise<boolean> {
+    const verificationUrl = `${this.configService.get(
+      'EMAIL_VERIFICATION_URL',
+    )}?token=${token}`;
     const appName = this.configService.get('APP_NAME', 'BrandBanda');
 
     return this.sendMail({
@@ -218,8 +254,14 @@ export class MailerService {
     });
   }
 
-  async sendPasswordResetEmail(email: string, token: string, userName?: string): Promise<boolean> {
-    const resetUrl = `${this.configService.get('PASSWORD_RESET_URL')}?token=${token}`;
+  async sendPasswordResetEmail(
+    email: string,
+    token: string,
+    userName?: string,
+  ): Promise<boolean> {
+    const resetUrl = `${this.configService.get(
+      'PASSWORD_RESET_URL',
+    )}?token=${token}`;
     const appName = this.configService.get('APP_NAME', 'BrandBanda');
 
     return this.sendMail({
@@ -265,7 +307,10 @@ export class MailerService {
     });
   }
 
-  async sendSubscriptionEmail(email: string, subscriptionData: any): Promise<boolean> {
+  async sendSubscriptionEmail(
+    email: string,
+    subscriptionData: any,
+  ): Promise<boolean> {
     const appName = this.configService.get('APP_NAME', 'BrandBanda');
 
     return this.sendMail({
@@ -279,7 +324,10 @@ export class MailerService {
     });
   }
 
-  async sendProjectInvitationEmail(email: string, invitationData: any): Promise<boolean> {
+  async sendProjectInvitationEmail(
+    email: string,
+    invitationData: any,
+  ): Promise<boolean> {
     const appName = this.configService.get('APP_NAME', 'BrandBanda');
 
     return this.sendMail({
@@ -321,10 +369,16 @@ export class MailerService {
       registrationId?: string;
       sessionId?: string;
       userId?: string;
-    }
+    },
   ): Promise<boolean> {
-    const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:5173');
-    const supportEmail = this.configService.get('SUPPORT_EMAIL', 'support@2zpoint.com');
+    const frontendUrl = this.configService.get(
+      'FRONTEND_URL',
+      'http://localhost:5173',
+    );
+    const supportEmail = this.configService.get(
+      'SUPPORT_EMAIL',
+      'support@2zpoint.com',
+    );
 
     return this.sendMail({
       to: email,
@@ -335,15 +389,17 @@ export class MailerService {
         supportEmail,
         frontendUrl,
       },
-      tracking: registrationData.registrationId ? {
-        emailType: 'registration_confirmation',
-        userId: registrationData.userId,
-        registrationId: registrationData.registrationId,
-        sessionId: registrationData.sessionId,
-        metadata: {
-          sessionTitle: registrationData.sessionTitle,
-        },
-      } : undefined,
+      tracking: registrationData.registrationId
+        ? {
+            emailType: 'registration_confirmation',
+            userId: registrationData.userId,
+            registrationId: registrationData.registrationId,
+            sessionId: registrationData.sessionId,
+            metadata: {
+              sessionTitle: registrationData.sessionTitle,
+            },
+          }
+        : undefined,
     });
   }
 
@@ -365,13 +421,19 @@ export class MailerService {
       registrationId: string;
       sessionId?: string;
       userId?: string;
-    }
+    },
   ): Promise<boolean> {
-    const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:5173');
-    const supportEmail = this.configService.get('SUPPORT_EMAIL', 'support@2zpoint.com');
+    const frontendUrl = this.configService.get(
+      'FRONTEND_URL',
+      'http://localhost:5173',
+    );
+    const supportEmail = this.configService.get(
+      'SUPPORT_EMAIL',
+      'support@2zpoint.com',
+    );
     const paymentPageUrl = `${frontendUrl}/payment-options?registrationId=${registrationData.registrationId}`;
     const whatsappMessage = encodeURIComponent(
-      `Hi, I want to complete payment for ${registrationData.sessionTitle}. Registration ID: ${registrationData.registrationId}`
+      `Hi, I want to complete payment for ${registrationData.sessionTitle}. Registration ID: ${registrationData.registrationId}`,
     );
 
     return this.sendMail({
@@ -415,13 +477,19 @@ export class MailerService {
       registrationId: string;
       sessionId?: string;
       userId?: string;
-    }
+    },
   ): Promise<boolean> {
-    const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:5173');
-    const supportEmail = this.configService.get('SUPPORT_EMAIL', 'support@2zpoint.com');
+    const frontendUrl = this.configService.get(
+      'FRONTEND_URL',
+      'http://localhost:5173',
+    );
+    const supportEmail = this.configService.get(
+      'SUPPORT_EMAIL',
+      'support@2zpoint.com',
+    );
     const paymentPageUrl = `${frontendUrl}/payment-options?registrationId=${reminderData.registrationId}`;
     const whatsappMessage = encodeURIComponent(
-      `Hi, I want to complete payment for ${reminderData.sessionTitle}. Registration ID: ${reminderData.registrationId}`
+      `Hi, I want to complete payment for ${reminderData.sessionTitle}. Registration ID: ${reminderData.registrationId}`,
     );
 
     return this.sendMail({
@@ -473,16 +541,20 @@ export class MailerService {
       sessionId?: string;
       meetingId?: string;
       notificationType?: string;
-    }
+    },
   ): Promise<{ success: boolean; trackingId?: string }> {
-    const supportEmail = this.configService.get('SUPPORT_EMAIL', 'support@2zpoint.com');
+    const supportEmail = this.configService.get(
+      'SUPPORT_EMAIL',
+      'support@2zpoint.com',
+    );
 
     // Create tracking ID before sending email
-    let trackingId: string = null;
+    const trackingId: string = null;
     try {
-
     } catch (error) {
-      this.logger.error(`Failed to create email tracking for ${email}: ${error.message}`);
+      this.logger.error(
+        `Failed to create email tracking for ${email}: ${error.message}`,
+      );
     }
 
     // Pass the pre-created tracking ID to sendMail
@@ -494,20 +566,22 @@ export class MailerService {
         ...reminderData,
         supportEmail,
       },
-      tracking: trackingId ? {
-        trackingId, // Use pre-created tracking ID
-        emailType: 'zoom_reminder',
-        userId: reminderData.userId,
-        registrationId: reminderData.registrationId,
-        sessionId: reminderData.sessionId,
-        metadata: {
-          topic: reminderData.topic,
-          meetingDate: reminderData.meetingDate,
-          reminderType: reminderData.reminderType,
-          meetingId: reminderData.meetingId,
-          notificationType: reminderData.notificationType,
-        },
-      } : undefined,
+      tracking: trackingId
+        ? {
+            trackingId, // Use pre-created tracking ID
+            emailType: 'zoom_reminder',
+            userId: reminderData.userId,
+            registrationId: reminderData.registrationId,
+            sessionId: reminderData.sessionId,
+            metadata: {
+              topic: reminderData.topic,
+              meetingDate: reminderData.meetingDate,
+              reminderType: reminderData.reminderType,
+              meetingId: reminderData.meetingId,
+              notificationType: reminderData.notificationType,
+            },
+          }
+        : undefined,
     });
 
     return { success: result, trackingId };
@@ -536,10 +610,16 @@ export class MailerService {
       registrationId?: string;
       sessionId?: string;
       userId?: string;
-    }
+    },
   ): Promise<boolean> {
-    const frontendUrl = this.configService.get('FRONTEND_URL', 'http://localhost:5173');
-    const supportEmail = this.configService.get('SUPPORT_EMAIL', 'support@2zpoint.com');
+    const frontendUrl = this.configService.get(
+      'FRONTEND_URL',
+      'http://localhost:5173',
+    );
+    const supportEmail = this.configService.get(
+      'SUPPORT_EMAIL',
+      'support@2zpoint.com',
+    );
 
     return this.sendMail({
       to: email,
@@ -550,18 +630,20 @@ export class MailerService {
         supportEmail,
         frontendUrl,
       },
-      tracking: confirmationData.registrationId ? {
-        emailType: 'payment_confirmed',
-        userId: confirmationData.userId,
-        registrationId: confirmationData.registrationId,
-        sessionId: confirmationData.sessionId,
-        metadata: {
-          sessionTitle: confirmationData.sessionTitle,
-          amountPaid: confirmationData.amountPaid,
-          currency: confirmationData.currency,
-          paymentTransactionId: confirmationData.paymentTransactionId,
-        },
-      } : undefined,
+      tracking: confirmationData.registrationId
+        ? {
+            emailType: 'payment_confirmed',
+            userId: confirmationData.userId,
+            registrationId: confirmationData.registrationId,
+            sessionId: confirmationData.sessionId,
+            metadata: {
+              sessionTitle: confirmationData.sessionTitle,
+              amountPaid: confirmationData.amountPaid,
+              currency: confirmationData.currency,
+              paymentTransactionId: confirmationData.paymentTransactionId,
+            },
+          }
+        : undefined,
     });
   }
 }

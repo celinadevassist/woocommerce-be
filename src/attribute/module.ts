@@ -3,7 +3,12 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { PassportModule } from '@nestjs/passport';
 import { AttributeController } from './controller';
 import { AttributeService } from './service';
-import { Attribute, AttributeSchema, AttributeTerm, AttributeTermSchema } from './schema';
+import {
+  Attribute,
+  AttributeSchema,
+  AttributeTerm,
+  AttributeTermSchema,
+} from './schema';
 import { Store, StoreSchema } from '../store/schema';
 import { WooCommerceModule } from '../integrations/woocommerce/woocommerce.module';
 

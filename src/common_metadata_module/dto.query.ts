@@ -1,5 +1,11 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsString, IsNumber, IsEnum, IsMongoId } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsNumber,
+  IsEnum,
+  IsMongoId,
+} from 'class-validator';
 import * as Joi from 'joi';
 import { ModuleType, MetadataOrderEnum, SortTypeEnum } from './enum';
 
@@ -75,10 +81,16 @@ export class QueryMetadataDto {
 
 export const QueryMetadataSchema = Joi.object({
   userId: Joi.string().optional(),
-  forModule: Joi.string().valid(...Object.values(ModuleType)).optional(),
+  forModule: Joi.string()
+    .valid(...Object.values(ModuleType))
+    .optional(),
   search: Joi.string().optional(),
   page: Joi.number().optional(),
   size: Joi.number().optional(),
-  orderBy: Joi.string().valid(...Object.values(MetadataOrderEnum)).optional(),
-  sortType: Joi.string().valid(...Object.values(SortTypeEnum)).optional(),
-}); 
+  orderBy: Joi.string()
+    .valid(...Object.values(MetadataOrderEnum))
+    .optional(),
+  sortType: Joi.string()
+    .valid(...Object.values(SortTypeEnum))
+    .optional(),
+});

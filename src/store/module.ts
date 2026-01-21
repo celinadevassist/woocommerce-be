@@ -10,9 +10,7 @@ import { SyncModule } from '../sync/module';
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
-    MongooseModule.forFeature([
-      { name: Store.name, schema: StoreSchema },
-    ]),
+    MongooseModule.forFeature([{ name: Store.name, schema: StoreSchema }]),
     forwardRef(() => SyncModule),
     WooCommerceModule,
   ],

@@ -10,10 +10,27 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Order, OrderDocument } from './schema';
-import { UpdateOrderDto, AddTrackingDto, AddOrderNoteDto, BatchOrdersDto, BatchCreateOrderItemDto, BatchUpdateOrderItemDto } from './dto.update';
+import {
+  UpdateOrderDto,
+  AddTrackingDto,
+  AddOrderNoteDto,
+  BatchOrdersDto,
+  BatchCreateOrderItemDto,
+  BatchUpdateOrderItemDto,
+} from './dto.update';
 import { QueryOrderDto } from './dto.query';
-import { IOrder, IOrderResponse, IOrderStats, ICreateManualOrderDto } from './interface';
-import { OrderStatus, PaymentStatus, FulfillmentStatus, OrderSource } from './enum';
+import {
+  IOrder,
+  IOrderResponse,
+  IOrderStats,
+  ICreateManualOrderDto,
+} from './interface';
+import {
+  OrderStatus,
+  PaymentStatus,
+  FulfillmentStatus,
+  OrderSource,
+} from './enum';
 import { OrderItemService } from '../order-item/service';
 import { Store, StoreDocument } from '../store/schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
@@ -47,20 +64,26 @@ export class OrderService {
    * Get store IDs that user has access to (owner or member)
    */
   private async getUserStoreIds(userId: string): Promise<Types.ObjectId[]> {
-    const stores = await this.storeModel.find({
-      isDeleted: false,
-      $or: [
-        { ownerId: new Types.ObjectId(userId) },
-        { 'members.userId': new Types.ObjectId(userId) },
-      ],
-    }).select('_id');
+    const stores = await this.storeModel
+      .find({
+        isDeleted: false,
+        $or: [
+          { ownerId: new Types.ObjectId(userId) },
+          { 'members.userId': new Types.ObjectId(userId) },
+        ],
+      })
+      .select('_id');
     return stores.map((store) => store._id);
   }
 
   /**
    * Verify user has access to a specific store
    */
-  private async verifyStoreAccess(storeId: string, userId: string, includeCredentials = false): Promise<StoreDocument> {
+  private async verifyStoreAccess(
+    storeId: string,
+    userId: string,
+    includeCredentials = false,
+  ): Promise<StoreDocument> {
     let query = this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       isDeleted: false,
@@ -115,16 +138,21 @@ export class OrderService {
     }
     if (query.startDate || query.endDate) {
       filter.dateCreatedWoo = {};
-      if (query.startDate) filter.dateCreatedWoo.$gte = new Date(query.startDate);
+      if (query.startDate)
+        filter.dateCreatedWoo.$gte = new Date(query.startDate);
       if (query.endDate) filter.dateCreatedWoo.$lte = new Date(query.endDate);
     }
     if (query.minTotal !== undefined || query.maxTotal !== undefined) {
       filter.$expr = { $and: [] };
       if (query.minTotal !== undefined) {
-        filter.$expr.$and.push({ $gte: [{ $toDouble: '$total' }, query.minTotal] });
+        filter.$expr.$and.push({
+          $gte: [{ $toDouble: '$total' }, query.minTotal],
+        });
       }
       if (query.maxTotal !== undefined) {
-        filter.$expr.$and.push({ $lte: [{ $toDouble: '$total' }, query.maxTotal] });
+        filter.$expr.$and.push({
+          $lte: [{ $toDouble: '$total' }, query.maxTotal],
+        });
       }
     }
     if (query.keyword) {
@@ -213,7 +241,11 @@ export class OrderService {
    * Update order (status, fulfillment, tracking, notes)
    * Optionally syncs status changes back to WooCommerce
    */
-  async update(id: string, userId: string, dto: UpdateOrderDto): Promise<IOrder> {
+  async update(
+    id: string,
+    userId: string,
+    dto: UpdateOrderDto,
+  ): Promise<IOrder> {
     const order = await this.orderModel.findOne({
       _id: new Types.ObjectId(id),
       isDeleted: false,
@@ -234,7 +266,8 @@ export class OrderService {
     if (dto.trackingNumber) order.trackingNumber = dto.trackingNumber;
     if (dto.trackingCarrier) order.trackingCarrier = dto.trackingCarrier;
     if (dto.trackingUrl) order.trackingUrl = dto.trackingUrl;
-    if (dto.internalNotes !== undefined) order.internalNotes = dto.internalNotes;
+    if (dto.internalNotes !== undefined)
+      order.internalNotes = dto.internalNotes;
     if (dto.tags) order.tags = dto.tags;
 
     // Auto-update fulfillment status based on order status
@@ -249,9 +282,13 @@ export class OrderService {
     if (statusChanged && dto.syncToStore !== false) {
       try {
         await this.syncOrderStatusToWoo(order);
-        this.logger.log(`Order ${order.orderNumber} status synced to WooCommerce: ${dto.status}`);
+        this.logger.log(
+          `Order ${order.orderNumber} status synced to WooCommerce: ${dto.status}`,
+        );
       } catch (error) {
-        this.logger.error(`Failed to sync order status to WooCommerce: ${error.message}`);
+        this.logger.error(
+          `Failed to sync order status to WooCommerce: ${error.message}`,
+        );
         // Don't throw - local update succeeded, just log the sync failure
       }
     }
@@ -282,7 +319,11 @@ export class OrderService {
   /**
    * Add tracking info to order
    */
-  async addTracking(id: string, userId: string, dto: AddTrackingDto): Promise<IOrder> {
+  async addTracking(
+    id: string,
+    userId: string,
+    dto: AddTrackingDto,
+  ): Promise<IOrder> {
     const order = await this.orderModel.findOne({
       _id: new Types.ObjectId(id),
       isDeleted: false,
@@ -310,7 +351,7 @@ export class OrderService {
     userId: string,
     orderIds: string[],
     status: OrderStatus,
-    syncToStore: boolean = true,
+    syncToStore = true,
   ): Promise<{ updated: number; failed: number; errors: string[] }> {
     const storeIds = await this.getUserStoreIds(userId);
 
@@ -343,7 +384,9 @@ export class OrderService {
           try {
             await this.syncOrderStatusToWoo(order);
           } catch (syncError) {
-            this.logger.error(`Failed to sync order ${order.orderNumber} to WooCommerce: ${syncError.message}`);
+            this.logger.error(
+              `Failed to sync order ${order.orderNumber} to WooCommerce: ${syncError.message}`,
+            );
           }
         }
       } catch (error) {
@@ -359,7 +402,12 @@ export class OrderService {
   /**
    * Add note to order
    */
-  async addNote(id: string, userId: string, userName: string, dto: AddOrderNoteDto): Promise<IOrder> {
+  async addNote(
+    id: string,
+    userId: string,
+    userName: string,
+    dto: AddOrderNoteDto,
+  ): Promise<IOrder> {
     const order = await this.orderModel.findOne({
       _id: new Types.ObjectId(id),
       isDeleted: false,
@@ -390,7 +438,11 @@ export class OrderService {
   /**
    * Delete note from order
    */
-  async deleteNote(id: string, noteId: string, userId: string): Promise<IOrder> {
+  async deleteNote(
+    id: string,
+    noteId: string,
+    userId: string,
+  ): Promise<IOrder> {
     const order = await this.orderModel.findOne({
       _id: new Types.ObjectId(id),
       isDeleted: false,
@@ -420,7 +472,12 @@ export class OrderService {
   /**
    * Get order statistics
    */
-  async getStats(userId: string, storeId?: string, startDate?: Date, endDate?: Date): Promise<IOrderStats> {
+  async getStats(
+    userId: string,
+    storeId?: string,
+    startDate?: Date,
+    endDate?: Date,
+  ): Promise<IOrderStats> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const baseFilter: any = {
@@ -451,7 +508,13 @@ export class OrderService {
       status: { $nin: excludedStatuses },
     };
 
-    const [totalOrders, revenueResult, refundsResult, statusCounts, recentOrders] = await Promise.all([
+    const [
+      totalOrders,
+      revenueResult,
+      refundsResult,
+      statusCounts,
+      recentOrders,
+    ] = await Promise.all([
       // Count only valid orders (not draft, cancelled, failed, refunded)
       this.orderModel.countDocuments(countFilter),
       // Sum revenue only from valid orders
@@ -493,7 +556,10 @@ export class OrderService {
     const totalRevenue = grossRevenue - totalRefunds;
     const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
-    const ordersByStatus: Record<OrderStatus, number> = {} as Record<OrderStatus, number>;
+    const ordersByStatus: Record<OrderStatus, number> = {} as Record<
+      OrderStatus,
+      number
+    >;
     Object.values(OrderStatus).forEach((status) => {
       ordersByStatus[status] = 0;
     });
@@ -543,7 +609,8 @@ export class OrderService {
     }
     if (query.startDate || query.endDate) {
       filter.dateCreatedWoo = {};
-      if (query.startDate) filter.dateCreatedWoo.$gte = new Date(query.startDate);
+      if (query.startDate)
+        filter.dateCreatedWoo.$gte = new Date(query.startDate);
       if (query.endDate) filter.dateCreatedWoo.$lte = new Date(query.endDate);
     }
 
@@ -599,14 +666,20 @@ export class OrderService {
         order.orderNumber,
         order.status,
         order.paymentStatus,
-        order.dateCreatedWoo ? new Date(order.dateCreatedWoo).toISOString().split('T')[0] : '',
-        `${order.billing?.firstName || ''} ${order.billing?.lastName || ''}`.trim(),
+        order.dateCreatedWoo
+          ? new Date(order.dateCreatedWoo).toISOString().split('T')[0]
+          : '',
+        `${order.billing?.firstName || ''} ${
+          order.billing?.lastName || ''
+        }`.trim(),
         order.billing?.email || '',
         order.billing?.phone || '',
         billingAddress,
         shippingAddress,
         order.lineItems?.length || 0,
-        parseFloat(order.total || '0') - parseFloat(order.shippingTotal || '0') - parseFloat(order.discountTotal || '0'),
+        parseFloat(order.total || '0') -
+          parseFloat(order.shippingTotal || '0') -
+          parseFloat(order.discountTotal || '0'),
         order.shippingTotal || '0',
         order.discountTotal || '0',
         order.total || '0',
@@ -627,10 +700,12 @@ export class OrderService {
 
     // Build CSV with UTF-8 BOM for Arabic text support
     const BOM = '\uFEFF';
-    const csvContent = BOM + [
-      headers.map(escapeValue).join(','),
-      ...rows.map((row) => row.map(escapeValue).join(',')),
-    ].join('\n');
+    const csvContent =
+      BOM +
+      [
+        headers.map(escapeValue).join(','),
+        ...rows.map((row) => row.map(escapeValue).join(',')),
+      ].join('\n');
 
     return csvContent;
   }
@@ -653,8 +728,13 @@ export class OrderService {
       orderNumber: wooOrder.number,
       orderKey: wooOrder.order_key,
       status: wooOrder.status as OrderStatus,
-      paymentStatus: wooOrder.date_paid ? PaymentStatus.PAID : PaymentStatus.PENDING,
-      fulfillmentStatus: wooOrder.status === 'completed' ? FulfillmentStatus.DELIVERED : FulfillmentStatus.UNFULFILLED,
+      paymentStatus: wooOrder.date_paid
+        ? PaymentStatus.PAID
+        : PaymentStatus.PENDING,
+      fulfillmentStatus:
+        wooOrder.status === 'completed'
+          ? FulfillmentStatus.DELIVERED
+          : FulfillmentStatus.UNFULFILLED,
       currency: wooOrder.currency,
       pricesIncludeTax: wooOrder.prices_include_tax,
       discountTotal: wooOrder.discount_total,
@@ -694,7 +774,9 @@ export class OrderService {
       paymentMethodTitle: wooOrder.payment_method_title,
       transactionId: wooOrder.transaction_id,
       datePaid: wooOrder.date_paid ? new Date(wooOrder.date_paid) : undefined,
-      dateCompleted: wooOrder.date_completed ? new Date(wooOrder.date_completed) : undefined,
+      dateCompleted: wooOrder.date_completed
+        ? new Date(wooOrder.date_completed)
+        : undefined,
       lineItems: wooOrder.line_items.map((item) => ({
         externalId: item.id,
         name: item.name,
@@ -709,25 +791,28 @@ export class OrderService {
         totalTax: item.total_tax,
         taxClass: item.tax_class,
       })),
-      shippingLines: wooOrder.shipping_lines?.map((line) => ({
-        externalId: line.id,
-        methodTitle: line.method_title,
-        methodId: line.method_id,
-        total: line.total,
-        totalTax: line.total_tax,
-      })) || [],
-      feeLines: wooOrder.fee_lines?.map((line) => ({
-        externalId: line.id,
-        name: line.name,
-        total: line.total,
-        totalTax: line.total_tax,
-      })) || [],
-      couponLines: wooOrder.coupon_lines?.map((line) => ({
-        externalId: line.id,
-        code: line.code,
-        discount: line.discount,
-        discountTax: line.discount_tax,
-      })) || [],
+      shippingLines:
+        wooOrder.shipping_lines?.map((line) => ({
+          externalId: line.id,
+          methodTitle: line.method_title,
+          methodId: line.method_id,
+          total: line.total,
+          totalTax: line.total_tax,
+        })) || [],
+      feeLines:
+        wooOrder.fee_lines?.map((line) => ({
+          externalId: line.id,
+          name: line.name,
+          total: line.total,
+          totalTax: line.total_tax,
+        })) || [],
+      couponLines:
+        wooOrder.coupon_lines?.map((line) => ({
+          externalId: line.id,
+          code: line.code,
+          discount: line.discount,
+          discountTax: line.discount_tax,
+        })) || [],
       createdVia: wooOrder.created_via,
       dateCreatedWoo: new Date(wooOrder.date_created),
       dateModifiedWoo: new Date(wooOrder.date_modified),
@@ -759,7 +844,9 @@ export class OrderService {
 
       if (customer && customer._id) {
         localCustomerId = customer._id;
-        this.logger.debug(`Order ${wooOrder.id}: linked to customer ${customer._id}`);
+        this.logger.debug(
+          `Order ${wooOrder.id}: linked to customer ${customer._id}`,
+        );
 
         // Create/link phone record if phone number exists
         if (wooOrder.billing?.phone) {
@@ -772,7 +859,9 @@ export class OrderService {
               String(wooOrder.id),
             );
           } catch (phoneError) {
-            this.logger.warn(`Failed to create phone record for order ${wooOrder.id}: ${phoneError.message}`);
+            this.logger.warn(
+              `Failed to create phone record for order ${wooOrder.id}: ${phoneError.message}`,
+            );
           }
         }
 
@@ -787,14 +876,21 @@ export class OrderService {
               String(wooOrder.id),
             );
           } catch (emailError) {
-            this.logger.warn(`Failed to create email record for order ${wooOrder.id}: ${emailError.message}`);
+            this.logger.warn(
+              `Failed to create email record for order ${wooOrder.id}: ${emailError.message}`,
+            );
           }
         }
       } else {
-        this.logger.warn(`Order ${wooOrder.id}: No customer created (missing phone number)`);
+        this.logger.warn(
+          `Order ${wooOrder.id}: No customer created (missing phone number)`,
+        );
       }
     } catch (error) {
-      this.logger.error(`Failed to create/update customer for order ${wooOrder.id}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create/update customer for order ${wooOrder.id}: ${error.message}`,
+        error.stack,
+      );
     }
 
     // Add local customer reference to order data
@@ -876,31 +972,45 @@ export class OrderService {
             warnings.push(result.warning);
           }
         } catch (err) {
-          this.logger.warn(`Failed to fulfill line item ${item.sku} for order ${order.orderNumber}: ${err.message}`);
+          this.logger.warn(
+            `Failed to fulfill line item ${item.sku} for order ${order.orderNumber}: ${err.message}`,
+          );
           warnings.push(`${item.sku}: ${err.message}`);
         }
       }
 
       // Update fulfillment status
-      order.fulfillmentStatus = warnings.length > 0
-        ? FulfillmentStatus.PARTIALLY_FULFILLED
-        : FulfillmentStatus.FULFILLED;
+      order.fulfillmentStatus =
+        warnings.length > 0
+          ? FulfillmentStatus.PARTIALLY_FULFILLED
+          : FulfillmentStatus.FULFILLED;
       await order.save();
 
       if (warnings.length > 0) {
-        this.logger.warn(`WooCommerce order ${order.orderNumber} partially fulfilled: ${warnings.join(', ')}`);
+        this.logger.warn(
+          `WooCommerce order ${
+            order.orderNumber
+          } partially fulfilled: ${warnings.join(', ')}`,
+        );
       } else {
-        this.logger.log(`WooCommerce order ${order.orderNumber} stock fulfilled successfully`);
+        this.logger.log(
+          `WooCommerce order ${order.orderNumber} stock fulfilled successfully`,
+        );
       }
     } catch (error) {
-      this.logger.error(`Failed to fulfill WooCommerce order ${order.orderNumber}: ${error.message}`);
+      this.logger.error(
+        `Failed to fulfill WooCommerce order ${order.orderNumber}: ${error.message}`,
+      );
     }
   }
 
   /**
    * Generate print data for order (packing slip)
    */
-  async getPrintData(id: string, userId: string): Promise<{
+  async getPrintData(
+    id: string,
+    userId: string,
+  ): Promise<{
     order: IOrder;
     store: any;
     printedAt: Date;
@@ -931,7 +1041,12 @@ export class OrderService {
   async createRefund(
     id: string,
     userId: string,
-    dto: { amount: string; reason?: string; syncToStore?: boolean; apiRefund?: boolean },
+    dto: {
+      amount: string;
+      reason?: string;
+      syncToStore?: boolean;
+      apiRefund?: boolean;
+    },
   ): Promise<IOrder> {
     const order = await this.orderModel.findOne({
       _id: new Types.ObjectId(id),
@@ -959,7 +1074,9 @@ export class OrderService {
 
     if (refundAmount > maxRefundable) {
       throw new ForbiddenException(
-        `Refund amount exceeds maximum refundable amount of ${maxRefundable.toFixed(2)}`,
+        `Refund amount exceeds maximum refundable amount of ${maxRefundable.toFixed(
+          2,
+        )}`,
       );
     }
 
@@ -987,11 +1104,17 @@ export class OrderService {
           );
 
           wooRefundId = wooRefund.id;
-          this.logger.log(`Refund ${wooRefund.id} created in WooCommerce for order ${order.externalId}`);
+          this.logger.log(
+            `Refund ${wooRefund.id} created in WooCommerce for order ${order.externalId}`,
+          );
         }
       } catch (error) {
-        this.logger.error(`Failed to create refund in WooCommerce: ${error.message}`);
-        throw new ForbiddenException(`Failed to create refund in WooCommerce: ${error.message}`);
+        this.logger.error(
+          `Failed to create refund in WooCommerce: ${error.message}`,
+        );
+        throw new ForbiddenException(
+          `Failed to create refund in WooCommerce: ${error.message}`,
+        );
       }
     }
 
@@ -1019,7 +1142,17 @@ export class OrderService {
   /**
    * Get refunds for an order
    */
-  async getRefunds(id: string, userId: string): Promise<Array<{ externalId?: number; reason?: string; total: string; refundedAt: Date }>> {
+  async getRefunds(
+    id: string,
+    userId: string,
+  ): Promise<
+    Array<{
+      externalId?: number;
+      reason?: string;
+      total: string;
+      refundedAt: Date;
+    }>
+  > {
     const order = await this.findById(id, userId);
     return order.refunds || [];
   }
@@ -1097,7 +1230,9 @@ export class OrderService {
 
     await order.save();
 
-    this.logger.log(`Manual order ${internalOrderNumber} created by user ${userId}`);
+    this.logger.log(
+      `Manual order ${internalOrderNumber} created by user ${userId}`,
+    );
     return this.toInterface(order);
   }
 
@@ -1127,7 +1262,9 @@ export class OrderService {
     // Check if order has items
     const orderItems = await this.orderItemService.getOrderItems(orderId);
     if (orderItems.length === 0) {
-      throw new ForbiddenException('Cannot confirm an order with no items. Please add items first.');
+      throw new ForbiddenException(
+        'Cannot confirm an order with no items. Please add items first.',
+      );
     }
 
     // Fulfill order items (deduct stock)
@@ -1152,7 +1289,9 @@ export class OrderService {
     order.itemsCount = totals.itemsCount;
     order.itemsQuantity = totals.itemsQuantity;
     order.itemsSubtotal = totals.itemsSubtotal;
-    order.total = (totals.itemsTotal + parseFloat(order.shippingTotal || '0')).toString();
+    order.total = (
+      totals.itemsTotal + parseFloat(order.shippingTotal || '0')
+    ).toString();
 
     await order.save();
 
@@ -1166,7 +1305,11 @@ export class OrderService {
   /**
    * Cancel an order - restores stock if confirmed
    */
-  async cancelOrder(orderId: string, userId: string, reason?: string): Promise<IOrder> {
+  async cancelOrder(
+    orderId: string,
+    userId: string,
+    reason?: string,
+  ): Promise<IOrder> {
     const order = await this.orderModel.findOne({
       _id: new Types.ObjectId(orderId),
       isDeleted: false,
@@ -1183,14 +1326,19 @@ export class OrderService {
       throw new ForbiddenException('Use status update for WooCommerce orders');
     }
 
-    const wasConfirmed = order.status === OrderStatus.CONFIRMED ||
+    const wasConfirmed =
+      order.status === OrderStatus.CONFIRMED ||
       order.status === OrderStatus.PROCESSING ||
       order.status === OrderStatus.SHIPPED;
 
     // Release stock if order was confirmed
     if (wasConfirmed && order.useSeparateItems) {
-      const releasedUnits = await this.orderItemService.releaseOrderUnits(orderId);
-      this.logger.log(`Released ${releasedUnits} units for cancelled order ${order.orderNumber}`);
+      const releasedUnits = await this.orderItemService.releaseOrderUnits(
+        orderId,
+      );
+      this.logger.log(
+        `Released ${releasedUnits} units for cancelled order ${order.orderNumber}`,
+      );
     }
 
     // Cancel pending items
@@ -1237,9 +1385,17 @@ export class OrderService {
     // Define valid transitions
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
       [OrderStatus.DRAFT]: [OrderStatus.CONFIRMED, OrderStatus.CANCELLED],
-      [OrderStatus.PENDING]: [OrderStatus.PROCESSING, OrderStatus.ON_HOLD, OrderStatus.CANCELLED],
+      [OrderStatus.PENDING]: [
+        OrderStatus.PROCESSING,
+        OrderStatus.ON_HOLD,
+        OrderStatus.CANCELLED,
+      ],
       [OrderStatus.CONFIRMED]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
-      [OrderStatus.PROCESSING]: [OrderStatus.SHIPPED, OrderStatus.ON_HOLD, OrderStatus.CANCELLED],
+      [OrderStatus.PROCESSING]: [
+        OrderStatus.SHIPPED,
+        OrderStatus.ON_HOLD,
+        OrderStatus.CANCELLED,
+      ],
       [OrderStatus.ON_HOLD]: [OrderStatus.PROCESSING, OrderStatus.CANCELLED],
       [OrderStatus.SHIPPED]: [OrderStatus.DELIVERED, OrderStatus.COMPLETED],
       [OrderStatus.DELIVERED]: [OrderStatus.COMPLETED, OrderStatus.REFUNDED],
@@ -1253,7 +1409,9 @@ export class OrderService {
     const allowedTransitions = validTransitions[currentStatus] || [];
     if (!allowedTransitions.includes(newStatus)) {
       throw new ForbiddenException(
-        `Cannot transition from ${currentStatus} to ${newStatus}. Allowed: ${allowedTransitions.join(', ') || 'none'}`,
+        `Cannot transition from ${currentStatus} to ${newStatus}. Allowed: ${
+          allowedTransitions.join(', ') || 'none'
+        }`,
       );
     }
 
@@ -1278,20 +1436,32 @@ export class OrderService {
       try {
         await this.syncOrderStatusToWoo(order);
       } catch (error) {
-        this.logger.error(`Failed to sync status to WooCommerce: ${error.message}`);
+        this.logger.error(
+          `Failed to sync status to WooCommerce: ${error.message}`,
+        );
       }
     }
 
     // Schedule review request when order is delivered or completed
-    if (newStatus === OrderStatus.DELIVERED || newStatus === OrderStatus.COMPLETED) {
+    if (
+      newStatus === OrderStatus.DELIVERED ||
+      newStatus === OrderStatus.COMPLETED
+    ) {
       try {
-        await this.reviewRequestService.scheduleRequest(order._id.toString(), newStatus);
+        await this.reviewRequestService.scheduleRequest(
+          order._id.toString(),
+          newStatus,
+        );
       } catch (error) {
-        this.logger.error(`Failed to schedule review request: ${error.message}`);
+        this.logger.error(
+          `Failed to schedule review request: ${error.message}`,
+        );
       }
     }
 
-    this.logger.log(`Order ${order.orderNumber} transitioned from ${currentStatus} to ${newStatus}`);
+    this.logger.log(
+      `Order ${order.orderNumber} transitioned from ${currentStatus} to ${newStatus}`,
+    );
     return this.toInterface(order);
   }
 
@@ -1348,7 +1518,9 @@ export class OrderService {
       }
     }
 
-    this.logger.log(`Order ${originalOrder.orderNumber} cloned to ${newOrder.orderNumber}`);
+    this.logger.log(
+      `Order ${originalOrder.orderNumber} cloned to ${newOrder.orderNumber}`,
+    );
     return this.findById(newOrder._id, userId);
   }
 
@@ -1363,19 +1535,19 @@ export class OrderService {
   private mapToWooCommerceStatus(status: string): string {
     const statusMap: Record<string, string> = {
       // Direct mappings
-      'pending': 'pending',
-      'processing': 'processing',
+      pending: 'pending',
+      processing: 'processing',
       'on-hold': 'on-hold',
-      'completed': 'completed',
-      'cancelled': 'cancelled',
-      'refunded': 'refunded',
-      'failed': 'failed',
-      'trash': 'trash',
+      completed: 'completed',
+      cancelled: 'cancelled',
+      refunded: 'refunded',
+      failed: 'failed',
+      trash: 'trash',
       // CartFlow-specific mappings
-      'draft': 'pending',        // Draft → Pending
-      'confirmed': 'processing', // Confirmed → Processing
-      'shipped': 'completed',    // Shipped → Completed (WooCommerce has no shipped status)
-      'delivered': 'completed',  // Delivered → Completed
+      draft: 'pending', // Draft → Pending
+      confirmed: 'processing', // Confirmed → Processing
+      shipped: 'completed', // Shipped → Completed (WooCommerce has no shipped status)
+      delivered: 'completed', // Delivered → Completed
     };
     return statusMap[status] || 'processing';
   }
@@ -1388,9 +1560,18 @@ export class OrderService {
     userId: string,
     dto: BatchOrdersDto,
   ): Promise<{
-    create?: { success: IOrder[]; failed: Array<{ index: number; error: string }> };
-    update?: { success: IOrder[]; failed: Array<{ id: number; error: string }> };
-    delete?: { success: IOrder[]; failed: Array<{ id: number; error: string }> };
+    create?: {
+      success: IOrder[];
+      failed: Array<{ index: number; error: string }>;
+    };
+    update?: {
+      success: IOrder[];
+      failed: Array<{ id: number; error: string }>;
+    };
+    delete?: {
+      success: IOrder[];
+      failed: Array<{ id: number; error: string }>;
+    };
   }> {
     const store = await this.verifyStoreAccess(dto.storeId, userId, true);
 
@@ -1401,29 +1582,45 @@ export class OrderService {
     };
 
     const result: {
-      create?: { success: IOrder[]; failed: Array<{ index: number; error: string }> };
-      update?: { success: IOrder[]; failed: Array<{ id: number; error: string }> };
-      delete?: { success: IOrder[]; failed: Array<{ id: number; error: string }> };
+      create?: {
+        success: IOrder[];
+        failed: Array<{ index: number; error: string }>;
+      };
+      update?: {
+        success: IOrder[];
+        failed: Array<{ id: number; error: string }>;
+      };
+      delete?: {
+        success: IOrder[];
+        failed: Array<{ id: number; error: string }>;
+      };
     } = {};
 
     try {
       // Map CartFlow statuses to WooCommerce statuses
-      const mappedCreate = dto.create?.map(order => ({
+      const mappedCreate = dto.create?.map((order) => ({
         ...order,
-        status: order.status ? this.mapToWooCommerceStatus(order.status) : undefined,
+        status: order.status
+          ? this.mapToWooCommerceStatus(order.status)
+          : undefined,
       }));
 
-      const mappedUpdate = dto.update?.map(order => ({
+      const mappedUpdate = dto.update?.map((order) => ({
         ...order,
-        status: order.status ? this.mapToWooCommerceStatus(order.status) : undefined,
+        status: order.status
+          ? this.mapToWooCommerceStatus(order.status)
+          : undefined,
       }));
 
       // Call WooCommerce batch API
-      const wooResponse = await this.wooCommerceService.batchOrders(credentials, {
-        create: mappedCreate,
-        update: mappedUpdate,
-        delete: dto.delete,
-      });
+      const wooResponse = await this.wooCommerceService.batchOrders(
+        credentials,
+        {
+          create: mappedCreate,
+          update: mappedUpdate,
+          delete: dto.delete,
+        },
+      );
 
       // Process created orders
       if (wooResponse.create && wooResponse.create.length > 0) {
@@ -1436,7 +1633,9 @@ export class OrderService {
             result.create.success.push(this.toInterface(localOrder));
           } catch (error) {
             result.create.failed.push({ index: i, error: error.message });
-            this.logger.error(`Failed to save created order ${wooOrder.id} locally: ${error.message}`);
+            this.logger.error(
+              `Failed to save created order ${wooOrder.id} locally: ${error.message}`,
+            );
           }
         }
       }
@@ -1450,8 +1649,13 @@ export class OrderService {
             const localOrder = await this.upsertFromWoo(dto.storeId, wooOrder);
             result.update.success.push(this.toInterface(localOrder));
           } catch (error) {
-            result.update.failed.push({ id: wooOrder.id, error: error.message });
-            this.logger.error(`Failed to update order ${wooOrder.id} locally: ${error.message}`);
+            result.update.failed.push({
+              id: wooOrder.id,
+              error: error.message,
+            });
+            this.logger.error(
+              `Failed to update order ${wooOrder.id} locally: ${error.message}`,
+            );
           }
         }
       }
@@ -1472,18 +1676,30 @@ export class OrderService {
               result.delete.success.push(this.toInterface(localOrder));
             } else {
               // Order not in local database, just report as success
-              result.delete.success.push({ _id: '', externalId: wooOrder.id } as any);
+              result.delete.success.push({
+                _id: '',
+                externalId: wooOrder.id,
+              } as any);
             }
           } catch (error) {
-            result.delete.failed.push({ id: wooOrder.id, error: error.message });
-            this.logger.error(`Failed to delete order ${wooOrder.id} locally: ${error.message}`);
+            result.delete.failed.push({
+              id: wooOrder.id,
+              error: error.message,
+            });
+            this.logger.error(
+              `Failed to delete order ${wooOrder.id} locally: ${error.message}`,
+            );
           }
         }
       }
 
       this.logger.log(
-        `Batch orders completed: created=${result.create?.success.length || 0}, ` +
-        `updated=${result.update?.success.length || 0}, deleted=${result.delete?.success.length || 0}`,
+        `Batch orders completed: created=${
+          result.create?.success.length || 0
+        }, ` +
+          `updated=${result.update?.success.length || 0}, deleted=${
+            result.delete?.success.length || 0
+          }`,
       );
 
       return result;
@@ -1524,20 +1740,28 @@ export class OrderService {
       // Map status if provided
       const mappedData = {
         ...updateData,
-        status: updateData.status ? this.mapToWooCommerceStatus(updateData.status) : undefined,
+        status: updateData.status
+          ? this.mapToWooCommerceStatus(updateData.status)
+          : undefined,
       };
 
       // Use batch API with single update
-      const wooResponse = await this.wooCommerceService.batchOrders(credentials, {
-        update: [{ id: wooOrderId, ...mappedData }],
-      });
+      const wooResponse = await this.wooCommerceService.batchOrders(
+        credentials,
+        {
+          update: [{ id: wooOrderId, ...mappedData }],
+        },
+      );
 
       if (!wooResponse.update || wooResponse.update.length === 0) {
         throw new BadRequestException('Failed to update order in WooCommerce');
       }
 
       // Upsert to local database
-      const localOrder = await this.upsertFromWoo(storeId, wooResponse.update[0]);
+      const localOrder = await this.upsertFromWoo(
+        storeId,
+        wooResponse.update[0],
+      );
 
       // Also update CartFlow-specific status if different from WooCommerce
       if (updateData.status && updateData.status !== mappedData.status) {
@@ -1545,10 +1769,14 @@ export class OrderService {
         await localOrder.save();
       }
 
-      this.logger.log(`WooCommerce order ${wooOrderId} updated and synced locally`);
+      this.logger.log(
+        `WooCommerce order ${wooOrderId} updated and synced locally`,
+      );
       return this.toInterface(localOrder);
     } catch (error) {
-      this.logger.error(`Failed to update WooCommerce order ${wooOrderId}: ${error.message}`);
+      this.logger.error(
+        `Failed to update WooCommerce order ${wooOrderId}: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -1571,12 +1799,17 @@ export class OrderService {
 
     try {
       // Create order in WooCommerce
-      const wooOrder = await this.wooCommerceService.createOrder(credentials, orderData);
+      const wooOrder = await this.wooCommerceService.createOrder(
+        credentials,
+        orderData,
+      );
 
       // Upsert to local database
       const localOrder = await this.upsertFromWoo(storeId, wooOrder);
 
-      this.logger.log(`WooCommerce order ${wooOrder.id} created and synced locally`);
+      this.logger.log(
+        `WooCommerce order ${wooOrder.id} created and synced locally`,
+      );
       return this.toInterface(localOrder);
     } catch (error) {
       this.logger.error(`Failed to create WooCommerce order: ${error.message}`);
@@ -1591,7 +1824,7 @@ export class OrderService {
     userId: string,
     storeId: string,
     wooOrderId: number,
-    force: boolean = false,
+    force = false,
   ): Promise<{ success: boolean; message: string }> {
     const store = await this.verifyStoreAccess(storeId, userId, true);
 
@@ -1617,9 +1850,14 @@ export class OrderService {
       }
 
       this.logger.log(`WooCommerce order ${wooOrderId} deleted`);
-      return { success: true, message: `Order ${wooOrderId} deleted successfully` };
+      return {
+        success: true,
+        message: `Order ${wooOrderId} deleted successfully`,
+      };
     } catch (error) {
-      this.logger.error(`Failed to delete WooCommerce order ${wooOrderId}: ${error.message}`);
+      this.logger.error(
+        `Failed to delete WooCommerce order ${wooOrderId}: ${error.message}`,
+      );
       throw error;
     }
   }
@@ -1631,7 +1869,7 @@ export class OrderService {
     userId: string,
     storeId: string,
     wooOrderIds: number[],
-    force: boolean = false,
+    force = false,
   ): Promise<{ deleted: number; failed: number; errors: string[] }> {
     const store = await this.verifyStoreAccess(storeId, userId, true);
 
@@ -1647,9 +1885,12 @@ export class OrderService {
 
     try {
       // Use batch API for deletion
-      const wooResponse = await this.wooCommerceService.batchOrders(credentials, {
-        delete: wooOrderIds,
-      });
+      const wooResponse = await this.wooCommerceService.batchOrders(
+        credentials,
+        {
+          delete: wooOrderIds,
+        },
+      );
 
       // Process deleted orders
       if (wooResponse.delete) {

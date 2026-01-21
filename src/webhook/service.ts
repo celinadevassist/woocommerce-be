@@ -12,7 +12,12 @@ import { OrderService } from '../order/service';
 import { ProductService } from '../product/service';
 import { CustomerService } from '../customer/service';
 import { ReviewService } from '../review/service';
-import { WooOrder, WooProduct, WooCustomer, WooProductReview } from '../integrations/woocommerce/woocommerce.types';
+import {
+  WooOrder,
+  WooProduct,
+  WooCustomer,
+  WooProductReview,
+} from '../integrations/woocommerce/woocommerce.types';
 
 export interface WebhookPayload {
   topic: string;
@@ -36,7 +41,11 @@ export class WebhookService {
   /**
    * Verify webhook signature from WooCommerce
    */
-  async verifySignature(storeId: string, signature: string, rawBody: string): Promise<StoreDocument> {
+  async verifySignature(
+    storeId: string,
+    signature: string,
+    rawBody: string,
+  ): Promise<StoreDocument> {
     const store = await this.storeModel.findById(storeId);
     if (!store) {
       throw new NotFoundException('Store not found');
@@ -145,7 +154,10 @@ export class WebhookService {
       case 'deleted':
         // Handle product deletion (mark as deleted)
         this.logger.log(`Product ${payload.id} deleted notification received`);
-        return { success: true, message: `Product ${payload.id} deletion noted` };
+        return {
+          success: true,
+          message: `Product ${payload.id} deletion noted`,
+        };
 
       case 'restored':
         await this.productService.upsertFromWoo(storeId, payload);
@@ -175,7 +187,10 @@ export class WebhookService {
 
       case 'deleted':
         this.logger.log(`Customer ${payload.id} deleted notification received`);
-        return { success: true, message: `Customer ${payload.id} deletion noted` };
+        return {
+          success: true,
+          message: `Customer ${payload.id} deletion noted`,
+        };
 
       default:
         this.logger.warn(`Unhandled customer event: ${event}`);
@@ -201,7 +216,10 @@ export class WebhookService {
 
       case 'deleted':
         this.logger.log(`Review ${payload.id} deleted notification received`);
-        return { success: true, message: `Review ${payload.id} deletion noted` };
+        return {
+          success: true,
+          message: `Review ${payload.id} deletion noted`,
+        };
 
       default:
         this.logger.warn(`Unhandled review event: ${event}`);

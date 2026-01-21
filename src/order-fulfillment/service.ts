@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Order, OrderDocument } from '../order/schema';
@@ -17,7 +21,8 @@ import {
 export class OrderFulfillmentService {
   constructor(
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
-    @InjectModel(ProductUnit.name) private productUnitModel: Model<ProductUnitDocument>,
+    @InjectModel(ProductUnit.name)
+    private productUnitModel: Model<ProductUnitDocument>,
   ) {}
 
   /**
@@ -46,7 +51,8 @@ export class OrderFulfillmentService {
         : [];
 
       // Get suggested units (FIFO - oldest first based on production date)
-      const pendingQuantity = lineItem.quantity - (lineItem.fulfilledQuantity || 0);
+      const pendingQuantity =
+        lineItem.quantity - (lineItem.fulfilledQuantity || 0);
       let suggestedUnits: ISuggestedUnit[] = [];
 
       if (pendingQuantity > 0 && lineItem.sku) {
@@ -78,7 +84,8 @@ export class OrderFulfillmentService {
     }
 
     // Calculate overall status
-    let status: 'unfulfilled' | 'partially_fulfilled' | 'fulfilled' = 'unfulfilled';
+    let status: 'unfulfilled' | 'partially_fulfilled' | 'fulfilled' =
+      'unfulfilled';
     if (fulfilledQuantity >= totalQuantity) {
       status = 'fulfilled';
     } else if (fulfilledQuantity > 0) {
@@ -134,7 +141,9 @@ export class OrderFulfillmentService {
     });
 
     if (units.length !== unitIds.length) {
-      throw new BadRequestException('Some units are not available for fulfillment');
+      throw new BadRequestException(
+        'Some units are not available for fulfillment',
+      );
     }
 
     // Verify SKU matches
@@ -160,7 +169,9 @@ export class OrderFulfillmentService {
     );
 
     // Update line item
-    const existingUnitIds = (lineItem.fulfilledUnits || []).map((id) => id.toString());
+    const existingUnitIds = (lineItem.fulfilledUnits || []).map((id) =>
+      id.toString(),
+    );
     const newUnitIds = units.map((u) => u._id);
     const allUnitIds = [
       ...existingUnitIds.map((id) => new Types.ObjectId(id)),
@@ -172,7 +183,8 @@ export class OrderFulfillmentService {
       {
         $set: {
           [`lineItems.${lineItemIndex}.fulfilledUnits`]: allUnitIds,
-          [`lineItems.${lineItemIndex}.fulfilledQuantity`]: currentFulfilled + units.length,
+          [`lineItems.${lineItemIndex}.fulfilledQuantity`]:
+            currentFulfilled + units.length,
         },
       },
     );
@@ -279,7 +291,9 @@ export class OrderFulfillmentService {
     }
 
     if (foundLineItemIndex === -1) {
-      throw new BadRequestException('Unit is not assigned to any line item in this order');
+      throw new BadRequestException(
+        'Unit is not assigned to any line item in this order',
+      );
     }
 
     const lineItem = order.lineItems[foundLineItemIndex];
@@ -347,7 +361,9 @@ export class OrderFulfillmentService {
     }
 
     if (allFulfilledUnitIds.length === 0) {
-      throw new BadRequestException('No units have been assigned for fulfillment');
+      throw new BadRequestException(
+        'No units have been assigned for fulfillment',
+      );
     }
 
     // Mark all units as sold
@@ -392,13 +408,21 @@ export class OrderFulfillmentService {
   /**
    * Auto-assign all suggested units (one-click fulfillment)
    */
-  async autoAssignAll(userId: string, orderId: string): Promise<IFulfillmentStatus> {
+  async autoAssignAll(
+    userId: string,
+    orderId: string,
+  ): Promise<IFulfillmentStatus> {
     const status = await this.getFulfillmentStatus(orderId);
 
     for (const lineItem of status.lineItems) {
       if (lineItem.suggestedUnits.length > 0) {
         const unitIds = lineItem.suggestedUnits.map((u) => u._id.toString());
-        await this.assignUnits(userId, orderId, lineItem.lineItemIndex, unitIds);
+        await this.assignUnits(
+          userId,
+          orderId,
+          lineItem.lineItemIndex,
+          unitIds,
+        );
       }
     }
 

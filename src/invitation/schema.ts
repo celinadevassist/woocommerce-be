@@ -10,7 +10,12 @@ export enum InvitationStatus {
 
 @Schema({ timestamps: true, versionKey: false, collection: 'invitations' })
 export class Invitation extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true, index: true })

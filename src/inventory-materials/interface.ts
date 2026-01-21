@@ -1,4 +1,8 @@
-import { MaterialUnit, MaterialTransactionType, MaterialTransactionReferenceType } from './enum';
+import {
+  MaterialUnit,
+  MaterialTransactionType,
+  MaterialTransactionReferenceType,
+} from './enum';
 
 export interface ISupplier {
   name: string;

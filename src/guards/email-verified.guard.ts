@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 
 export const REQUIRE_EMAIL_VERIFICATION_KEY = 'requireEmailVerification';
@@ -10,7 +15,7 @@ export class EmailVerifiedGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
     const requireEmailVerification = this.reflector.getAllAndOverride<boolean>(
       REQUIRE_EMAIL_VERIFICATION_KEY,
-      [context.getHandler(), context.getClass()]
+      [context.getHandler(), context.getClass()],
     );
 
     if (!requireEmailVerification) {
@@ -28,7 +33,7 @@ export class EmailVerifiedGuard implements CanActivate {
       throw new ForbiddenException({
         message: 'Email verification required',
         code: 'EMAIL_NOT_VERIFIED',
-        emailVerified: false
+        emailVerified: false,
       });
     }
 
@@ -39,5 +44,5 @@ export class EmailVerifiedGuard implements CanActivate {
 // Decorator to mark routes that require email verification
 import { SetMetadata } from '@nestjs/common';
 
-export const RequireEmailVerification = () => 
+export const RequireEmailVerification = () =>
   SetMetadata(REQUIRE_EMAIL_VERIFICATION_KEY, true);

@@ -1,6 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import * as Joi from 'joi';
-import { MaterialUnit, MaterialTransactionType, MaterialTransactionReferenceType } from './enum';
+import {
+  MaterialUnit,
+  MaterialTransactionType,
+  MaterialTransactionReferenceType,
+} from './enum';
 
 // Supplier DTO
 export class SupplierDto {
@@ -54,7 +58,10 @@ export class CreateMaterialDto {
   @ApiPropertyOptional({ description: 'Suggested reorder quantity' })
   reorderQuantity?: number;
 
-  @ApiPropertyOptional({ type: [SupplierDto], description: 'List of suppliers' })
+  @ApiPropertyOptional({
+    type: [SupplierDto],
+    description: 'List of suppliers',
+  })
   suppliers?: SupplierDto[];
 }
 
@@ -62,7 +69,9 @@ export const CreateMaterialSchema = Joi.object({
   sku: Joi.string().min(1).max(50).required(),
   name: Joi.string().min(1).max(255).required(),
   description: Joi.string().optional().allow(''),
-  unit: Joi.string().valid(...Object.values(MaterialUnit)).required(),
+  unit: Joi.string()
+    .valid(...Object.values(MaterialUnit))
+    .required(),
   category: Joi.string().optional().allow(''),
   minStockLevel: Joi.number().min(0).optional().default(0),
   reorderPoint: Joi.number().min(0).optional().default(0),
@@ -78,7 +87,10 @@ export class UpdateMaterialDto {
   @ApiPropertyOptional({ description: 'Material description' })
   description?: string;
 
-  @ApiPropertyOptional({ enum: MaterialUnit, description: 'Unit of measurement' })
+  @ApiPropertyOptional({
+    enum: MaterialUnit,
+    description: 'Unit of measurement',
+  })
   unit?: MaterialUnit;
 
   @ApiPropertyOptional({ description: 'Material category' })
@@ -93,14 +105,19 @@ export class UpdateMaterialDto {
   @ApiPropertyOptional({ description: 'Suggested reorder quantity' })
   reorderQuantity?: number;
 
-  @ApiPropertyOptional({ type: [SupplierDto], description: 'List of suppliers' })
+  @ApiPropertyOptional({
+    type: [SupplierDto],
+    description: 'List of suppliers',
+  })
   suppliers?: SupplierDto[];
 }
 
 export const UpdateMaterialSchema = Joi.object({
   name: Joi.string().min(1).max(255).optional(),
   description: Joi.string().optional().allow(''),
-  unit: Joi.string().valid(...Object.values(MaterialUnit)).optional(),
+  unit: Joi.string()
+    .valid(...Object.values(MaterialUnit))
+    .optional(),
   category: Joi.string().optional().allow(''),
   minStockLevel: Joi.number().min(0).optional(),
   reorderPoint: Joi.number().min(0).optional(),
@@ -138,7 +155,10 @@ export const QueryMaterialSchema = Joi.object({
   keyword: Joi.string().optional(),
   page: Joi.number().min(1).optional().default(1),
   size: Joi.number().min(1).max(100).optional().default(20),
-  sortBy: Joi.string().valid('name', 'sku', 'currentStock', 'averageCost', 'createdAt').optional().default('name'),
+  sortBy: Joi.string()
+    .valid('name', 'sku', 'currentStock', 'averageCost', 'createdAt')
+    .optional()
+    .default('name'),
   sortOrder: Joi.string().valid('asc', 'desc').optional().default('asc'),
 });
 
@@ -169,7 +189,9 @@ export class AdjustStockDto {
   @ApiProperty({ enum: ['ADJUST', 'WASTE'], description: 'Type of adjustment' })
   type: 'ADJUST' | 'WASTE';
 
-  @ApiProperty({ description: 'Quantity change (positive to add, negative to remove)' })
+  @ApiProperty({
+    description: 'Quantity change (positive to add, negative to remove)',
+  })
   quantity: number;
 
   @ApiPropertyOptional({ description: 'Reference' })
@@ -208,8 +230,12 @@ export class QueryTransactionsDto {
 }
 
 export const QueryTransactionsSchema = Joi.object({
-  type: Joi.string().valid(...Object.values(MaterialTransactionType)).optional(),
-  referenceType: Joi.string().valid(...Object.values(MaterialTransactionReferenceType)).optional(),
+  type: Joi.string()
+    .valid(...Object.values(MaterialTransactionType))
+    .optional(),
+  referenceType: Joi.string()
+    .valid(...Object.values(MaterialTransactionReferenceType))
+    .optional(),
   startDate: Joi.string().isoDate().optional(),
   endDate: Joi.string().isoDate().optional(),
   page: Joi.number().min(1).optional().default(1),

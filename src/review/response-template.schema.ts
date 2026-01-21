@@ -1,9 +1,18 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
 
-@Schema({ timestamps: true, versionKey: false, collection: 'response_templates' })
+@Schema({
+  timestamps: true,
+  versionKey: false,
+  collection: 'response_templates',
+})
 export class ResponseTemplate extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true })
@@ -33,7 +42,8 @@ export class ResponseTemplate extends Document {
 
 export type ResponseTemplateDocument = ResponseTemplate & Document;
 
-export const ResponseTemplateSchema = SchemaFactory.createForClass(ResponseTemplate);
+export const ResponseTemplateSchema =
+  SchemaFactory.createForClass(ResponseTemplate);
 
 // Indexes
 ResponseTemplateSchema.index({ storeId: 1, isDeleted: 1 });

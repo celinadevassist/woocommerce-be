@@ -5,8 +5,9 @@ import { Type, Transform } from 'class-transformer';
 export class SearchAnalyticsQueryDto {
   @ApiProperty({
     required: false,
-    description: 'Filter by endpoint type (e.g., projects, image-prompts, sessions, articles, questions, tools, quotes)',
-    example: 'projects'
+    description:
+      'Filter by endpoint type (e.g., projects, image-prompts, sessions, articles, questions, tools, quotes)',
+    example: 'projects',
   })
   @IsOptional()
   @IsString()
@@ -15,7 +16,7 @@ export class SearchAnalyticsQueryDto {
   @ApiProperty({
     required: false,
     description: 'Start date for filtering (ISO 8601 format)',
-    example: '2025-01-01T00:00:00.000Z'
+    example: '2025-01-01T00:00:00.000Z',
   })
   @IsOptional()
   @IsDateString()
@@ -24,7 +25,7 @@ export class SearchAnalyticsQueryDto {
   @ApiProperty({
     required: false,
     description: 'End date for filtering (ISO 8601 format)',
-    example: '2025-12-31T23:59:59.999Z'
+    example: '2025-12-31T23:59:59.999Z',
   })
   @IsOptional()
   @IsDateString()
@@ -34,7 +35,7 @@ export class SearchAnalyticsQueryDto {
     required: false,
     description: 'Page number',
     example: 1,
-    default: 1
+    default: 1,
   })
   @IsOptional()
   @Type(() => Number)
@@ -44,7 +45,7 @@ export class SearchAnalyticsQueryDto {
     required: false,
     description: 'Items per page',
     example: 20,
-    default: 20
+    default: 20,
   })
   @IsOptional()
   @Type(() => Number)
@@ -54,7 +55,7 @@ export class SearchAnalyticsQueryDto {
     required: false,
     description: 'Group results by search term to get aggregated counts',
     example: true,
-    default: false
+    default: false,
   })
   @IsOptional()
   @Transform(({ value }) => {

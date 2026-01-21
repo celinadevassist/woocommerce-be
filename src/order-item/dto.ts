@@ -117,7 +117,12 @@ export class QueryOrderItemsDto {
 }
 
 export const QueryOrderItemsSchema = Joi.object({
-  stockStatus: Joi.string().valid('pending', 'fulfilled', 'cancelled', 'returned'),
+  stockStatus: Joi.string().valid(
+    'pending',
+    'fulfilled',
+    'cancelled',
+    'returned',
+  ),
   sku: Joi.string().max(100),
   page: Joi.number().integer().min(1).default(1),
   size: Joi.number().integer().min(1).max(100).default(20),

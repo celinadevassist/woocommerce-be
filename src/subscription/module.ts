@@ -2,10 +2,19 @@ import { Module, Global } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ConfigModule } from '@nestjs/config';
-import { Subscription, SubscriptionSchema, Invoice, InvoiceSchema } from './schema';
+import {
+  Subscription,
+  SubscriptionSchema,
+  Invoice,
+  InvoiceSchema,
+} from './schema';
 import { Store, StoreSchema } from '../store/schema';
 import { SubscriptionService } from './service';
-import { SubscriptionController, InvoiceController, PaymentWebhookController } from './controller';
+import {
+  SubscriptionController,
+  InvoiceController,
+  PaymentWebhookController,
+} from './controller';
 import { SubscriptionGuard } from './guard';
 import { ZiinaModule } from '../shared/payment/ziina';
 
@@ -21,7 +30,11 @@ import { ZiinaModule } from '../shared/payment/ziina';
     ConfigModule,
     ZiinaModule,
   ],
-  controllers: [SubscriptionController, InvoiceController, PaymentWebhookController],
+  controllers: [
+    SubscriptionController,
+    InvoiceController,
+    PaymentWebhookController,
+  ],
   providers: [SubscriptionService, SubscriptionGuard],
   exports: [SubscriptionService, SubscriptionGuard],
 })

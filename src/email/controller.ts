@@ -10,7 +10,14 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { EmailService } from './service';
 import { User } from '../decorators/user.decorator';
 import { EmailStatus } from './schema';
@@ -41,7 +48,8 @@ export class EmailController {
   ) {
     return this.emailService.getStoreEmails(storeId, {
       verified: verified !== undefined ? verified === 'true' : undefined,
-      marketingOptIn: marketingOptIn !== undefined ? marketingOptIn === 'true' : undefined,
+      marketingOptIn:
+        marketingOptIn !== undefined ? marketingOptIn === 'true' : undefined,
       status,
       page: page ? parseInt(page) : undefined,
       limit: limit ? parseInt(limit) : undefined,
@@ -57,7 +65,10 @@ export class EmailController {
   }
 
   @Get('store/:storeId/campaign')
-  @ApiOperation({ summary: 'Get emails ready for marketing campaign (verified, opted-in, active)' })
+  @ApiOperation({
+    summary:
+      'Get emails ready for marketing campaign (verified, opted-in, active)',
+  })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'storeId', description: 'Store ID' })
   async getCampaignEmails(@Param('storeId') storeId: string) {
@@ -81,7 +92,10 @@ export class EmailController {
     @Param('storeId') storeId: string,
     @Param('email') email: string,
   ) {
-    const customer = await this.emailService.findCustomerByEmail(storeId, decodeURIComponent(email));
+    const customer = await this.emailService.findCustomerByEmail(
+      storeId,
+      decodeURIComponent(email),
+    );
     return { customer };
   }
 
@@ -89,7 +103,8 @@ export class EmailController {
   @ApiOperation({ summary: 'Add a new email' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   async addEmail(
-    @Body() dto: {
+    @Body()
+    dto: {
       storeId: string;
       email: string;
       customerId?: string;
@@ -108,10 +123,7 @@ export class EmailController {
   @ApiOperation({ summary: 'Verify an email address' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Email ID' })
-  async verify(
-    @Param('id') id: string,
-    @User('_id') userId: string,
-  ) {
+  async verify(@Param('id') id: string, @User('_id') userId: string) {
     return this.emailService.verify(id, userId);
   }
 
@@ -151,10 +163,7 @@ export class EmailController {
   @ApiOperation({ summary: 'Block an email address' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Email ID' })
-  async block(
-    @Param('id') id: string,
-    @Body() dto: { reason?: string },
-  ) {
+  async block(@Param('id') id: string, @Body() dto: { reason?: string }) {
     return this.emailService.block(id, dto.reason);
   }
 
@@ -162,10 +171,7 @@ export class EmailController {
   @ApiOperation({ summary: 'Mark email as invalid (bounced)' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Email ID' })
-  async markInvalid(
-    @Param('id') id: string,
-    @Body() dto: { reason?: string },
-  ) {
+  async markInvalid(@Param('id') id: string, @Body() dto: { reason?: string }) {
     return this.emailService.markInvalid(id, dto.reason);
   }
 

@@ -11,44 +11,45 @@ import { ModuleType } from './enum';
 export class Metadata {
   @ApiProperty({
     description: 'ID of the user this metadata belongs to',
-    example: '60d21b4667d0d8992e610c85'
+    example: '60d21b4667d0d8992e610c85',
   })
   @Prop({
     type: MongooseSchema.Types.ObjectId,
     ref: 'User',
-    required: true
+    required: true,
   })
   userId: MongooseSchema.Types.ObjectId;
 
   @ApiProperty({
     description: 'Module this metadata is for',
     enum: ModuleType,
-    example: ModuleType.EMAIL_MARKETING
+    example: ModuleType.EMAIL_MARKETING,
   })
   @Prop({
     type: String,
     enum: Object.values(ModuleType),
-    required: true
+    required: true,
   })
   forModule: ModuleType;
 
   @ApiProperty({
     description: 'Metadata object containing flexible key-value pairs',
-    example: { 
+    example: {
       erpnext: {
-          baseUrl: "https://erpnext-marketing.sys-track-overview.site",
-          token: "de668493e4344b0:38d508b26d63eba",
-          communication_doctype: "User",
-          communication_name: "Administrator",
-          default_sender: "support@2zpoint.com",
-          test_email: "test@example.com"
+        baseUrl: 'https://erpnext-marketing.sys-track-overview.site',
+        token: 'de668493e4344b0:38d508b26d63eba',
+        communication_doctype: 'User',
+        communication_name: 'Administrator',
+        default_sender: 'support@2zpoint.com',
+        test_email: 'test@example.com',
+      },
+      type: 'object',
     },
-    type: 'object'
-  }})
+  })
   @Prop({
     type: MongooseSchema.Types.Mixed,
     required: true,
-    default: {}
+    default: {},
   })
   meta: Record<string, any>;
 
@@ -76,4 +77,4 @@ MetadataSchema.index({ userId: 1 });
 MetadataSchema.index({ forModule: 1 });
 MetadataSchema.index({ userId: 1, forModule: 1 }, { unique: true });
 MetadataSchema.index({ createdAt: -1 });
-MetadataSchema.index({ updatedAt: -1 }); 
+MetadataSchema.index({ updatedAt: -1 });

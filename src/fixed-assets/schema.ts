@@ -1,6 +1,11 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Types } from 'mongoose';
-import { AssetCategory, AssetStatus, MaintenanceType, DepreciationMethod } from './enum';
+import {
+  AssetCategory,
+  AssetStatus,
+  MaintenanceType,
+  DepreciationMethod,
+} from './enum';
 
 @Schema({ _id: false })
 export class Warranty {
@@ -37,7 +42,8 @@ export class MaintenanceLog {
   createdBy: Types.ObjectId;
 }
 
-export const MaintenanceLogSchema = SchemaFactory.createForClass(MaintenanceLog);
+export const MaintenanceLogSchema =
+  SchemaFactory.createForClass(MaintenanceLog);
 
 @Schema({ timestamps: true })
 export class FixedAsset extends Document {
@@ -50,7 +56,11 @@ export class FixedAsset extends Document {
   @Prop({ required: true, trim: true })
   assetTag: string;
 
-  @Prop({ required: true, enum: Object.values(AssetCategory), default: AssetCategory.OTHER })
+  @Prop({
+    required: true,
+    enum: Object.values(AssetCategory),
+    default: AssetCategory.OTHER,
+  })
   category: AssetCategory;
 
   @Prop({ trim: true, default: '' })
@@ -68,7 +78,11 @@ export class FixedAsset extends Document {
   @Prop({ trim: true, default: '' })
   supplier: string;
 
-  @Prop({ required: true, enum: Object.values(AssetStatus), default: AssetStatus.ACTIVE })
+  @Prop({
+    required: true,
+    enum: Object.values(AssetStatus),
+    default: AssetStatus.ACTIVE,
+  })
   status: AssetStatus;
 
   @Prop({ trim: true, default: '' })
@@ -86,7 +100,10 @@ export class FixedAsset extends Document {
   @Prop({ default: 0, min: 0 })
   salvageValue: number;
 
-  @Prop({ enum: Object.values(DepreciationMethod), default: DepreciationMethod.STRAIGHT_LINE })
+  @Prop({
+    enum: Object.values(DepreciationMethod),
+    default: DepreciationMethod.STRAIGHT_LINE,
+  })
   depreciationMethod: DepreciationMethod;
 
   @Prop({ type: [MaintenanceLogSchema], default: [] })

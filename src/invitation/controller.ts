@@ -9,7 +9,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { InvitationService } from './service';
 import { User } from '../decorators/user.decorator';
 import { UserDocument } from '../schema/user.schema';
@@ -25,7 +30,8 @@ export class InvitationController {
   @ApiOperation({ summary: 'Send an invitation to join a store' })
   @ApiResponse({ status: 201, description: 'Invitation sent successfully' })
   async sendInvitation(
-    @Body() body: {
+    @Body()
+    body: {
       storeId: string;
       email: string;
       role: string;
@@ -83,7 +89,10 @@ export class InvitationController {
     @Param('invitationId') invitationId: string,
     @User() user: UserDocument,
   ) {
-    return this.invitationService.revokeInvitation(invitationId, user._id.toString());
+    return this.invitationService.revokeInvitation(
+      invitationId,
+      user._id.toString(),
+    );
   }
 
   @Post(':invitationId/resend')
@@ -95,7 +104,10 @@ export class InvitationController {
     @Param('invitationId') invitationId: string,
     @User() user: UserDocument,
   ) {
-    return this.invitationService.resendInvitation(invitationId, user._id.toString());
+    return this.invitationService.resendInvitation(
+      invitationId,
+      user._id.toString(),
+    );
   }
 
   @Get('pending')

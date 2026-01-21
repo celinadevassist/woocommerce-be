@@ -32,7 +32,9 @@ export class AdminUpdateSubscriptionDTO {
 }
 
 export const AdminUpdateSubscriptionSchema = Joi.object({
-  status: Joi.string().valid('active', 'suspended', 'cancelled', 'trial').optional(),
+  status: Joi.string()
+    .valid('active', 'suspended', 'cancelled', 'trial')
+    .optional(),
   plan: Joi.string().optional().allow(''),
   pricePerMonth: Joi.number().min(0).optional(),
   currency: Joi.string().optional(),
@@ -83,7 +85,10 @@ export const AdminCreateSubscriptionSchema = Joi.object({
   plan: Joi.string().optional().default('standard'),
   pricePerMonth: Joi.number().required().min(0),
   currency: Joi.string().optional().default('USD'),
-  billingCycle: Joi.string().valid('monthly', 'yearly').optional().default('monthly'),
+  billingCycle: Joi.string()
+    .valid('monthly', 'yearly')
+    .optional()
+    .default('monthly'),
   trialDays: Joi.number().optional().min(0).default(0),
 });
 

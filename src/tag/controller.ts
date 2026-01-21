@@ -11,7 +11,12 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { TagService } from './service';
 import {
   CreateTagDto,
@@ -137,6 +142,9 @@ export class TagController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.tagService.syncFromWooCommerce(user._id.toString(), storeId);
+    return await this.tagService.syncFromWooCommerce(
+      user._id.toString(),
+      storeId,
+    );
   }
 }

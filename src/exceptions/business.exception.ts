@@ -8,7 +8,10 @@ import { ErrorCodes } from 'src/constants/error-codes';
 export class BusinessException extends HttpException {
   private readonly errorCode: ErrorCodes;
 
-  constructor(errorCode: ErrorCodes, statusCode: HttpStatus = HttpStatus.BAD_REQUEST) {
+  constructor(
+    errorCode: ErrorCodes,
+    statusCode: HttpStatus = HttpStatus.BAD_REQUEST,
+  ) {
     // Pass the error code as the message and the status code
     super(errorCode, statusCode);
     this.errorCode = errorCode;
@@ -20,4 +23,4 @@ export class BusinessException extends HttpException {
   getErrorCode(): ErrorCodes {
     return this.errorCode;
   }
-} 
+}

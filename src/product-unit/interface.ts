@@ -75,16 +75,16 @@ export interface IStockItem {
   sku: string;
   productName: string;
   category?: string;
-  currentStock: number;      // in_stock count
-  holdStock: number;         // hold count
-  soldStock: number;         // sold count
-  damagedStock: number;      // damaged count
-  totalUnits: number;        // total units ever created
-  avgUnitCost: number;       // average cost of in_stock units
-  totalValue: number;        // currentStock * avgUnitCost
-  minStockLevel: number;     // from SKU settings
-  reorderPoint: number;      // from SKU settings
-  reorderQuantity: number;   // from SKU settings
+  currentStock: number; // in_stock count
+  holdStock: number; // hold count
+  soldStock: number; // sold count
+  damagedStock: number; // damaged count
+  totalUnits: number; // total units ever created
+  avgUnitCost: number; // average cost of in_stock units
+  totalValue: number; // currentStock * avgUnitCost
+  minStockLevel: number; // from SKU settings
+  reorderPoint: number; // from SKU settings
+  reorderQuantity: number; // from SKU settings
   status: 'in_stock' | 'low_stock' | 'out_of_stock';
   lastProductionDate?: Date;
 }
@@ -93,9 +93,9 @@ export interface IStockSummary {
   totalSkus: number;
   totalUnits: number;
   totalValue: number;
-  inStock: number;           // SKUs with stock > minLevel
-  lowStock: number;          // SKUs with stock <= minLevel but > 0
-  outOfStock: number;        // SKUs with stock = 0
+  inStock: number; // SKUs with stock > minLevel
+  lowStock: number; // SKUs with stock <= minLevel but > 0
+  outOfStock: number; // SKUs with stock = 0
 }
 
 export interface IStockResponse {

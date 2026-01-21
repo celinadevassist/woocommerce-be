@@ -1,6 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import * as Joi from 'joi';
-import { ProductStatus, StockStatus, ProductType, TaxStatus, BackorderStatus, CatalogVisibility } from './enum';
+import {
+  ProductStatus,
+  StockStatus,
+  ProductType,
+  TaxStatus,
+  BackorderStatus,
+  CatalogVisibility,
+} from './enum';
 
 // Image DTO for product image management
 export class ProductImageDto {
@@ -105,7 +112,10 @@ export class UpdateProductDto {
   @ApiPropertyOptional({ description: 'Featured product' })
   featured?: boolean;
 
-  @ApiPropertyOptional({ description: 'Catalog visibility', enum: CatalogVisibility })
+  @ApiPropertyOptional({
+    description: 'Catalog visibility',
+    enum: CatalogVisibility,
+  })
   catalogVisibility?: CatalogVisibility;
 
   @ApiPropertyOptional({ description: 'Product description' })
@@ -117,7 +127,9 @@ export class UpdateProductDto {
   @ApiPropertyOptional({ description: 'Product SKU' })
   sku?: string;
 
-  @ApiPropertyOptional({ description: 'Global unique ID (GTIN, UPC, EAN, ISBN)' })
+  @ApiPropertyOptional({
+    description: 'Global unique ID (GTIN, UPC, EAN, ISBN)',
+  })
   globalUniqueId?: string;
 
   @ApiPropertyOptional({ description: 'Regular price' })
@@ -144,13 +156,18 @@ export class UpdateProductDto {
   @ApiPropertyOptional({ description: 'Downloadable product' })
   downloadable?: boolean;
 
-  @ApiPropertyOptional({ description: 'Downloadable files', type: [ProductDownloadDto] })
+  @ApiPropertyOptional({
+    description: 'Downloadable files',
+    type: [ProductDownloadDto],
+  })
   downloads?: ProductDownloadDto[];
 
   @ApiPropertyOptional({ description: 'Download limit (-1 for unlimited)' })
   downloadLimit?: number;
 
-  @ApiPropertyOptional({ description: 'Download expiry days (-1 for unlimited)' })
+  @ApiPropertyOptional({
+    description: 'Download expiry days (-1 for unlimited)',
+  })
   downloadExpiry?: number;
 
   @ApiPropertyOptional({ description: 'External product URL' })
@@ -174,7 +191,10 @@ export class UpdateProductDto {
   @ApiPropertyOptional({ description: 'Stock status', enum: StockStatus })
   stockStatus?: StockStatus;
 
-  @ApiPropertyOptional({ description: 'Backorder status', enum: BackorderStatus })
+  @ApiPropertyOptional({
+    description: 'Backorder status',
+    enum: BackorderStatus,
+  })
   backorders?: BackorderStatus;
 
   @ApiPropertyOptional({ description: 'Low stock threshold' })
@@ -186,7 +206,10 @@ export class UpdateProductDto {
   @ApiPropertyOptional({ description: 'Product weight' })
   weight?: string;
 
-  @ApiPropertyOptional({ description: 'Product dimensions', type: ProductDimensionsDto })
+  @ApiPropertyOptional({
+    description: 'Product dimensions',
+    type: ProductDimensionsDto,
+  })
   dimensions?: ProductDimensionsDto;
 
   @ApiPropertyOptional({ description: 'Shipping class slug' })
@@ -213,13 +236,22 @@ export class UpdateProductDto {
   @ApiPropertyOptional({ description: 'Tag IDs' })
   tags?: number[];
 
-  @ApiPropertyOptional({ description: 'Product images', type: [ProductImageDto] })
+  @ApiPropertyOptional({
+    description: 'Product images',
+    type: [ProductImageDto],
+  })
   images?: ProductImageDto[];
 
-  @ApiPropertyOptional({ description: 'Product attributes', type: [ProductAttributeDto] })
+  @ApiPropertyOptional({
+    description: 'Product attributes',
+    type: [ProductAttributeDto],
+  })
   attributes?: ProductAttributeDto[];
 
-  @ApiPropertyOptional({ description: 'Default attributes for variable products', type: [ProductDefaultAttributeDto] })
+  @ApiPropertyOptional({
+    description: 'Default attributes for variable products',
+    type: [ProductDefaultAttributeDto],
+  })
   defaultAttributes?: ProductDefaultAttributeDto[];
 
   @ApiPropertyOptional({ description: 'Grouped product IDs' })
@@ -228,17 +260,22 @@ export class UpdateProductDto {
   @ApiPropertyOptional({ description: 'Menu order for sorting' })
   menuOrder?: number;
 
-  @ApiPropertyOptional({ description: 'Product meta data', type: [ProductMetaDataDto] })
+  @ApiPropertyOptional({
+    description: 'Product meta data',
+    type: [ProductMetaDataDto],
+  })
   metaData?: ProductMetaDataDto[];
 }
 
-const ProductImageJoiSchema = Joi.object().keys({
-  id: Joi.number().optional(),
-  src: Joi.string().uri().optional(),
-  alt: Joi.string().allow('').optional(),
-  name: Joi.string().allow('').optional(),
-  position: Joi.number().min(0).optional(),
-}).or('id', 'src');
+const ProductImageJoiSchema = Joi.object()
+  .keys({
+    id: Joi.number().optional(),
+    src: Joi.string().uri().optional(),
+    alt: Joi.string().allow('').optional(),
+    name: Joi.string().allow('').optional(),
+    position: Joi.number().min(0).optional(),
+  })
+  .or('id', 'src');
 
 const ProductDownloadJoiSchema = Joi.object().keys({
   id: Joi.string().optional(),
@@ -276,10 +313,16 @@ const ProductDimensionsJoiSchema = Joi.object().keys({
 export const UpdateProductSchema = Joi.object().keys({
   name: Joi.string().min(1).max(255).optional(),
   slug: Joi.string().optional(),
-  type: Joi.string().valid(...Object.values(ProductType)).optional(),
-  status: Joi.string().valid(...Object.values(ProductStatus)).optional(),
+  type: Joi.string()
+    .valid(...Object.values(ProductType))
+    .optional(),
+  status: Joi.string()
+    .valid(...Object.values(ProductStatus))
+    .optional(),
   featured: Joi.boolean().optional(),
-  catalogVisibility: Joi.string().valid(...Object.values(CatalogVisibility)).optional(),
+  catalogVisibility: Joi.string()
+    .valid(...Object.values(CatalogVisibility))
+    .optional(),
   description: Joi.string().allow('').optional(),
   shortDescription: Joi.string().allow('').optional(),
   sku: Joi.string().allow('').optional(),
@@ -297,12 +340,18 @@ export const UpdateProductSchema = Joi.object().keys({
   downloadExpiry: Joi.number().min(-1).optional(),
   externalUrl: Joi.string().uri().allow('').optional(),
   buttonText: Joi.string().allow('').optional(),
-  taxStatus: Joi.string().valid(...Object.values(TaxStatus)).optional(),
+  taxStatus: Joi.string()
+    .valid(...Object.values(TaxStatus))
+    .optional(),
   taxClass: Joi.string().allow('').optional(),
   manageStock: Joi.boolean().optional(),
   stockQuantity: Joi.number().min(0).allow(null).optional(),
-  stockStatus: Joi.string().valid(...Object.values(StockStatus)).optional(),
-  backorders: Joi.string().valid(...Object.values(BackorderStatus)).optional(),
+  stockStatus: Joi.string()
+    .valid(...Object.values(StockStatus))
+    .optional(),
+  backorders: Joi.string()
+    .valid(...Object.values(BackorderStatus))
+    .optional(),
   lowStockAmount: Joi.number().min(0).allow(null).optional(),
   soldIndividually: Joi.boolean().optional(),
   weight: Joi.string().allow('').optional(),
@@ -317,7 +366,9 @@ export const UpdateProductSchema = Joi.object().keys({
   tags: Joi.array().items(Joi.number()).optional(),
   images: Joi.array().items(ProductImageJoiSchema).optional(),
   attributes: Joi.array().items(ProductAttributeJoiSchema).optional(),
-  defaultAttributes: Joi.array().items(ProductDefaultAttributeJoiSchema).optional(),
+  defaultAttributes: Joi.array()
+    .items(ProductDefaultAttributeJoiSchema)
+    .optional(),
   groupedProducts: Joi.array().items(Joi.number()).optional(),
   menuOrder: Joi.number().optional(),
   metaData: Joi.array().items(ProductMetaDataJoiSchema).optional(),
@@ -351,9 +402,13 @@ export class BulkUpdateProductDto {
 
 export const BulkUpdateProductSchema = Joi.object().keys({
   productIds: Joi.array().items(Joi.string()).min(1).required(),
-  status: Joi.string().valid(...Object.values(ProductStatus)).optional(),
+  status: Joi.string()
+    .valid(...Object.values(ProductStatus))
+    .optional(),
   stockQuantity: Joi.number().min(0).optional(),
-  stockStatus: Joi.string().valid(...Object.values(StockStatus)).optional(),
+  stockStatus: Joi.string()
+    .valid(...Object.values(StockStatus))
+    .optional(),
   regularPrice: Joi.string().optional(),
   salePrice: Joi.string().allow('').optional(),
   manageStock: Joi.boolean().optional(),
@@ -384,11 +439,15 @@ export class BulkUpdateVariantDto {
 export const BulkUpdateVariantSchema = Joi.object().keys({
   variantIds: Joi.array().items(Joi.string()).min(1).required(),
   stockQuantity: Joi.number().min(0).optional(),
-  stockStatus: Joi.string().valid(...Object.values(StockStatus)).optional(),
+  stockStatus: Joi.string()
+    .valid(...Object.values(StockStatus))
+    .optional(),
   regularPrice: Joi.string().optional(),
   salePrice: Joi.string().allow('').optional(),
   manageStock: Joi.boolean().optional(),
-  status: Joi.string().valid('publish', 'pending', 'draft', 'private').optional(),
+  status: Joi.string()
+    .valid('publish', 'pending', 'draft', 'private')
+    .optional(),
   priceAdjustment: Joi.object({
     type: Joi.string().valid('increase', 'decrease').required(),
     method: Joi.string().valid('percentage', 'fixed').required(),
@@ -407,16 +466,27 @@ export class CreateProductDto {
   @ApiPropertyOptional({ description: 'Product slug' })
   slug?: string;
 
-  @ApiPropertyOptional({ description: 'Product type', enum: ProductType, default: ProductType.SIMPLE })
+  @ApiPropertyOptional({
+    description: 'Product type',
+    enum: ProductType,
+    default: ProductType.SIMPLE,
+  })
   type?: ProductType;
 
-  @ApiPropertyOptional({ description: 'Product status', enum: ProductStatus, default: ProductStatus.DRAFT })
+  @ApiPropertyOptional({
+    description: 'Product status',
+    enum: ProductStatus,
+    default: ProductStatus.DRAFT,
+  })
   status?: ProductStatus;
 
   @ApiPropertyOptional({ description: 'Featured product' })
   featured?: boolean;
 
-  @ApiPropertyOptional({ description: 'Catalog visibility', enum: CatalogVisibility })
+  @ApiPropertyOptional({
+    description: 'Catalog visibility',
+    enum: CatalogVisibility,
+  })
   catalogVisibility?: CatalogVisibility;
 
   @ApiPropertyOptional({ description: 'Product description' })
@@ -428,7 +498,9 @@ export class CreateProductDto {
   @ApiPropertyOptional({ description: 'Product SKU' })
   sku?: string;
 
-  @ApiPropertyOptional({ description: 'Global unique ID (GTIN, UPC, EAN, ISBN)' })
+  @ApiPropertyOptional({
+    description: 'Global unique ID (GTIN, UPC, EAN, ISBN)',
+  })
   globalUniqueId?: string;
 
   @ApiPropertyOptional({ description: 'Regular price' })
@@ -455,13 +527,18 @@ export class CreateProductDto {
   @ApiPropertyOptional({ description: 'Downloadable product' })
   downloadable?: boolean;
 
-  @ApiPropertyOptional({ description: 'Downloadable files', type: [ProductDownloadDto] })
+  @ApiPropertyOptional({
+    description: 'Downloadable files',
+    type: [ProductDownloadDto],
+  })
   downloads?: ProductDownloadDto[];
 
   @ApiPropertyOptional({ description: 'Download limit (-1 for unlimited)' })
   downloadLimit?: number;
 
-  @ApiPropertyOptional({ description: 'Download expiry days (-1 for unlimited)' })
+  @ApiPropertyOptional({
+    description: 'Download expiry days (-1 for unlimited)',
+  })
   downloadExpiry?: number;
 
   @ApiPropertyOptional({ description: 'External product URL' })
@@ -485,7 +562,10 @@ export class CreateProductDto {
   @ApiPropertyOptional({ description: 'Stock status', enum: StockStatus })
   stockStatus?: StockStatus;
 
-  @ApiPropertyOptional({ description: 'Backorder status', enum: BackorderStatus })
+  @ApiPropertyOptional({
+    description: 'Backorder status',
+    enum: BackorderStatus,
+  })
   backorders?: BackorderStatus;
 
   @ApiPropertyOptional({ description: 'Low stock threshold' })
@@ -497,7 +577,10 @@ export class CreateProductDto {
   @ApiPropertyOptional({ description: 'Product weight' })
   weight?: string;
 
-  @ApiPropertyOptional({ description: 'Product dimensions', type: ProductDimensionsDto })
+  @ApiPropertyOptional({
+    description: 'Product dimensions',
+    type: ProductDimensionsDto,
+  })
   dimensions?: ProductDimensionsDto;
 
   @ApiPropertyOptional({ description: 'Shipping class slug' })
@@ -524,13 +607,22 @@ export class CreateProductDto {
   @ApiPropertyOptional({ description: 'Tag IDs' })
   tags?: number[];
 
-  @ApiPropertyOptional({ description: 'Product images', type: [ProductImageDto] })
+  @ApiPropertyOptional({
+    description: 'Product images',
+    type: [ProductImageDto],
+  })
   images?: ProductImageDto[];
 
-  @ApiPropertyOptional({ description: 'Product attributes', type: [ProductAttributeDto] })
+  @ApiPropertyOptional({
+    description: 'Product attributes',
+    type: [ProductAttributeDto],
+  })
   attributes?: ProductAttributeDto[];
 
-  @ApiPropertyOptional({ description: 'Default attributes for variable products', type: [ProductDefaultAttributeDto] })
+  @ApiPropertyOptional({
+    description: 'Default attributes for variable products',
+    type: [ProductDefaultAttributeDto],
+  })
   defaultAttributes?: ProductDefaultAttributeDto[];
 
   @ApiPropertyOptional({ description: 'Grouped product IDs' })
@@ -539,18 +631,31 @@ export class CreateProductDto {
   @ApiPropertyOptional({ description: 'Menu order for sorting' })
   menuOrder?: number;
 
-  @ApiPropertyOptional({ description: 'Product meta data', type: [ProductMetaDataDto] })
+  @ApiPropertyOptional({
+    description: 'Product meta data',
+    type: [ProductMetaDataDto],
+  })
   metaData?: ProductMetaDataDto[];
 }
 
 export const CreateProductSchema = Joi.object().keys({
-  storeId: Joi.string().pattern(/^[0-9a-fA-F]{24}$/).required(),
+  storeId: Joi.string()
+    .pattern(/^[0-9a-fA-F]{24}$/)
+    .required(),
   name: Joi.string().min(1).max(255).required(),
   slug: Joi.string().optional(),
-  type: Joi.string().valid(...Object.values(ProductType)).default('simple').optional(),
-  status: Joi.string().valid(...Object.values(ProductStatus)).default('draft').optional(),
+  type: Joi.string()
+    .valid(...Object.values(ProductType))
+    .default('simple')
+    .optional(),
+  status: Joi.string()
+    .valid(...Object.values(ProductStatus))
+    .default('draft')
+    .optional(),
   featured: Joi.boolean().optional(),
-  catalogVisibility: Joi.string().valid(...Object.values(CatalogVisibility)).optional(),
+  catalogVisibility: Joi.string()
+    .valid(...Object.values(CatalogVisibility))
+    .optional(),
   description: Joi.string().allow('').optional(),
   shortDescription: Joi.string().allow('').optional(),
   sku: Joi.string().allow('').optional(),
@@ -568,12 +673,18 @@ export const CreateProductSchema = Joi.object().keys({
   downloadExpiry: Joi.number().min(-1).optional(),
   externalUrl: Joi.string().uri().allow('').optional(),
   buttonText: Joi.string().allow('').optional(),
-  taxStatus: Joi.string().valid(...Object.values(TaxStatus)).optional(),
+  taxStatus: Joi.string()
+    .valid(...Object.values(TaxStatus))
+    .optional(),
   taxClass: Joi.string().allow('').optional(),
   manageStock: Joi.boolean().default(false).optional(),
   stockQuantity: Joi.number().min(0).allow(null).optional(),
-  stockStatus: Joi.string().valid(...Object.values(StockStatus)).optional(),
-  backorders: Joi.string().valid(...Object.values(BackorderStatus)).optional(),
+  stockStatus: Joi.string()
+    .valid(...Object.values(StockStatus))
+    .optional(),
+  backorders: Joi.string()
+    .valid(...Object.values(BackorderStatus))
+    .optional(),
   lowStockAmount: Joi.number().min(0).allow(null).optional(),
   soldIndividually: Joi.boolean().optional(),
   weight: Joi.string().allow('').optional(),
@@ -588,7 +699,9 @@ export const CreateProductSchema = Joi.object().keys({
   tags: Joi.array().items(Joi.number()).optional(),
   images: Joi.array().items(ProductImageJoiSchema).optional(),
   attributes: Joi.array().items(ProductAttributeJoiSchema).optional(),
-  defaultAttributes: Joi.array().items(ProductDefaultAttributeJoiSchema).optional(),
+  defaultAttributes: Joi.array()
+    .items(ProductDefaultAttributeJoiSchema)
+    .optional(),
   groupedProducts: Joi.array().items(Joi.number()).optional(),
   menuOrder: Joi.number().optional(),
   metaData: Joi.array().items(ProductMetaDataJoiSchema).optional(),
@@ -633,8 +746,12 @@ export const UpdateVariantSchema = Joi.object().keys({
   sku: Joi.string().allow('').optional(),
   manageStock: Joi.boolean().optional(),
   stockQuantity: Joi.number().min(0).optional(),
-  stockStatus: Joi.string().valid(...Object.values(StockStatus)).optional(),
-  status: Joi.string().valid('publish', 'pending', 'draft', 'private').optional(),
+  stockStatus: Joi.string()
+    .valid(...Object.values(StockStatus))
+    .optional(),
+  status: Joi.string()
+    .valid('publish', 'pending', 'draft', 'private')
+    .optional(),
   weight: Joi.string().allow('').optional(),
   description: Joi.string().allow('').optional(),
   image: Joi.object({

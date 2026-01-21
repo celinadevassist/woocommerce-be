@@ -8,12 +8,12 @@ import { SearchQuerySchema } from '../../shared/search-query.schema';
 @Module({
   imports: [
     MongooseModule.forFeature([
-      { name: 'SearchQuery', schema: SearchQuerySchema }
+      { name: 'SearchQuery', schema: SearchQuerySchema },
     ]),
-    PassportModule.register({ defaultStrategy: 'jwt' })
+    PassportModule.register({ defaultStrategy: 'jwt' }),
   ],
   controllers: [SearchAnalyticsController],
   providers: [SearchAnalyticsService],
-  exports: [SearchAnalyticsService]
+  exports: [SearchAnalyticsService],
 })
 export class SearchAnalyticsModule {}

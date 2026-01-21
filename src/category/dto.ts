@@ -29,7 +29,9 @@ export const CreateCategorySchema = Joi.object().keys({
   slug: Joi.string().optional(),
   parentId: Joi.string().optional().allow(null, ''),
   description: Joi.string().optional().allow(''),
-  display: Joi.string().valid('default', 'products', 'subcategories', 'both').optional(),
+  display: Joi.string()
+    .valid('default', 'products', 'subcategories', 'both')
+    .optional(),
   menuOrder: Joi.number().min(0).optional(),
   imageUrl: Joi.string().uri().optional().allow(''),
 });
@@ -62,7 +64,9 @@ export const UpdateCategorySchema = Joi.object().keys({
   slug: Joi.string().optional(),
   parentId: Joi.string().optional().allow(null, ''),
   description: Joi.string().optional().allow(''),
-  display: Joi.string().valid('default', 'products', 'subcategories', 'both').optional(),
+  display: Joi.string()
+    .valid('default', 'products', 'subcategories', 'both')
+    .optional(),
   menuOrder: Joi.number().min(0).optional(),
   imageUrl: Joi.string().uri().optional().allow(''),
 });

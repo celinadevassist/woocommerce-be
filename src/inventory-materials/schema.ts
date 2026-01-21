@@ -1,6 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { MaterialUnit, MaterialTransactionType, MaterialTransactionReferenceType } from './enum';
+import {
+  MaterialUnit,
+  MaterialTransactionType,
+  MaterialTransactionReferenceType,
+} from './enum';
 
 // Supplier sub-document
 class Supplier {
@@ -20,9 +24,18 @@ class Supplier {
   notes?: string;
 }
 
-@Schema({ timestamps: true, versionKey: false, collection: 'inventory_materials' })
+@Schema({
+  timestamps: true,
+  versionKey: false,
+  collection: 'inventory_materials',
+})
 export class Material extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true })
@@ -49,7 +62,18 @@ export class Material extends Document {
   @Prop({ default: 0 })
   reorderQuantity: number;
 
-  @Prop({ type: [{ name: String, contactPerson: String, email: String, phone: String, notes: String }], default: [] })
+  @Prop({
+    type: [
+      {
+        name: String,
+        contactPerson: String,
+        email: String,
+        phone: String,
+        notes: String,
+      },
+    ],
+    default: [],
+  })
   suppliers: Supplier[];
 
   @Prop({ default: 0 })
@@ -79,15 +103,33 @@ MaterialSchema.index({ storeId: 1, currentStock: 1, minStockLevel: 1 });
 MaterialSchema.index({ storeId: 1, name: 'text', sku: 'text' });
 
 // Material Transaction Schema
-@Schema({ timestamps: false, versionKey: false, collection: 'inventory_material_transactions' })
+@Schema({
+  timestamps: false,
+  versionKey: false,
+  collection: 'inventory_material_transactions',
+})
 export class MaterialTransaction extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Material', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Material',
+    required: true,
+    index: true,
+  })
   materialId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: String, enum: Object.values(MaterialTransactionType), required: true })
+  @Prop({
+    type: String,
+    enum: Object.values(MaterialTransactionType),
+    required: true,
+  })
   type: MaterialTransactionType;
 
   @Prop({ required: true })
@@ -114,7 +156,11 @@ export class MaterialTransaction extends Document {
   @Prop()
   reference?: string;
 
-  @Prop({ type: String, enum: Object.values(MaterialTransactionReferenceType), required: true })
+  @Prop({
+    type: String,
+    enum: Object.values(MaterialTransactionReferenceType),
+    required: true,
+  })
   referenceType: MaterialTransactionReferenceType;
 
   @Prop()
@@ -129,7 +175,8 @@ export class MaterialTransaction extends Document {
 
 export type MaterialTransactionDocument = MaterialTransaction & Document;
 
-export const MaterialTransactionSchema = SchemaFactory.createForClass(MaterialTransaction);
+export const MaterialTransactionSchema =
+  SchemaFactory.createForClass(MaterialTransaction);
 
 // Indexes
 MaterialTransactionSchema.index({ materialId: 1, createdAt: -1 });

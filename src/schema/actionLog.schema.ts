@@ -1,6 +1,7 @@
 import * as mongoose from 'mongoose';
 
-const schema = new mongoose.Schema({
+const schema = new mongoose.Schema(
+  {
     creatorId: { type: mongoose.Schema.Types.ObjectId },
     userId: { type: mongoose.Schema.Types.ObjectId },
     serviceId: { type: mongoose.Schema.Types.ObjectId },
@@ -9,10 +10,12 @@ const schema = new mongoose.Schema({
     title: { type: mongoose.Schema.Types.Mixed },
     description: { type: mongoose.Schema.Types.Mixed },
     createdAt: { type: Date, default: () => new Date() },
-}, {
+  },
+  {
     versionKey: false,
     autoIndex: true,
     collection: 'action-log',
-});
+  },
+);
 
 export const ActionLogMongoSchema = schema;

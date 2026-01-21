@@ -3,7 +3,10 @@ import * as Joi from 'joi';
 import { StorePlatform, StoreStatus } from './enum';
 
 export class QueryStoreDto {
-  @ApiPropertyOptional({ description: 'Filter by platform', enum: StorePlatform })
+  @ApiPropertyOptional({
+    description: 'Filter by platform',
+    enum: StorePlatform,
+  })
   platform?: StorePlatform;
 
   @ApiPropertyOptional({ description: 'Filter by status', enum: StoreStatus })
@@ -26,11 +29,18 @@ export class QueryStoreDto {
 }
 
 export const QueryStoreSchema = Joi.object().keys({
-  platform: Joi.string().valid(...Object.values(StorePlatform)).optional(),
-  status: Joi.string().valid(...Object.values(StoreStatus)).optional(),
+  platform: Joi.string()
+    .valid(...Object.values(StorePlatform))
+    .optional(),
+  status: Joi.string()
+    .valid(...Object.values(StoreStatus))
+    .optional(),
   keyword: Joi.string().optional(),
   page: Joi.number().min(1).default(1).optional(),
   size: Joi.number().min(1).max(100).default(10).optional(),
-  sortBy: Joi.string().valid('createdAt', 'name', 'updatedAt', 'status').default('createdAt').optional(),
+  sortBy: Joi.string()
+    .valid('createdAt', 'name', 'updatedAt', 'status')
+    .default('createdAt')
+    .optional(),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc').optional(),
 });

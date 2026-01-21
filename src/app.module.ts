@@ -3,10 +3,7 @@ import { AuthModule } from './auth/auth.module';
 import { config } from './config.manager';
 import { Module, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import {
-  RoleModule,
-  UserModule,
-} from './modules';
+import { RoleModule, UserModule } from './modules';
 import { HealthController } from './controllers/health.controller';
 
 import { ActionLogModule } from './modules/actionLog.module';
@@ -106,4 +103,4 @@ import { LocationLibraryModule } from './location-library/module';
   controllers: [HealthController],
   providers: [ValidationPipe],
 })
-export class AppModule { }
+export class AppModule {}

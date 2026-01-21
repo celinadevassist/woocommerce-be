@@ -1,5 +1,9 @@
 import * as Joi from 'joi';
-import { ReviewRequestTrigger, ReviewRequestChannel, ReviewRequestStatus } from './enum';
+import {
+  ReviewRequestTrigger,
+  ReviewRequestChannel,
+  ReviewRequestStatus,
+} from './enum';
 
 // Query DTO for listing requests
 export class QueryReviewRequestDto {
@@ -28,7 +32,9 @@ export const QueryReviewRequestSchema = Joi.object({
   endDate: Joi.string().isoDate().optional(),
   page: Joi.number().min(1).default(1),
   size: Joi.number().min(1).max(100).default(20),
-  sortBy: Joi.string().valid('createdAt', 'sentAt', 'status', 'customerName').optional(),
+  sortBy: Joi.string()
+    .valid('createdAt', 'sentAt', 'status', 'customerName')
+    .optional(),
   sortOrder: Joi.string().valid('asc', 'desc').optional(),
 });
 

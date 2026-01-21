@@ -9,7 +9,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { User, UserDocument } from '../schema/user.schema';
 import { Store, StoreDocument } from '../store/schema';
-import { Subscription, SubscriptionDocument, Invoice, InvoiceDocument, SubscriptionStatus, InvoiceStatus } from '../subscription/schema';
+import {
+  Subscription,
+  SubscriptionDocument,
+  Invoice,
+  InvoiceDocument,
+  SubscriptionStatus,
+  InvoiceStatus,
+} from '../subscription/schema';
 import {
   AdminQueryUsersDTO,
   AdminQueryStoresDTO,
@@ -32,7 +39,8 @@ export class AdminService {
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
-    @InjectModel(Subscription.name) private subscriptionModel: Model<SubscriptionDocument>,
+    @InjectModel(Subscription.name)
+    private subscriptionModel: Model<SubscriptionDocument>,
     @InjectModel(Invoice.name) private invoiceModel: Model<InvoiceDocument>,
   ) {}
 
@@ -56,17 +64,41 @@ export class AdminService {
       thisMonthRevenue,
     ] = await Promise.all([
       this.userModel.countDocuments({ isDeleted: { $ne: true } }),
-      this.userModel.countDocuments({ role: 'admin', isDeleted: { $ne: true } }),
+      this.userModel.countDocuments({
+        role: 'admin',
+        isDeleted: { $ne: true },
+      }),
       this.storeModel.countDocuments({ isDeleted: false }),
-      this.subscriptionModel.countDocuments({ status: SubscriptionStatus.ACTIVE, isDeleted: { $ne: true } }),
-      this.subscriptionModel.countDocuments({ status: SubscriptionStatus.SUSPENDED, isDeleted: { $ne: true } }),
+      this.subscriptionModel.countDocuments({
+        status: SubscriptionStatus.ACTIVE,
+        isDeleted: { $ne: true },
+      }),
+      this.subscriptionModel.countDocuments({
+        status: SubscriptionStatus.SUSPENDED,
+        isDeleted: { $ne: true },
+      }),
       this.subscriptionModel.countDocuments({ isDeleted: { $ne: true } }),
-      this.subscriptionModel.countDocuments({ status: SubscriptionStatus.ACTIVE, isDeleted: { $ne: true } }),
-      this.subscriptionModel.countDocuments({ status: SubscriptionStatus.TRIAL, isDeleted: { $ne: true } }),
+      this.subscriptionModel.countDocuments({
+        status: SubscriptionStatus.ACTIVE,
+        isDeleted: { $ne: true },
+      }),
+      this.subscriptionModel.countDocuments({
+        status: SubscriptionStatus.TRIAL,
+        isDeleted: { $ne: true },
+      }),
       this.invoiceModel.countDocuments({ isDeleted: { $ne: true } }),
-      this.invoiceModel.countDocuments({ status: InvoiceStatus.PENDING, isDeleted: { $ne: true } }),
-      this.invoiceModel.countDocuments({ status: InvoiceStatus.OVERDUE, isDeleted: { $ne: true } }),
-      this.invoiceModel.countDocuments({ status: InvoiceStatus.PAID, isDeleted: { $ne: true } }),
+      this.invoiceModel.countDocuments({
+        status: InvoiceStatus.PENDING,
+        isDeleted: { $ne: true },
+      }),
+      this.invoiceModel.countDocuments({
+        status: InvoiceStatus.OVERDUE,
+        isDeleted: { $ne: true },
+      }),
+      this.invoiceModel.countDocuments({
+        status: InvoiceStatus.PAID,
+        isDeleted: { $ne: true },
+      }),
       this.invoiceModel.aggregate([
         { $match: { status: InvoiceStatus.PAID, isDeleted: { $ne: true } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
@@ -77,7 +109,11 @@ export class AdminService {
             status: InvoiceStatus.PAID,
             isDeleted: { $ne: true },
             paidAt: {
-              $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+              $gte: new Date(
+                new Date().getFullYear(),
+                new Date().getMonth(),
+                1,
+              ),
             },
           },
         },
@@ -134,7 +170,14 @@ export class AdminService {
   // ==================== USERS MANAGEMENT ====================
 
   async getUsers(query: AdminQueryUsersDTO) {
-    const { page = 1, size = 20, keyword, role, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+    const {
+      page = 1,
+      size = 20,
+      keyword,
+      role,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = query;
     const skip = (page - 1) * size;
 
     const filter: any = { isDeleted: { $ne: true } };
@@ -166,8 +209,14 @@ export class AdminService {
     const usersWithStores = await Promise.all(
       users.map(async (user) => {
         const [ownedStores, memberStores] = await Promise.all([
-          this.storeModel.countDocuments({ ownerId: user._id, isDeleted: false }),
-          this.storeModel.countDocuments({ 'members.userId': user._id, isDeleted: false }),
+          this.storeModel.countDocuments({
+            ownerId: user._id,
+            isDeleted: false,
+          }),
+          this.storeModel.countDocuments({
+            'members.userId': user._id,
+            isDeleted: false,
+          }),
         ]);
         return {
           ...user,
@@ -205,17 +254,21 @@ export class AdminService {
 
     const storesWithSubscription = await Promise.all(
       ownedStores.map(async (store) => {
-        const subscription = await this.subscriptionModel.findOne({ storeId: store._id }).lean();
+        const subscription = await this.subscriptionModel
+          .findOne({ storeId: store._id })
+          .lean();
         const pendingInvoices = await this.invoiceModel.countDocuments({
           storeId: store._id,
           status: { $in: [InvoiceStatus.PENDING, InvoiceStatus.OVERDUE] },
         });
         return {
           ...store,
-          subscription: subscription ? {
-            status: subscription.status,
-            nextInvoiceDate: subscription.nextInvoiceDate,
-          } : null,
+          subscription: subscription
+            ? {
+                status: subscription.status,
+                nextInvoiceDate: subscription.nextInvoiceDate,
+              }
+            : null,
           pendingInvoices,
         };
       }),
@@ -267,7 +320,9 @@ export class AdminService {
 
     await user.save();
 
-    this.logger.log(`Admin ${adminId} updated user ${userId}: ${JSON.stringify(data)}`);
+    this.logger.log(
+      `Admin ${adminId} updated user ${userId}: ${JSON.stringify(data)}`,
+    );
 
     return user;
   }
@@ -305,7 +360,15 @@ export class AdminService {
   // ==================== STORES MANAGEMENT ====================
 
   async getStores(query: AdminQueryStoresDTO) {
-    const { page = 1, size = 20, keyword, status, subscriptionStatus, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+    const {
+      page = 1,
+      size = 20,
+      keyword,
+      status,
+      subscriptionStatus,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = query;
     const skip = (page - 1) * size;
 
     const filter: any = { isDeleted: false };
@@ -335,7 +398,9 @@ export class AdminService {
     // Get subscription info for each store
     let storesWithDetails = await Promise.all(
       stores.map(async (store) => {
-        const subscription = await this.subscriptionModel.findOne({ storeId: store._id }).lean();
+        const subscription = await this.subscriptionModel
+          .findOne({ storeId: store._id })
+          .lean();
         const pendingInvoices = await this.invoiceModel.countDocuments({
           storeId: store._id,
           status: { $in: [InvoiceStatus.PENDING, InvoiceStatus.OVERDUE] },
@@ -343,11 +408,13 @@ export class AdminService {
         return {
           ...store,
           membersCount: store.members?.length || 0,
-          subscription: subscription ? {
-            status: subscription.status,
-            nextInvoiceDate: subscription.nextInvoiceDate,
-            trialEndsAt: subscription.trialEndsAt,
-          } : null,
+          subscription: subscription
+            ? {
+                status: subscription.status,
+                nextInvoiceDate: subscription.nextInvoiceDate,
+                trialEndsAt: subscription.trialEndsAt,
+              }
+            : null,
           pendingInvoices,
         };
       }),
@@ -398,7 +465,11 @@ export class AdminService {
     };
   }
 
-  async suspendStore(storeId: string, data: AdminSuspendStoreDTO, adminId: string) {
+  async suspendStore(
+    storeId: string,
+    data: AdminSuspendStoreDTO,
+    adminId: string,
+  ) {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       isDeleted: false,
@@ -418,7 +489,9 @@ export class AdminService {
       },
     );
 
-    this.logger.log(`Admin ${adminId} suspended store ${storeId}: ${data.reason}`);
+    this.logger.log(
+      `Admin ${adminId} suspended store ${storeId}: ${data.reason}`,
+    );
 
     return { message: 'Store suspended successfully' };
   }
@@ -475,7 +548,13 @@ export class AdminService {
   // ==================== SUBSCRIPTIONS MANAGEMENT ====================
 
   async getSubscriptions(query: AdminQuerySubscriptionsDTO) {
-    const { page = 1, size = 20, status, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+    const {
+      page = 1,
+      size = 20,
+      status,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = query;
     const skip = (page - 1) * size;
 
     const filter: any = { isDeleted: { $ne: true } };
@@ -503,12 +582,14 @@ export class AdminService {
           .lean();
         return {
           ...sub,
-          store: store ? {
-            id: store._id,
-            name: store.name,
-            url: store.url,
-            owner: store.ownerId,
-          } : null,
+          store: store
+            ? {
+                id: store._id,
+                name: store.name,
+                url: store.url,
+                owner: store.ownerId,
+              }
+            : null,
         };
       }),
     );
@@ -524,7 +605,11 @@ export class AdminService {
     };
   }
 
-  async updateSubscription(subscriptionId: string, data: AdminUpdateSubscriptionDTO, adminId: string) {
+  async updateSubscription(
+    subscriptionId: string,
+    data: AdminUpdateSubscriptionDTO,
+    adminId: string,
+  ) {
     const subscription = await this.subscriptionModel.findOne({
       _id: new Types.ObjectId(subscriptionId),
       isDeleted: { $ne: true },
@@ -537,21 +622,31 @@ export class AdminService {
     // Update all provided fields
     if (data.status) subscription.status = data.status as SubscriptionStatus;
     if (data.plan !== undefined) subscription.plan = data.plan;
-    if (data.pricePerMonth !== undefined) subscription.pricePerMonth = data.pricePerMonth;
+    if (data.pricePerMonth !== undefined)
+      subscription.pricePerMonth = data.pricePerMonth;
     if (data.currency) subscription.currency = data.currency;
     if (data.billingCycle) subscription.billingCycle = data.billingCycle;
     if (data.discount !== undefined) subscription.discount = data.discount;
-    if (data.trialEndsAt !== undefined) subscription.trialEndsAt = data.trialEndsAt;
+    if (data.trialEndsAt !== undefined)
+      subscription.trialEndsAt = data.trialEndsAt;
     if (data.notes !== undefined) subscription.notes = data.notes;
 
     await subscription.save();
 
-    this.logger.log(`Admin ${adminId} updated subscription ${subscriptionId}: ${JSON.stringify(data)}`);
+    this.logger.log(
+      `Admin ${adminId} updated subscription ${subscriptionId}: ${JSON.stringify(
+        data,
+      )}`,
+    );
 
     return subscription;
   }
 
-  async cancelSubscription(storeId: string, data: AdminCancelSubscriptionDTO, adminId: string) {
+  async cancelSubscription(
+    storeId: string,
+    data: AdminCancelSubscriptionDTO,
+    adminId: string,
+  ) {
     const subscription = await this.subscriptionModel.findOne({
       storeId: new Types.ObjectId(storeId),
       isDeleted: { $ne: true },
@@ -571,7 +666,9 @@ export class AdminService {
       { status: 'suspended' },
     );
 
-    this.logger.log(`Admin ${adminId} cancelled subscription for store ${storeId}: ${data.reason}`);
+    this.logger.log(
+      `Admin ${adminId} cancelled subscription for store ${storeId}: ${data.reason}`,
+    );
 
     return { message: 'Subscription cancelled successfully' };
   }
@@ -597,7 +694,9 @@ export class AdminService {
       { status: 'active' },
     );
 
-    this.logger.log(`Admin ${adminId} reactivated subscription for store ${storeId}`);
+    this.logger.log(
+      `Admin ${adminId} reactivated subscription for store ${storeId}`,
+    );
 
     return { message: 'Subscription reactivated successfully' };
   }
@@ -605,7 +704,16 @@ export class AdminService {
   // ==================== INVOICES MANAGEMENT ====================
 
   async getInvoices(query: AdminQueryInvoicesDTO) {
-    const { page = 1, size = 20, status, storeId, dateFrom, dateTo, sortBy = 'createdAt', sortOrder = 'desc' } = query;
+    const {
+      page = 1,
+      size = 20,
+      status,
+      storeId,
+      dateFrom,
+      dateTo,
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
+    } = query;
     const skip = (page - 1) * size;
 
     const filter: any = { isDeleted: { $ne: true } };
@@ -676,7 +784,10 @@ export class AdminService {
       revenueByMonth,
     ] = await Promise.all([
       this.invoiceModel.countDocuments({ isDeleted: { $ne: true } }),
-      this.invoiceModel.countDocuments({ status: InvoiceStatus.PAID, isDeleted: { $ne: true } }),
+      this.invoiceModel.countDocuments({
+        status: InvoiceStatus.PAID,
+        isDeleted: { $ne: true },
+      }),
       this.invoiceModel.aggregate([
         { $match: { status: InvoiceStatus.PAID, isDeleted: { $ne: true } } },
         { $group: { _id: null, total: { $sum: '$amount' } } },
@@ -703,18 +814,32 @@ export class AdminService {
       ]),
       this.invoiceModel.aggregate([
         { $match: { status: InvoiceStatus.PENDING, isDeleted: { $ne: true } } },
-        { $group: { _id: null, count: { $sum: 1 }, amount: { $sum: '$amount' } } },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            amount: { $sum: '$amount' },
+          },
+        },
       ]),
       this.invoiceModel.aggregate([
         { $match: { status: InvoiceStatus.OVERDUE, isDeleted: { $ne: true } } },
-        { $group: { _id: null, count: { $sum: 1 }, amount: { $sum: '$amount' } } },
+        {
+          $group: {
+            _id: null,
+            count: { $sum: 1 },
+            amount: { $sum: '$amount' },
+          },
+        },
       ]),
       this.invoiceModel.aggregate([
         {
           $match: {
             status: InvoiceStatus.PAID,
             isDeleted: { $ne: true },
-            paidAt: { $gte: new Date(now.getFullYear(), now.getMonth() - 11, 1) },
+            paidAt: {
+              $gte: new Date(now.getFullYear(), now.getMonth() - 11, 1),
+            },
           },
         },
         {
@@ -748,7 +873,11 @@ export class AdminService {
     };
   }
 
-  async markInvoicePaid(invoiceId: string, data: AdminMarkInvoicePaidDTO, adminId: string) {
+  async markInvoicePaid(
+    invoiceId: string,
+    data: AdminMarkInvoicePaidDTO,
+    adminId: string,
+  ) {
     const invoice = await this.invoiceModel.findOne({
       _id: new Types.ObjectId(invoiceId),
       isDeleted: { $ne: true },
@@ -765,7 +894,8 @@ export class AdminService {
     invoice.status = InvoiceStatus.PAID;
     invoice.paidAt = new Date();
     invoice.paymentMethod = data.paymentMethod;
-    invoice.paymentReference = data.paymentReference || `ADMIN-${adminId}-${Date.now()}`;
+    invoice.paymentReference =
+      data.paymentReference || `ADMIN-${adminId}-${Date.now()}`;
     await invoice.save();
 
     // Activate the subscription
@@ -774,12 +904,20 @@ export class AdminService {
       { status: SubscriptionStatus.ACTIVE },
     );
 
-    this.logger.log(`Admin ${adminId} marked invoice ${invoiceId} as paid: ${JSON.stringify(data)}`);
+    this.logger.log(
+      `Admin ${adminId} marked invoice ${invoiceId} as paid: ${JSON.stringify(
+        data,
+      )}`,
+    );
 
     return invoice;
   }
 
-  async cancelInvoice(invoiceId: string, data: AdminCancelInvoiceDTO, adminId: string) {
+  async cancelInvoice(
+    invoiceId: string,
+    data: AdminCancelInvoiceDTO,
+    adminId: string,
+  ) {
     const invoice = await this.invoiceModel.findOne({
       _id: new Types.ObjectId(invoiceId),
       isDeleted: { $ne: true },
@@ -796,7 +934,9 @@ export class AdminService {
     invoice.status = InvoiceStatus.CANCELLED;
     await invoice.save();
 
-    this.logger.log(`Admin ${adminId} cancelled invoice ${invoiceId}: ${data.reason}`);
+    this.logger.log(
+      `Admin ${adminId} cancelled invoice ${invoiceId}: ${data.reason}`,
+    );
 
     return { message: 'Invoice cancelled successfully' };
   }
@@ -805,7 +945,13 @@ export class AdminService {
 
   async createSubscriptionForStore(
     storeId: string,
-    data: { plan?: string; pricePerMonth: number; currency?: string; billingCycle?: string; trialDays?: number },
+    data: {
+      plan?: string;
+      pricePerMonth: number;
+      currency?: string;
+      billingCycle?: string;
+      trialDays?: number;
+    },
     adminId: string,
   ) {
     const store = await this.storeModel.findOne({
@@ -853,7 +999,9 @@ export class AdminService {
       trialEndsAt,
     });
 
-    this.logger.log(`Admin ${adminId} created subscription for store ${storeId}`);
+    this.logger.log(
+      `Admin ${adminId} created subscription for store ${storeId}`,
+    );
 
     return {
       message: 'Subscription created successfully',
@@ -911,7 +1059,9 @@ export class AdminService {
 
     const invoice = await this.invoiceModel.create(invoiceData);
 
-    this.logger.log(`Admin ${adminId} generated invoice ${invoiceNumber} for store ${storeId}`);
+    this.logger.log(
+      `Admin ${adminId} generated invoice ${invoiceNumber} for store ${storeId}`,
+    );
 
     return {
       message: 'Invoice generated successfully',

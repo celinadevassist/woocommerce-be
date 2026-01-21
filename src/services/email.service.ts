@@ -1,4 +1,9 @@
-import { Injectable, InternalServerErrorException, Inject, forwardRef } from '@nestjs/common';
+import {
+  Injectable,
+  InternalServerErrorException,
+  Inject,
+  forwardRef,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { LoggerService } from '../logger/logger.service';
@@ -28,7 +33,8 @@ export class EmailService {
 
   constructor(
     logger: LoggerService,
-    @Inject(forwardRef(() => MetadataService)) private readonly metadataService: MetadataService,
+    @Inject(forwardRef(() => MetadataService))
+    private readonly metadataService: MetadataService,
     private readonly mailerService: MailerService,
     private readonly configService: ConfigService,
   ) {
@@ -43,68 +49,113 @@ export class EmailService {
   }
 
   // Legacy method for backward compatibility
-  async sendEmail(to: string, subject: string, content: string): Promise<{ message: string }> {
+  async sendEmail(
+    to: string,
+    subject: string,
+    content: string,
+  ): Promise<{ message: string }> {
     const emailData: EmailData = {
       recipients: to,
       subject: subject,
       content: content,
-      contentType: 'text'
+      contentType: 'text',
     };
 
     // For backward compatibility, we'll try to send without userId first
     // This will only work if there are environment-based credentials
     const success = await this.sendEmailWithProviders(emailData);
-    
+
     if (success) {
       return { message: 'Your New PW send to your registered E-mail' };
     } else {
-      return { message: "Failed To Send" };
+      return { message: 'Failed To Send' };
     }
   }
 
   // New method with provider support
-  async sendEmailWithProviders(data: EmailData, userId?: string): Promise<boolean> {
+  async sendEmailWithProviders(
+    data: EmailData,
+    userId?: string,
+  ): Promise<boolean> {
     for (const provider of this.emailProviders) {
       try {
         // Get credentials from metadata for this provider
-        const credentials = await this.getProviderCredentials(provider.name, userId);
+        const credentials = await this.getProviderCredentials(
+          provider.name,
+          userId,
+        );
         if (!credentials) {
-          this.logger.error(`No credentials found for ${provider.name}`, 'EmailService');
+          this.logger.error(
+            `No credentials found for ${provider.name}`,
+            'EmailService',
+          );
           continue;
         }
 
-        const response = await provider.handler.call(provider.this, data, credentials);
+        const response = await provider.handler.call(
+          provider.this,
+          data,
+          credentials,
+        );
         if (response === true) {
-          this.logger.log(`Email sent successfully via ${provider.name}`, 'EmailService');
+          this.logger.log(
+            `Email sent successfully via ${provider.name}`,
+            'EmailService',
+          );
           return true;
         } else {
-          this.logger.error(`${provider.name} -> ${JSON.stringify(response)}`, 'EmailService');
+          this.logger.error(
+            `${provider.name} -> ${JSON.stringify(response)}`,
+            'EmailService',
+          );
         }
       } catch (e) {
-        this.logger.error(`${provider.name} -> ${JSON.stringify(e)}`, 'EmailService');
+        this.logger.error(
+          `${provider.name} -> ${JSON.stringify(e)}`,
+          'EmailService',
+        );
       }
     }
     return false;
   }
 
-  private async getProviderCredentials(providerName: string, userId?: string): Promise<any> {
+  private async getProviderCredentials(
+    providerName: string,
+    userId?: string,
+  ): Promise<any> {
     try {
       if (!userId) {
-        this.logger.error('UserId is required to fetch email provider credentials', 'EmailService');
+        this.logger.error(
+          'UserId is required to fetch email provider credentials',
+          'EmailService',
+        );
         return null;
       }
 
-      const metadata = await this.metadataService.findByUserAndModule(userId, ModuleType.EMAIL_MARKETING);
+      const metadata = await this.metadataService.findByUserAndModule(
+        userId,
+        ModuleType.EMAIL_MARKETING,
+      );
       if (!metadata || !metadata.meta) {
-        this.logger.error(`No email marketing metadata found for user ${userId}`, 'EmailService');
+        this.logger.error(
+          `No email marketing metadata found for user ${userId}`,
+          'EmailService',
+        );
         return null;
       }
 
       // Look for provider-specific credentials in meta object
       const providerKey = providerName.toLowerCase().replace(/\s+/g, '_');
-      return metadata.meta[providerKey] || metadata.meta.default_provider || null;
+      return (
+        metadata.meta[providerKey] || metadata.meta.default_provider || null
+      );
     } catch (error) {
-      this.logger.error(`Error fetching credentials for ${providerName}: ${JSON.stringify(error)}`, 'EmailService');
+      this.logger.error(
+        `Error fetching credentials for ${providerName}: ${JSON.stringify(
+          error,
+        )}`,
+        'EmailService',
+      );
       return null;
     }
   }
@@ -116,20 +167,20 @@ export class EmailService {
       }
 
       // Convert recipients to string if it's an array
-      const recipients = Array.isArray(data.recipients) 
-        ? data.recipients.join(', ') 
+      const recipients = Array.isArray(data.recipients)
+        ? data.recipients.join(', ')
         : data.recipients;
 
       const payload = {
         recipients: recipients,
         subject: data.subject,
         content: data.content,
-        communication_doctype: credentials.communication_doctype || "User",
-        communication_name: credentials.communication_name || "Administrator",
+        communication_doctype: credentials.communication_doctype || 'User',
+        communication_name: credentials.communication_name || 'Administrator',
         send_email: true,
-        content_type: data.contentType || "text",
+        content_type: data.contentType || 'text',
         sender: data.sender || credentials.default_sender || recipients,
-        communication_medium: "Email"
+        communication_medium: 'Email',
       };
 
       const response = await axios.post(
@@ -138,10 +189,10 @@ export class EmailService {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `token ${credentials.token}`,
+            Authorization: `token ${credentials.token}`,
           },
           timeout: 30000, // 30 seconds timeout
-        }
+        },
       );
 
       // Check ERPNext response format
@@ -150,7 +201,9 @@ export class EmailService {
         if (response.data.message.name || response.status === 200) {
           return true;
         } else {
-          return `ERPNext -> Unexpected response: ${JSON.stringify(response.data)}`;
+          return `ERPNext -> Unexpected response: ${JSON.stringify(
+            response.data,
+          )}`;
         }
       } else if (response.status === 200) {
         return true;
@@ -159,7 +212,9 @@ export class EmailService {
       }
     } catch (error) {
       if (error.response) {
-        return `ERPNext -> HTTP ${error.response.status}: ${JSON.stringify(error.response.data)}`;
+        return `ERPNext -> HTTP ${error.response.status}: ${JSON.stringify(
+          error.response.data,
+        )}`;
       } else if (error.request) {
         return `ERPNext -> Network error: ${error.message}`;
       } else {
@@ -200,11 +255,20 @@ export class EmailService {
   }
 
   // Utility method to test provider connectivity
-  async testProvider(providerName: string, userId: string): Promise<{ success: boolean; message: string }> {
+  async testProvider(
+    providerName: string,
+    userId: string,
+  ): Promise<{ success: boolean; message: string }> {
     try {
-      const credentials = await this.getProviderCredentials(providerName, userId);
+      const credentials = await this.getProviderCredentials(
+        providerName,
+        userId,
+      );
       if (!credentials) {
-        return { success: false, message: `No credentials found for ${providerName}` };
+        return {
+          success: false,
+          message: `No credentials found for ${providerName}`,
+        };
       }
 
       // Send a test email
@@ -212,18 +276,20 @@ export class EmailService {
         recipients: credentials.test_email || 'test@example.com',
         subject: `Test Email from ${providerName}`,
         content: `This is a test email sent via ${providerName} provider at ${new Date().toISOString()}`,
-        contentType: 'text'
+        contentType: 'text',
       };
 
       const result = await this.sendEmailWithProviders(testData, userId);
       return {
         success: result,
-        message: result ? `Test email sent successfully via ${providerName}` : `Failed to send test email via ${providerName}`
+        message: result
+          ? `Test email sent successfully via ${providerName}`
+          : `Failed to send test email via ${providerName}`,
       };
     } catch (error) {
       return {
         success: false,
-        message: `Error testing ${providerName}: ${error.message}`
+        message: `Error testing ${providerName}: ${error.message}`,
       };
     }
   }
@@ -233,7 +299,10 @@ export class EmailService {
     const availableProviders: string[] = [];
 
     for (const provider of this.emailProviders) {
-      const credentials = await this.getProviderCredentials(provider.name, userId);
+      const credentials = await this.getProviderCredentials(
+        provider.name,
+        userId,
+      );
       if (credentials) {
         availableProviders.push(provider.name);
       }
@@ -311,7 +380,10 @@ export class EmailService {
 
     // Use MailerService (SMTP) to send the email
     try {
-      this.logger.log(`Sending invitation email to ${to} via SMTP`, 'EmailService');
+      this.logger.log(
+        `Sending invitation email to ${to} via SMTP`,
+        'EmailService',
+      );
 
       const result = await this.mailerService.sendMail({
         to: to,
@@ -320,20 +392,29 @@ export class EmailService {
       });
 
       if (result) {
-        this.logger.log(`Invitation email sent successfully to ${to}`, 'EmailService');
+        this.logger.log(
+          `Invitation email sent successfully to ${to}`,
+          'EmailService',
+        );
         return true;
       } else {
-        this.logger.error(`Failed to send invitation email to ${to}`, 'EmailService');
+        this.logger.error(
+          `Failed to send invitation email to ${to}`,
+          'EmailService',
+        );
         return false;
       }
     } catch (error) {
-      this.logger.error(`Failed to send invitation email: ${error.message}`, 'EmailService');
+      this.logger.error(
+        `Failed to send invitation email: ${error.message}`,
+        'EmailService',
+      );
       // Log invitation details for manual handling
-      this.logger.log(`Invitation email (fallback): To: ${to}, Link: ${inviteLink}`, 'EmailService');
+      this.logger.log(
+        `Invitation email (fallback): To: ${to}, Link: ${inviteLink}`,
+        'EmailService',
+      );
       return false;
     }
   }
 }
-
-
-

@@ -39,7 +39,7 @@ export class EmailService {
     storeId: string,
     emailAddress: string,
     customerId?: string,
-    source: string = 'order',
+    source = 'order',
     sourceOrderId?: string,
   ): Promise<EmailDocument> {
     const normalizedEmail = this.normalizeEmail(emailAddress);
@@ -88,11 +88,15 @@ export class EmailService {
       marketingOptIn: true,
       transactionalOptIn: true,
       isVerified: false,
-      ownerHistory: customerId ? [{
-        customerId: new Types.ObjectId(customerId),
-        assignedAt: new Date(),
-        source,
-      }] : [],
+      ownerHistory: customerId
+        ? [
+            {
+              customerId: new Types.ObjectId(customerId),
+              assignedAt: new Date(),
+              source,
+            },
+          ]
+        : [],
     });
 
     // Update customer's primary email if not set
@@ -106,7 +110,10 @@ export class EmailService {
   /**
    * Update customer's primary email if not set
    */
-  private async updateCustomerPrimaryEmail(customerId: string, email: string): Promise<void> {
+  private async updateCustomerPrimaryEmail(
+    customerId: string,
+    email: string,
+  ): Promise<void> {
     await this.customerModel.updateOne(
       { _id: new Types.ObjectId(customerId), email: { $in: [null, ''] } },
       { email },
@@ -117,10 +124,12 @@ export class EmailService {
    * Get emails for a customer
    */
   async getCustomerEmails(customerId: string): Promise<EmailDocument[]> {
-    return this.emailModel.find({
-      customerId: new Types.ObjectId(customerId),
-      isDeleted: false,
-    }).sort({ isVerified: -1, createdAt: 1 });
+    return this.emailModel
+      .find({
+        customerId: new Types.ObjectId(customerId),
+        isDeleted: false,
+      })
+      .sort({ isVerified: -1, createdAt: 1 });
   }
 
   /**
@@ -142,7 +151,8 @@ export class EmailService {
     };
 
     if (options.verified !== undefined) filter.isVerified = options.verified;
-    if (options.marketingOptIn !== undefined) filter.marketingOptIn = options.marketingOptIn;
+    if (options.marketingOptIn !== undefined)
+      filter.marketingOptIn = options.marketingOptIn;
     if (options.status) filter.status = options.status;
 
     const page = options.page || 1;
@@ -165,13 +175,15 @@ export class EmailService {
    * Get emails ready for marketing campaign
    */
   async getCampaignEmails(storeId: string): Promise<EmailDocument[]> {
-    return this.emailModel.find({
-      storeId: new Types.ObjectId(storeId),
-      status: EmailStatus.ACTIVE,
-      marketingOptIn: true,
-      isVerified: true,
-      isDeleted: false,
-    }).populate('customerId', 'firstName lastName phone');
+    return this.emailModel
+      .find({
+        storeId: new Types.ObjectId(storeId),
+        status: EmailStatus.ACTIVE,
+        marketingOptIn: true,
+        isVerified: true,
+        isDeleted: false,
+      })
+      .populate('customerId', 'firstName lastName phone');
   }
 
   /**
@@ -356,7 +368,10 @@ export class EmailService {
   /**
    * Find customer by email address
    */
-  async findCustomerByEmail(storeId: string, emailAddress: string): Promise<CustomerDocument | null> {
+  async findCustomerByEmail(
+    storeId: string,
+    emailAddress: string,
+  ): Promise<CustomerDocument | null> {
     const normalizedEmail = this.normalizeEmail(emailAddress);
     if (!normalizedEmail) return null;
 
@@ -404,21 +419,36 @@ export class EmailService {
       this.emailModel.countDocuments({ ...baseFilter, isVerified: false }),
       this.emailModel.countDocuments({ ...baseFilter, marketingOptIn: true }),
       this.emailModel.countDocuments({ ...baseFilter, marketingOptIn: false }),
-      this.emailModel.countDocuments({ ...baseFilter, status: EmailStatus.BLOCKED }),
-      this.emailModel.countDocuments({ ...baseFilter, status: EmailStatus.INVALID }),
-      this.emailModel.countDocuments({ ...baseFilter, status: EmailStatus.UNSUBSCRIBED }),
+      this.emailModel.countDocuments({
+        ...baseFilter,
+        status: EmailStatus.BLOCKED,
+      }),
+      this.emailModel.countDocuments({
+        ...baseFilter,
+        status: EmailStatus.INVALID,
+      }),
+      this.emailModel.countDocuments({
+        ...baseFilter,
+        status: EmailStatus.UNSUBSCRIBED,
+      }),
     ]);
 
-    return { total, verified, unverified, marketingOptIn, marketingOptOut, blocked, invalid, unsubscribed };
+    return {
+      total,
+      verified,
+      unverified,
+      marketingOptIn,
+      marketingOptOut,
+      blocked,
+      invalid,
+      unsubscribed,
+    };
   }
 
   /**
    * Delete email (soft delete)
    */
   async delete(emailId: string): Promise<void> {
-    await this.emailModel.updateOne(
-      { _id: emailId },
-      { isDeleted: true },
-    );
+    await this.emailModel.updateOne({ _id: emailId }, { isDeleted: true });
   }
 }

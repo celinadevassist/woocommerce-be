@@ -93,7 +93,11 @@ export class AuditLog extends Document {
   @Prop()
   resourceName?: string; // Human-readable name for display
 
-  @Prop({ type: String, enum: Object.values(AuditSeverity), default: AuditSeverity.INFO })
+  @Prop({
+    type: String,
+    enum: Object.values(AuditSeverity),
+    default: AuditSeverity.INFO,
+  })
   severity: AuditSeverity;
 
   @Prop({ required: true })
@@ -129,4 +133,7 @@ AuditLogSchema.index({ userId: 1, createdAt: -1 });
 AuditLogSchema.index({ resourceType: 1, resourceId: 1 });
 
 // TTL index to auto-delete old logs (90 days)
-AuditLogSchema.index({ createdAt: 1 }, { expireAfterSeconds: 90 * 24 * 60 * 60 });
+AuditLogSchema.index(
+  { createdAt: 1 },
+  { expireAfterSeconds: 90 * 24 * 60 * 60 },
+);

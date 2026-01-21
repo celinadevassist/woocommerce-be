@@ -25,7 +25,8 @@ export class PluginsController {
         id: 'cartflow-bridge',
         name: 'CartFlow Bridge',
         version: '1.0.0',
-        description: 'REST API bridge for CartFlow to manage WordPress & WooCommerce settings that lack native API support',
+        description:
+          'REST API bridge for CartFlow to manage WordPress & WooCommerce settings that lack native API support',
         features: [
           'Manage Site Title, Tagline, Admin Email',
           'Configure Timezone, Date/Time Format',
@@ -65,7 +66,10 @@ export class PluginsController {
     if (fs.existsSync(zipPath)) {
       // Serve the pre-built ZIP file
       res.setHeader('Content-Type', 'application/zip');
-      res.setHeader('Content-Disposition', `attachment; filename="${pluginId}.zip"`);
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${pluginId}.zip"`,
+      );
 
       const fileStream = fs.createReadStream(zipPath);
       fileStream.pipe(res);
@@ -81,7 +85,10 @@ export class PluginsController {
 
     // Set response headers for ZIP download
     res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${pluginId}.zip"`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${pluginId}.zip"`,
+    );
 
     // Create ZIP archive
     const archive = archiver('zip', { zlib: { level: 9 } });
@@ -109,7 +116,8 @@ export class PluginsController {
         id: 'cartflow-bridge',
         name: 'CartFlow Bridge',
         version: '1.0.0',
-        description: 'REST API bridge for CartFlow to manage WordPress & WooCommerce settings',
+        description:
+          'REST API bridge for CartFlow to manage WordPress & WooCommerce settings',
         author: 'CartFlow',
         license: 'GPL v2 or later',
         endpoints: [
@@ -117,7 +125,8 @@ export class PluginsController {
             category: 'General Settings',
             methods: ['GET', 'POST'],
             path: '/wp-json/cartflow/v1/settings/general',
-            description: 'Site title, tagline, admin email, timezone, date/time format',
+            description:
+              'Site title, tagline, admin email, timezone, date/time format',
           },
           {
             category: 'Reading Settings',
@@ -141,7 +150,8 @@ export class PluginsController {
             category: 'WooCommerce Settings',
             methods: ['GET', 'POST'],
             path: '/wp-json/cartflow/v1/settings/woocommerce',
-            description: 'Store address, currency, tax, inventory, checkout, shipping',
+            description:
+              'Store address, currency, tax, inventory, checkout, shipping',
           },
           {
             category: 'Custom Options',
@@ -169,7 +179,8 @@ export class PluginsController {
           'Activate the plugin',
           'Go to CartFlow Bridge in the admin menu to see available endpoints',
         ],
-        authentication: 'Uses WooCommerce API credentials (consumer_key & consumer_secret)',
+        authentication:
+          'Uses WooCommerce API credentials (consumer_key & consumer_secret)',
       },
     };
 

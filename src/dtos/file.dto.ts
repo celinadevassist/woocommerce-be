@@ -8,7 +8,7 @@ export class FileBase64UploadDto {
 
 export const FileBase64UploadSchema = Joi.object().keys({
   file: Joi.string().regex(/^(.+)$/),
-})
+});
 
 // tslint:disable-next-line: max-classes-per-file
 export class FileBinaryUploadDto {

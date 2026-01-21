@@ -44,7 +44,10 @@ export class CreateSKUDto {
   @ApiPropertyOptional({ enum: SKUStatus, description: 'SKU status' })
   status?: SKUStatus;
 
-  @ApiPropertyOptional({ type: [BOMMaterialDto], description: 'Bill of Materials' })
+  @ApiPropertyOptional({
+    type: [BOMMaterialDto],
+    description: 'Bill of Materials',
+  })
   materials?: BOMMaterialDto[];
 
   @ApiPropertyOptional({ description: 'Labor cost per unit' })
@@ -56,7 +59,9 @@ export class CreateSKUDto {
   @ApiPropertyOptional({ description: 'Use fixed cost instead of calculated' })
   fixedCost?: boolean;
 
-  @ApiPropertyOptional({ description: 'Fixed cost value (when fixedCost=true)' })
+  @ApiPropertyOptional({
+    description: 'Fixed cost value (when fixedCost=true)',
+  })
   cost?: number;
 
   @ApiPropertyOptional({ description: 'Suggested selling price' })
@@ -81,7 +86,10 @@ export const CreateSKUSchema = Joi.object({
   description: Joi.string().optional().allow(''),
   specs: Joi.object().optional(),
   category: Joi.string().optional().allow(''),
-  status: Joi.string().valid(...Object.values(SKUStatus)).optional().default(SKUStatus.DRAFT),
+  status: Joi.string()
+    .valid(...Object.values(SKUStatus))
+    .optional()
+    .default(SKUStatus.DRAFT),
   materials: Joi.array().items(BOMMaterialSchema).optional().default([]),
   laborCost: Joi.number().min(0).optional().default(0),
   overheadCost: Joi.number().min(0).optional().default(0),
@@ -111,7 +119,10 @@ export class UpdateSKUDto {
   @ApiPropertyOptional({ enum: SKUStatus, description: 'SKU status' })
   status?: SKUStatus;
 
-  @ApiPropertyOptional({ type: [BOMMaterialDto], description: 'Bill of Materials' })
+  @ApiPropertyOptional({
+    type: [BOMMaterialDto],
+    description: 'Bill of Materials',
+  })
   materials?: BOMMaterialDto[];
 
   @ApiPropertyOptional({ description: 'Labor cost per unit' })
@@ -123,7 +134,9 @@ export class UpdateSKUDto {
   @ApiPropertyOptional({ description: 'Use fixed cost instead of calculated' })
   fixedCost?: boolean;
 
-  @ApiPropertyOptional({ description: 'Fixed cost value (when fixedCost=true)' })
+  @ApiPropertyOptional({
+    description: 'Fixed cost value (when fixedCost=true)',
+  })
   cost?: number;
 
   @ApiPropertyOptional({ description: 'Suggested selling price' })
@@ -147,7 +160,9 @@ export const UpdateSKUSchema = Joi.object({
   description: Joi.string().optional().allow(''),
   specs: Joi.object().optional(),
   category: Joi.string().optional().allow(''),
-  status: Joi.string().valid(...Object.values(SKUStatus)).optional(),
+  status: Joi.string()
+    .valid(...Object.values(SKUStatus))
+    .optional(),
   materials: Joi.array().items(BOMMaterialSchema).optional(),
   laborCost: Joi.number().min(0).optional(),
   overheadCost: Joi.number().min(0).optional(),
@@ -190,10 +205,15 @@ export class QuerySKUDto {
 export const QuerySKUSchema = Joi.object({
   storeId: Joi.string().optional(),
   category: Joi.string().optional(),
-  status: Joi.string().valid(...Object.values(SKUStatus)).optional(),
+  status: Joi.string()
+    .valid(...Object.values(SKUStatus))
+    .optional(),
   keyword: Joi.string().optional(),
   page: Joi.number().min(1).optional().default(1),
   size: Joi.number().min(1).max(100).optional().default(20),
-  sortBy: Joi.string().valid('title', 'sku', 'calculatedCost', 'sellingPrice', 'createdAt').optional().default('title'),
+  sortBy: Joi.string()
+    .valid('title', 'sku', 'calculatedCost', 'sellingPrice', 'createdAt')
+    .optional()
+    .default('title'),
   sortOrder: Joi.string().valid('asc', 'desc').optional().default('asc'),
 });

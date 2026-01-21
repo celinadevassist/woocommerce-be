@@ -11,7 +11,13 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { InventorySKUsService } from './service';
 import {
   CreateSKUDto,
@@ -36,8 +42,16 @@ export class InventorySKUsController {
   @Get()
   @ApiOperation({ summary: 'Get all SKUs for a store' })
   @ApiQuery({ name: 'storeId', required: true, description: 'Store ID' })
-  @ApiQuery({ name: 'category', required: false, description: 'Filter by category' })
-  @ApiQuery({ name: 'status', required: false, description: 'Filter by status' })
+  @ApiQuery({
+    name: 'category',
+    required: false,
+    description: 'Filter by category',
+  })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Filter by status',
+  })
   @ApiQuery({ name: 'keyword', required: false, description: 'Search keyword' })
   @ApiQuery({ name: 'page', required: false, description: 'Page number' })
   @ApiQuery({ name: 'size', required: false, description: 'Page size' })
@@ -61,7 +75,10 @@ export class InventorySKUsController {
   @Get('categories')
   @ApiOperation({ summary: 'Get unique SKU categories' })
   @ApiQuery({ name: 'storeId', required: true, description: 'Store ID' })
-  async getCategories(@User('_id') userId: string, @Query('storeId') storeId: string) {
+  async getCategories(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+  ) {
     return this.skusService.getCategories(userId, storeId);
   }
 

@@ -1,4 +1,8 @@
-import { ReviewRequestStatus, ReviewRequestChannel, ReviewRequestTrigger } from './enum';
+import {
+  ReviewRequestStatus,
+  ReviewRequestChannel,
+  ReviewRequestTrigger,
+} from './enum';
 
 export interface IReviewRequestItem {
   productId?: string;

@@ -1,7 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { AuditLog, AuditLogDocument, AuditAction, AuditSeverity } from './schema';
+import {
+  AuditLog,
+  AuditLogDocument,
+  AuditAction,
+  AuditSeverity,
+} from './schema';
 
 export interface CreateAuditLogDto {
   storeId?: string;
@@ -47,12 +52,8 @@ export class AuditLogService {
   async log(data: CreateAuditLogDto): Promise<AuditLogDocument> {
     try {
       const auditLog = await this.auditLogModel.create({
-        storeId: data.storeId
-          ? new Types.ObjectId(data.storeId)
-          : undefined,
-        userId: data.userId
-          ? new Types.ObjectId(data.userId)
-          : undefined,
+        storeId: data.storeId ? new Types.ObjectId(data.storeId) : undefined,
+        userId: data.userId ? new Types.ObjectId(data.userId) : undefined,
         action: data.action,
         resourceType: data.resourceType,
         resourceId: data.resourceId
@@ -70,7 +71,10 @@ export class AuditLogService {
 
       return auditLog;
     } catch (error) {
-      this.logger.error(`Failed to create audit log: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create audit log: ${error.message}`,
+        error.stack,
+      );
       // Don't throw - audit logging should not break the main flow
       return null;
     }
@@ -169,10 +173,7 @@ export class AuditLogService {
   /**
    * Get audit logs for a user
    */
-  async getUserAuditLogs(
-    userId: string,
-    options?: Partial<AuditLogQueryDto>,
-  ) {
+  async getUserAuditLogs(userId: string, options?: Partial<AuditLogQueryDto>) {
     return this.getAuditLogs({
       ...options,
       userId,
@@ -184,7 +185,7 @@ export class AuditLogService {
    */
   async getRecentActivity(
     storeId: string,
-    limit: number = 10,
+    limit = 10,
   ): Promise<AuditLogDocument[]> {
     return this.auditLogModel
       .find({ storeId: new Types.ObjectId(storeId) })
@@ -198,7 +199,7 @@ export class AuditLogService {
    */
   async getActivitySummary(
     storeId: string,
-    days: number = 30,
+    days = 30,
   ): Promise<{
     totalActions: number;
     actionBreakdown: Record<string, number>;
@@ -377,14 +378,23 @@ export class AuditLogService {
       resourceId: params.productId,
       resourceName: params.productName,
       description: `Updated product: ${params.productName}`,
-      metadata: params.changes ? { changes: Object.keys(params.changes) } : undefined,
+      metadata: params.changes
+        ? { changes: Object.keys(params.changes) }
+        : undefined,
     });
   }
 
   async logSync(params: {
     storeId: string;
     userId?: string;
-    resourceType: 'product' | 'order' | 'customer' | 'category' | 'attribute' | 'tag' | 'review';
+    resourceType:
+      | 'product'
+      | 'order'
+      | 'customer'
+      | 'category'
+      | 'attribute'
+      | 'tag'
+      | 'review';
     count: number;
     created?: number;
     updated?: number;

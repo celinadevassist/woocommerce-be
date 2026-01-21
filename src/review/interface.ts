@@ -1,4 +1,9 @@
-import { ReviewStatus, ReviewSource, ReviewType, ModerationStatus } from './enum';
+import {
+  ReviewStatus,
+  ReviewSource,
+  ReviewType,
+  ModerationStatus,
+} from './enum';
 
 export interface IReviewPhoto {
   _id?: string;

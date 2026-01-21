@@ -3,9 +3,17 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { PassportModule } from '@nestjs/passport';
 import { InventoryController } from './controller';
 import { InventoryService } from './service';
-import { InventoryLog, InventoryLogSchema, StockAlert, StockAlertSchema } from './schema';
+import {
+  InventoryLog,
+  InventoryLogSchema,
+  StockAlert,
+  StockAlertSchema,
+} from './schema';
 import { Product, ProductSchema } from '../product/schema';
-import { ProductVariant, ProductVariantSchema } from '../product/variant.schema';
+import {
+  ProductVariant,
+  ProductVariantSchema,
+} from '../product/variant.schema';
 import { Store, StoreSchema } from '../store/schema';
 
 @Module({

@@ -1,6 +1,7 @@
 import * as mongoose from 'mongoose';
 
-const schema = new mongoose.Schema({
+const schema = new mongoose.Schema(
+  {
     type: { type: String }, //profile - store
 
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'user' },
@@ -10,9 +11,11 @@ const schema = new mongoose.Schema({
 
     createdAt: { type: Date, default: () => new Date() },
     updatedAt: { type: Date, default: () => new Date() },
-}, {
+  },
+  {
     versionKey: false,
     collection: 'image',
-});
+  },
+);
 
 export const ImageMongoSchema = schema;

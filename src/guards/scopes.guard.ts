@@ -12,11 +12,14 @@ export class ScopesGuard implements CanActivate {
     }
     const request = context.switchToHttp().getRequest();
     const user = request.user;
-    const hasScope = () => scopes.some((scope) => {
-      return user.scopes.includes(`*:*`) ||
-      user.scopes.includes(`${scope.split(':')[0]}:*`) ||
-      user.scopes.includes(scope);
-    });
+    const hasScope = () =>
+      scopes.some((scope) => {
+        return (
+          user.scopes.includes(`*:*`) ||
+          user.scopes.includes(`${scope.split(':')[0]}:*`) ||
+          user.scopes.includes(scope)
+        );
+      });
     return user && user.scopes && hasScope();
   }
 }

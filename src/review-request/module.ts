@@ -3,7 +3,10 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { PassportModule } from '@nestjs/passport';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ReviewRequest, ReviewRequestSchema } from './schema';
-import { ReviewRequestSettings, ReviewRequestSettingsSchema } from './settings.schema';
+import {
+  ReviewRequestSettings,
+  ReviewRequestSettingsSchema,
+} from './settings.schema';
 import { ReviewRequestController } from './controller';
 import { PublicReviewRequestController } from './public.controller';
 import { ReviewRequestService } from './service';

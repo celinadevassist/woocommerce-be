@@ -1,6 +1,23 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, UsePipes } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Delete,
+  Body,
+  Param,
+  Query,
+  UseGuards,
+  UsePipes,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { User } from '../decorators/user.decorator';
 import { UserDocument } from '../schema/user.schema';
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
@@ -26,7 +43,9 @@ import {
 @UseGuards(AuthGuard('jwt'))
 @Controller(':lang/location-library')
 export class LocationLibraryController {
-  constructor(private readonly locationLibraryService: LocationLibraryService) {}
+  constructor(
+    private readonly locationLibraryService: LocationLibraryService,
+  ) {}
 
   // ============== COUNTRIES SUMMARY ==============
 
@@ -45,39 +64,72 @@ export class LocationLibraryController {
   @ApiResponse({ status: 200, description: 'Groups retrieved' })
   @ApiQuery({ name: 'countryCode', required: false })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
-  async getGroups(@User() user: UserDocument, @Query('countryCode') countryCode?: string) {
-    return this.locationLibraryService.getGroups(user._id.toString(), countryCode);
+  async getGroups(
+    @User() user: UserDocument,
+    @Query('countryCode') countryCode?: string,
+  ) {
+    return this.locationLibraryService.getGroups(
+      user._id.toString(),
+      countryCode,
+    );
   }
 
   @Get('groups/:groupId')
   @ApiOperation({ summary: 'Get a single state group' })
   @ApiResponse({ status: 200, description: 'Group retrieved' })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
-  async getGroup(@User() user: UserDocument, @Param('groupId') groupId: string) {
+  async getGroup(
+    @User() user: UserDocument,
+    @Param('groupId') groupId: string,
+  ) {
     return this.locationLibraryService.getGroup(user._id.toString(), groupId);
   }
 
   @Post('groups')
   @ApiOperation({ summary: 'Create a state group' })
   @ApiResponse({ status: 201, description: 'Group created' })
-  @UsePipes(new JoiValidationPipe({ body: CreateStateGroupSchema, param: { lang: LanguageSchema } }))
-  async createGroup(@User() user: UserDocument, @Body() dto: CreateStateGroupDto) {
+  @UsePipes(
+    new JoiValidationPipe({
+      body: CreateStateGroupSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async createGroup(
+    @User() user: UserDocument,
+    @Body() dto: CreateStateGroupDto,
+  ) {
     return this.locationLibraryService.createGroup(user._id.toString(), dto);
   }
 
   @Put('groups/:groupId')
   @ApiOperation({ summary: 'Update a state group' })
   @ApiResponse({ status: 200, description: 'Group updated' })
-  @UsePipes(new JoiValidationPipe({ body: UpdateStateGroupSchema, param: { lang: LanguageSchema } }))
-  async updateGroup(@User() user: UserDocument, @Param('groupId') groupId: string, @Body() dto: UpdateStateGroupDto) {
-    return this.locationLibraryService.updateGroup(user._id.toString(), groupId, dto);
+  @UsePipes(
+    new JoiValidationPipe({
+      body: UpdateStateGroupSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async updateGroup(
+    @User() user: UserDocument,
+    @Param('groupId') groupId: string,
+    @Body() dto: UpdateStateGroupDto,
+  ) {
+    return this.locationLibraryService.updateGroup(
+      user._id.toString(),
+      groupId,
+      dto,
+    );
   }
 
   @Delete('groups/:groupId')
   @ApiOperation({ summary: 'Delete a state group' })
   @ApiResponse({ status: 200, description: 'Group deleted' })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
-  async deleteGroup(@User() user: UserDocument, @Param('groupId') groupId: string) {
+  async deleteGroup(
+    @User() user: UserDocument,
+    @Param('groupId') groupId: string,
+  ) {
     await this.locationLibraryService.deleteGroup(user._id.toString(), groupId);
     return { success: true, message: 'Group deleted' };
   }
@@ -95,38 +147,69 @@ export class LocationLibraryController {
     @Query('countryCode') countryCode?: string,
     @Query('groupId') groupId?: string,
   ) {
-    return this.locationLibraryService.getStates(user._id.toString(), countryCode, groupId);
+    return this.locationLibraryService.getStates(
+      user._id.toString(),
+      countryCode,
+      groupId,
+    );
   }
 
   @Get('states/:stateId')
   @ApiOperation({ summary: 'Get a single local state' })
   @ApiResponse({ status: 200, description: 'State retrieved' })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
-  async getState(@User() user: UserDocument, @Param('stateId') stateId: string) {
+  async getState(
+    @User() user: UserDocument,
+    @Param('stateId') stateId: string,
+  ) {
     return this.locationLibraryService.getState(user._id.toString(), stateId);
   }
 
   @Post('states')
   @ApiOperation({ summary: 'Create a local state' })
   @ApiResponse({ status: 201, description: 'State created' })
-  @UsePipes(new JoiValidationPipe({ body: CreateLocalStateSchema, param: { lang: LanguageSchema } }))
-  async createState(@User() user: UserDocument, @Body() dto: CreateLocalStateDto) {
+  @UsePipes(
+    new JoiValidationPipe({
+      body: CreateLocalStateSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async createState(
+    @User() user: UserDocument,
+    @Body() dto: CreateLocalStateDto,
+  ) {
     return this.locationLibraryService.createState(user._id.toString(), dto);
   }
 
   @Put('states/:stateId')
   @ApiOperation({ summary: 'Update a local state' })
   @ApiResponse({ status: 200, description: 'State updated' })
-  @UsePipes(new JoiValidationPipe({ body: UpdateLocalStateSchema, param: { lang: LanguageSchema } }))
-  async updateState(@User() user: UserDocument, @Param('stateId') stateId: string, @Body() dto: UpdateLocalStateDto) {
-    return this.locationLibraryService.updateState(user._id.toString(), stateId, dto);
+  @UsePipes(
+    new JoiValidationPipe({
+      body: UpdateLocalStateSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async updateState(
+    @User() user: UserDocument,
+    @Param('stateId') stateId: string,
+    @Body() dto: UpdateLocalStateDto,
+  ) {
+    return this.locationLibraryService.updateState(
+      user._id.toString(),
+      stateId,
+      dto,
+    );
   }
 
   @Delete('states/:stateId')
   @ApiOperation({ summary: 'Delete a local state' })
   @ApiResponse({ status: 200, description: 'State deleted' })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
-  async deleteState(@User() user: UserDocument, @Param('stateId') stateId: string) {
+  async deleteState(
+    @User() user: UserDocument,
+    @Param('stateId') stateId: string,
+  ) {
     await this.locationLibraryService.deleteState(user._id.toString(), stateId);
     return { success: true, message: 'State deleted' };
   }
@@ -134,9 +217,20 @@ export class LocationLibraryController {
   @Post('states/bulk')
   @ApiOperation({ summary: 'Bulk create/update local states' })
   @ApiResponse({ status: 201, description: 'States created/updated' })
-  @UsePipes(new JoiValidationPipe({ body: BulkCreateLocalStatesSchema, param: { lang: LanguageSchema } }))
-  async bulkCreateStates(@User() user: UserDocument, @Body() dto: BulkCreateLocalStatesDto) {
-    return this.locationLibraryService.bulkCreateStates(user._id.toString(), dto);
+  @UsePipes(
+    new JoiValidationPipe({
+      body: BulkCreateLocalStatesSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async bulkCreateStates(
+    @User() user: UserDocument,
+    @Body() dto: BulkCreateLocalStatesDto,
+  ) {
+    return this.locationLibraryService.bulkCreateStates(
+      user._id.toString(),
+      dto,
+    );
   }
 
   // ============== SYNC OPERATIONS ==============
@@ -144,9 +238,19 @@ export class LocationLibraryController {
   @Post('sync-to-store')
   @ApiOperation({ summary: 'Sync local states to a store' })
   @ApiResponse({ status: 200, description: 'States synced to store' })
-  @UsePipes(new JoiValidationPipe({ body: SyncToStoreSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: SyncToStoreSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async syncToStore(@User() user: UserDocument, @Body() dto: SyncToStoreDto) {
-    return this.locationLibraryService.syncToStore(user._id.toString(), dto.storeId, dto.countryCode, dto.stateIds);
+    return this.locationLibraryService.syncToStore(
+      user._id.toString(),
+      dto.storeId,
+      dto.countryCode,
+      dto.stateIds,
+    );
   }
 
   @Post('import-from-store')
@@ -160,6 +264,10 @@ export class LocationLibraryController {
     @Query('storeId') storeId: string,
     @Query('countryCode') countryCode: string,
   ) {
-    return this.locationLibraryService.importFromWooCommerce(user._id.toString(), storeId, countryCode);
+    return this.locationLibraryService.importFromWooCommerce(
+      user._id.toString(),
+      storeId,
+      countryCode,
+    );
   }
 }

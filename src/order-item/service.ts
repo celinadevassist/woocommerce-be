@@ -24,7 +24,8 @@ export class OrderItemService {
   private readonly logger = new Logger(OrderItemService.name);
 
   constructor(
-    @InjectModel(OrderItem.name) private orderItemModel: Model<OrderItemDocument>,
+    @InjectModel(OrderItem.name)
+    private orderItemModel: Model<OrderItemDocument>,
     @InjectModel(Order.name) private orderModel: Model<OrderDocument>,
     @InjectModel(ProductUnit.name) private productUnitModel: Model<ProductUnit>,
   ) {}
@@ -70,8 +71,8 @@ export class OrderItemService {
   private calculateItemTotals(
     quantity: number,
     unitPrice: number,
-    discountAmount: number = 0,
-    taxAmount: number = 0,
+    discountAmount = 0,
+    taxAmount = 0,
   ): { subtotal: number; total: number } {
     const subtotal = quantity * unitPrice;
     const total = subtotal - discountAmount + taxAmount;
@@ -82,10 +83,12 @@ export class OrderItemService {
    * Get order items for an order
    */
   async getOrderItems(orderId: string): Promise<IOrderItem[]> {
-    const items = await this.orderItemModel.find({
-      orderId: new Types.ObjectId(orderId),
-      isDeleted: false,
-    }).sort({ createdAt: 1 });
+    const items = await this.orderItemModel
+      .find({
+        orderId: new Types.ObjectId(orderId),
+        isDeleted: false,
+      })
+      .sort({ createdAt: 1 });
 
     return items.map((item) => this.toInterface(item));
   }
@@ -178,8 +181,12 @@ export class OrderItemService {
       const item = new this.orderItemModel({
         storeId: new Types.ObjectId(dto.storeId),
         orderId: new Types.ObjectId(dto.orderId),
-        productId: itemData.productId ? new Types.ObjectId(itemData.productId) : undefined,
-        variantId: itemData.variantId ? new Types.ObjectId(itemData.variantId) : undefined,
+        productId: itemData.productId
+          ? new Types.ObjectId(itemData.productId)
+          : undefined,
+        variantId: itemData.variantId
+          ? new Types.ObjectId(itemData.variantId)
+          : undefined,
         skuId: itemData.skuId ? new Types.ObjectId(itemData.skuId) : undefined,
         sku: itemData.sku,
         name: itemData.name,
@@ -233,7 +240,8 @@ export class OrderItemService {
     if (dto.name !== undefined) item.name = dto.name;
     if (dto.quantity !== undefined) item.quantity = dto.quantity;
     if (dto.unitPrice !== undefined) item.unitPrice = dto.unitPrice;
-    if (dto.discountAmount !== undefined) item.discountAmount = dto.discountAmount;
+    if (dto.discountAmount !== undefined)
+      item.discountAmount = dto.discountAmount;
     if (dto.taxAmount !== undefined) item.taxAmount = dto.taxAmount;
     if (dto.attributes !== undefined) item.attributes = dto.attributes;
     if (dto.notes !== undefined) item.notes = dto.notes;
@@ -272,7 +280,9 @@ export class OrderItemService {
 
     // Cannot remove fulfilled items
     if (item.stockStatus === OrderItemStockStatus.FULFILLED) {
-      throw new BadRequestException('Cannot remove fulfilled items. Use return instead.');
+      throw new BadRequestException(
+        'Cannot remove fulfilled items. Use return instead.',
+      );
     }
 
     item.isDeleted = true;
@@ -289,7 +299,10 @@ export class OrderItemService {
    * Fulfill all items for an order (when order is confirmed)
    * Gets available units FIFO and marks them as SOLD
    */
-  async fulfillOrderItems(orderId: string, orderNumber: string): Promise<{
+  async fulfillOrderItems(
+    orderId: string,
+    orderNumber: string,
+  ): Promise<{
     fulfilledItems: number;
     totalUnitsAssigned: number;
     warnings: string[];
@@ -445,7 +458,9 @@ export class OrderItemService {
 
       await item.save();
 
-      this.logger.log(`Returned ${unitsToReturn.length} units for item ${itemId}`);
+      this.logger.log(
+        `Returned ${unitsToReturn.length} units for item ${itemId}`,
+      );
     }
 
     // Recalculate order totals
@@ -472,7 +487,9 @@ export class OrderItemService {
       },
     );
 
-    this.logger.log(`Cancelled ${result.modifiedCount} items for order ${orderId}`);
+    this.logger.log(
+      `Cancelled ${result.modifiedCount} items for order ${orderId}`,
+    );
     return result.modifiedCount;
   }
 
@@ -622,7 +639,9 @@ export class OrderItemService {
       },
     );
 
-    this.logger.log(`SKU ${sku}: Marked ${availableUnits.length} units as SOLD`);
+    this.logger.log(
+      `SKU ${sku}: Marked ${availableUnits.length} units as SOLD`,
+    );
 
     // Return result
     if (availableUnits.length < quantity) {

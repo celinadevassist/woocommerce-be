@@ -11,7 +11,13 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { JoiValidationPipe } from '../pipes';
 import { User } from '../decorators';
 import { ProductUnitService } from './service';
@@ -58,7 +64,10 @@ export class ProductUnitController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'size', required: false, type: Number })
   @UsePipes(new JoiValidationPipe({ query: QueryProductUnitSchema }))
-  async findAll(@User('_id') userId: string, @Query() query: QueryProductUnitDto) {
+  async findAll(
+    @User('_id') userId: string,
+    @Query() query: QueryProductUnitDto,
+  ) {
     return this.unitService.findAll(query.storeId, userId, query);
   }
 
@@ -81,7 +90,10 @@ export class ProductUnitController {
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'code', description: 'RFID code' })
   @ApiQuery({ name: 'storeId', required: true })
-  async findByRfid(@Param('code') code: string, @Query('storeId') storeId: string) {
+  async findByRfid(
+    @Param('code') code: string,
+    @Query('storeId') storeId: string,
+  ) {
     return this.unitService.findByRfidCode(storeId, code);
   }
 
@@ -114,7 +126,10 @@ export class ProductUnitController {
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'skuId', description: 'SKU ID' })
   @ApiQuery({ name: 'storeId', required: true })
-  async getCounts(@Param('skuId') skuId: string, @Query('storeId') storeId: string) {
+  async getCounts(
+    @Param('skuId') skuId: string,
+    @Query('storeId') storeId: string,
+  ) {
     return this.unitService.getUnitCountsByStatus(storeId, skuId);
   }
 
@@ -131,11 +146,17 @@ export class ProductUnitController {
   // ========================
 
   @Post('generate-rfid')
-  @ApiOperation({ summary: 'Generate RFID codes (for preview before batch completion)' })
+  @ApiOperation({
+    summary: 'Generate RFID codes (for preview before batch completion)',
+  })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @UsePipes(new JoiValidationPipe({ body: GenerateRfidSchema }))
   async generateRfid(@Body() dto: GenerateRfidDto) {
-    return this.unitService.generateBulkRfidCodes(dto.storeId, dto.skuCode, dto.count);
+    return this.unitService.generateBulkRfidCodes(
+      dto.storeId,
+      dto.skuCode,
+      dto.count,
+    );
   }
 
   // ========================
@@ -160,15 +181,24 @@ export class ProductUnitController {
   // ========================
 
   @Post('mark-sold')
-  @ApiOperation({ summary: 'Mark units as sold (internal use by order system)' })
+  @ApiOperation({
+    summary: 'Mark units as sold (internal use by order system)',
+  })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @UsePipes(new JoiValidationPipe({ body: MarkUnitsSoldSchema }))
   async markAsSold(@User('_id') userId: string, @Body() dto: MarkUnitsSoldDto) {
-    return this.unitService.markAsSold(userId, dto.unitIds, dto.orderId, dto.orderNumber);
+    return this.unitService.markAsSold(
+      userId,
+      dto.unitIds,
+      dto.orderId,
+      dto.orderNumber,
+    );
   }
 
   @Post('hold')
-  @ApiOperation({ summary: 'Put units on hold (temporarily unavailable, deducts from stock)' })
+  @ApiOperation({
+    summary: 'Put units on hold (temporarily unavailable, deducts from stock)',
+  })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @UsePipes(new JoiValidationPipe({ body: HoldUnitsSchema }))
   async holdUnits(@User('_id') userId: string, @Body() dto: HoldUnitsDto) {
@@ -184,10 +214,15 @@ export class ProductUnitController {
   }
 
   @Post('damaged')
-  @ApiOperation({ summary: 'Mark units as damaged (permanent, cannot be undone)' })
+  @ApiOperation({
+    summary: 'Mark units as damaged (permanent, cannot be undone)',
+  })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @UsePipes(new JoiValidationPipe({ body: MarkDamagedSchema }))
-  async markAsDamaged(@User('_id') userId: string, @Body() dto: MarkDamagedDto) {
+  async markAsDamaged(
+    @User('_id') userId: string,
+    @Body() dto: MarkDamagedDto,
+  ) {
     return this.unitService.markAsDamaged(userId, dto.unitIds, dto.reason);
   }
 
@@ -203,7 +238,10 @@ export class ProductUnitController {
   @ApiOperation({ summary: 'Get stock summary across all SKUs' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: true })
-  async getStockSummary(@User('_id') userId: string, @Query('storeId') storeId: string) {
+  async getStockSummary(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+  ) {
     return this.unitService.getStockSummary(userId, storeId);
   }
 
@@ -212,7 +250,11 @@ export class ProductUnitController {
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: true })
   @ApiQuery({ name: 'keyword', required: false })
-  @ApiQuery({ name: 'status', required: false, enum: ['all', 'in_stock', 'low_stock', 'out_of_stock'] })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    enum: ['all', 'in_stock', 'low_stock', 'out_of_stock'],
+  })
   @ApiQuery({ name: 'category', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'size', required: false, type: Number })
@@ -225,14 +267,23 @@ export class ProductUnitController {
     @Query('page') page?: number,
     @Query('size') size?: number,
   ) {
-    return this.unitService.getStockList(userId, storeId, { keyword, status, category, page, size });
+    return this.unitService.getStockList(userId, storeId, {
+      keyword,
+      status,
+      category,
+      page,
+      size,
+    });
   }
 
   @Get('stock/low')
   @ApiOperation({ summary: 'Get low stock items' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: true })
-  async getLowStock(@User('_id') userId: string, @Query('storeId') storeId: string) {
+  async getLowStock(
+    @User('_id') userId: string,
+    @Query('storeId') storeId: string,
+  ) {
     return this.unitService.getLowStockItems(userId, storeId);
   }
 

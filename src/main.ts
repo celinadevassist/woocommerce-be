@@ -8,7 +8,7 @@ import { AllExceptionsFilter } from './filters/http-exception.filter';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
-    bodyParser: false // Disable automatic body parsing to handle it manually
+    bodyParser: false, // Disable automatic body parsing to handle it manually
   });
   app.setGlobalPrefix('api');
   developmentConfig(app);

@@ -9,7 +9,13 @@ import {
   UsePipes,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { StoreSettingsService } from './service';
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
 import { User } from '../decorators/user.decorator';
@@ -33,7 +39,10 @@ export class StoreSettingsController {
     @Query('storeId') storeId: string,
     @User() user: UserDocument,
   ) {
-    return await this.storeSettingsService.checkPluginStatus(storeId, user._id.toString());
+    return await this.storeSettingsService.checkPluginStatus(
+      storeId,
+      user._id.toString(),
+    );
   }
 
   // ============== GENERAL SETTINGS ==============
@@ -46,7 +55,10 @@ export class StoreSettingsController {
     @Query('storeId') storeId: string,
     @User() user: UserDocument,
   ) {
-    return await this.storeSettingsService.getGeneralSettings(storeId, user._id.toString());
+    return await this.storeSettingsService.getGeneralSettings(
+      storeId,
+      user._id.toString(),
+    );
   }
 
   @Post('general')
@@ -58,7 +70,11 @@ export class StoreSettingsController {
     @Body() data: Record<string, any>,
     @User() user: UserDocument,
   ) {
-    return await this.storeSettingsService.updateGeneralSettings(storeId, user._id.toString(), data);
+    return await this.storeSettingsService.updateGeneralSettings(
+      storeId,
+      user._id.toString(),
+      data,
+    );
   }
 
   // ============== READING SETTINGS ==============
@@ -71,7 +87,10 @@ export class StoreSettingsController {
     @Query('storeId') storeId: string,
     @User() user: UserDocument,
   ) {
-    return await this.storeSettingsService.getReadingSettings(storeId, user._id.toString());
+    return await this.storeSettingsService.getReadingSettings(
+      storeId,
+      user._id.toString(),
+    );
   }
 
   @Post('reading')
@@ -83,7 +102,11 @@ export class StoreSettingsController {
     @Body() data: Record<string, any>,
     @User() user: UserDocument,
   ) {
-    return await this.storeSettingsService.updateReadingSettings(storeId, user._id.toString(), data);
+    return await this.storeSettingsService.updateReadingSettings(
+      storeId,
+      user._id.toString(),
+      data,
+    );
   }
 
   // ============== WOOCOMMERCE SETTINGS ==============
@@ -96,7 +119,10 @@ export class StoreSettingsController {
     @Query('storeId') storeId: string,
     @User() user: UserDocument,
   ) {
-    return await this.storeSettingsService.getWooCommerceSettings(storeId, user._id.toString());
+    return await this.storeSettingsService.getWooCommerceSettings(
+      storeId,
+      user._id.toString(),
+    );
   }
 
   @Post('woocommerce')
@@ -108,19 +134,28 @@ export class StoreSettingsController {
     @Body() data: Record<string, any>,
     @User() user: UserDocument,
   ) {
-    return await this.storeSettingsService.updateWooCommerceSettings(storeId, user._id.toString(), data);
+    return await this.storeSettingsService.updateWooCommerceSettings(
+      storeId,
+      user._id.toString(),
+      data,
+    );
   }
 
   // ============== SYSTEM INFO ==============
 
   @Get('system')
-  @ApiOperation({ summary: 'Get system info (WordPress, WooCommerce versions)' })
+  @ApiOperation({
+    summary: 'Get system info (WordPress, WooCommerce versions)',
+  })
   @ApiQuery({ name: 'storeId', required: true })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
   async getSystemInfo(
     @Query('storeId') storeId: string,
     @User() user: UserDocument,
   ) {
-    return await this.storeSettingsService.getSystemInfo(storeId, user._id.toString());
+    return await this.storeSettingsService.getSystemInfo(
+      storeId,
+      user._id.toString(),
+    );
   }
 }

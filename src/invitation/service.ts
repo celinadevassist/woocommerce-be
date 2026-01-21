@@ -21,7 +21,8 @@ export class InvitationService {
   private readonly INVITATION_EXPIRY_DAYS = 7;
 
   constructor(
-    @InjectModel(Invitation.name) private invitationModel: Model<InvitationDocument>,
+    @InjectModel(Invitation.name)
+    private invitationModel: Model<InvitationDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     private readonly emailService: EmailService,
@@ -47,7 +48,9 @@ export class InvitationService {
 
     // Check if user can invite (owner or admin)
     if (!this.userCanManage(store, userId)) {
-      throw new ForbiddenException('You do not have permission to invite members');
+      throw new ForbiddenException(
+        'You do not have permission to invite members',
+      );
     }
 
     // Cannot invite as OWNER
@@ -56,7 +59,9 @@ export class InvitationService {
     }
 
     // Check if user is already a member (by email)
-    const existingUser = await this.userModel.findOne({ email: email.toLowerCase() });
+    const existingUser = await this.userModel.findOne({
+      email: email.toLowerCase(),
+    });
     if (existingUser) {
       // Check if already owner
       if (store.ownerId?.toString() === existingUser._id.toString()) {
@@ -79,7 +84,9 @@ export class InvitationService {
     });
 
     if (existingInvitation) {
-      throw new ConflictException('An invitation has already been sent to this email');
+      throw new ConflictException(
+        'An invitation has already been sent to this email',
+      );
     }
 
     // Generate unique token
@@ -101,7 +108,8 @@ export class InvitationService {
     // Get inviter info
     const inviter = await this.userModel.findById(userId);
     const inviterName = inviter
-      ? `${inviter.firstName || ''} ${inviter.lastName || ''}`.trim() || inviter.email
+      ? `${inviter.firstName || ''} ${inviter.lastName || ''}`.trim() ||
+        inviter.email
       : 'A team member';
 
     // Send invitation email
@@ -142,7 +150,9 @@ export class InvitationService {
     }
 
     if (invitation.status !== InvitationStatus.PENDING) {
-      throw new BadRequestException(`Invitation has already been ${invitation.status}`);
+      throw new BadRequestException(
+        `Invitation has already been ${invitation.status}`,
+      );
     }
 
     if (new Date() > invitation.expiresAt) {
@@ -166,7 +176,10 @@ export class InvitationService {
   /**
    * Accept an invitation
    */
-  async acceptInvitation(token: string, userId: string): Promise<{ message: string; storeId: string }> {
+  async acceptInvitation(
+    token: string,
+    userId: string,
+  ): Promise<{ message: string; storeId: string }> {
     const invitation = await this.invitationModel.findOne({ token });
 
     if (!invitation) {
@@ -174,7 +187,9 @@ export class InvitationService {
     }
 
     if (invitation.status !== InvitationStatus.PENDING) {
-      throw new BadRequestException(`Invitation has already been ${invitation.status}`);
+      throw new BadRequestException(
+        `Invitation has already been ${invitation.status}`,
+      );
     }
 
     if (new Date() > invitation.expiresAt) {
@@ -291,7 +306,10 @@ export class InvitationService {
   /**
    * Revoke a pending invitation
    */
-  async revokeInvitation(invitationId: string, userId: string): Promise<{ message: string }> {
+  async revokeInvitation(
+    invitationId: string,
+    userId: string,
+  ): Promise<{ message: string }> {
     const invitation = await this.invitationModel.findById(invitationId);
 
     if (!invitation) {
@@ -308,11 +326,15 @@ export class InvitationService {
     }
 
     if (!this.userCanManage(store, userId)) {
-      throw new ForbiddenException('You do not have permission to revoke invitations');
+      throw new ForbiddenException(
+        'You do not have permission to revoke invitations',
+      );
     }
 
     if (invitation.status !== InvitationStatus.PENDING) {
-      throw new BadRequestException(`Cannot revoke invitation that is ${invitation.status}`);
+      throw new BadRequestException(
+        `Cannot revoke invitation that is ${invitation.status}`,
+      );
     }
 
     invitation.status = InvitationStatus.REVOKED;
@@ -324,7 +346,10 @@ export class InvitationService {
   /**
    * Resend an invitation
    */
-  async resendInvitation(invitationId: string, userId: string): Promise<{ message: string }> {
+  async resendInvitation(
+    invitationId: string,
+    userId: string,
+  ): Promise<{ message: string }> {
     const invitation = await this.invitationModel.findById(invitationId);
 
     if (!invitation) {
@@ -341,11 +366,15 @@ export class InvitationService {
     }
 
     if (!this.userCanManage(store, userId)) {
-      throw new ForbiddenException('You do not have permission to resend invitations');
+      throw new ForbiddenException(
+        'You do not have permission to resend invitations',
+      );
     }
 
     if (invitation.status !== InvitationStatus.PENDING) {
-      throw new BadRequestException(`Cannot resend invitation that is ${invitation.status}`);
+      throw new BadRequestException(
+        `Cannot resend invitation that is ${invitation.status}`,
+      );
     }
 
     // Update expiry
@@ -357,7 +386,8 @@ export class InvitationService {
     // Get inviter info
     const inviter = await this.userModel.findById(userId);
     const inviterName = inviter
-      ? `${inviter.firstName || ''} ${inviter.lastName || ''}`.trim() || inviter.email
+      ? `${inviter.firstName || ''} ${inviter.lastName || ''}`.trim() ||
+        inviter.email
       : 'A team member';
 
     // Resend email
@@ -367,7 +397,9 @@ export class InvitationService {
         inviterName,
         storeName: store.name,
         role: invitation.role,
-        inviteLink: `${this.getFrontendUrl()}/accept-invitation?token=${invitation.token}`,
+        inviteLink: `${this.getFrontendUrl()}/accept-invitation?token=${
+          invitation.token
+        }`,
         expiresAt,
       });
     } catch (error) {

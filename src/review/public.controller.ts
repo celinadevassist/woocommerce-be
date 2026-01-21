@@ -47,15 +47,40 @@ export class PublicReviewController {
 
   @Get()
   @ApiOperation({ summary: 'Get published reviews (public)' })
-  @ApiQuery({ name: 'api_key', required: true, description: 'Store public API key' })
-  @ApiQuery({ name: 'product_id', required: false, description: 'Filter by product ID' })
-  @ApiQuery({ name: 'type', required: false, enum: ReviewType, description: 'Filter by review type' })
-  @ApiQuery({ name: 'featured', required: false, type: Boolean, description: 'Only featured reviews' })
+  @ApiQuery({
+    name: 'api_key',
+    required: true,
+    description: 'Store public API key',
+  })
+  @ApiQuery({
+    name: 'product_id',
+    required: false,
+    description: 'Filter by product ID',
+  })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    enum: ReviewType,
+    description: 'Filter by review type',
+  })
+  @ApiQuery({
+    name: 'featured',
+    required: false,
+    type: Boolean,
+    description: 'Only featured reviews',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'size', required: false, type: Number })
-  @ApiQuery({ name: 'sort_by', required: false, enum: ['createdAt', 'rating', 'helpfulCount'] })
+  @ApiQuery({
+    name: 'sort_by',
+    required: false,
+    enum: ['createdAt', 'rating', 'helpfulCount'],
+  })
   @ApiQuery({ name: 'sort_order', required: false, enum: ['asc', 'desc'] })
-  @ApiResponse({ status: 200, description: 'Returns published reviews with pagination' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns published reviews with pagination',
+  })
   async getReviews(
     @Query('api_key') apiKey: string,
     @Query('product_id') productId?: string,
@@ -66,7 +91,12 @@ export class PublicReviewController {
     @Query('sort_by') sortBy?: 'createdAt' | 'rating' | 'helpfulCount',
     @Query('sort_order') sortOrder?: 'asc' | 'desc',
   ) {
-    this.logger.log(`Public reviews request received with api_key: ${apiKey?.substring(0, 10)}...`);
+    this.logger.log(
+      `Public reviews request received with api_key: ${apiKey?.substring(
+        0,
+        10,
+      )}...`,
+    );
     const storeId = await this.validateApiKey(apiKey);
 
     return this.publicReviewService.getPublishedReviews(storeId, {
@@ -82,8 +112,15 @@ export class PublicReviewController {
 
   @Get('summary')
   @ApiOperation({ summary: 'Get review summary statistics (public)' })
-  @ApiQuery({ name: 'api_key', required: true, description: 'Store public API key' })
-  @ApiResponse({ status: 200, description: 'Returns review summary with counts and averages' })
+  @ApiQuery({
+    name: 'api_key',
+    required: true,
+    description: 'Store public API key',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns review summary with counts and averages',
+  })
   async getSummary(@Query('api_key') apiKey: string) {
     const storeId = await this.validateApiKey(apiKey);
     return this.publicReviewService.getPublicSummary(storeId);
@@ -91,9 +128,21 @@ export class PublicReviewController {
 
   @Get('featured')
   @ApiOperation({ summary: 'Get featured reviews (public)' })
-  @ApiQuery({ name: 'api_key', required: true, description: 'Store public API key' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Max number of reviews (default: 5)' })
-  @ApiResponse({ status: 200, description: 'Returns featured reviews sorted by order' })
+  @ApiQuery({
+    name: 'api_key',
+    required: true,
+    description: 'Store public API key',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Max number of reviews (default: 5)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns featured reviews sorted by order',
+  })
   async getFeaturedReviews(
     @Query('api_key') apiKey: string,
     @Query('limit') limit?: string,
@@ -110,12 +159,13 @@ export class PublicReviewController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get a single review by ID (public)' })
-  @ApiQuery({ name: 'api_key', required: true, description: 'Store public API key' })
+  @ApiQuery({
+    name: 'api_key',
+    required: true,
+    description: 'Store public API key',
+  })
   @ApiResponse({ status: 200, description: 'Returns review details' })
-  async getReview(
-    @Param('id') id: string,
-    @Query('api_key') apiKey: string,
-  ) {
+  async getReview(@Param('id') id: string, @Query('api_key') apiKey: string) {
     const storeId = await this.validateApiKey(apiKey);
 
     // Get the review - it must be published and approved
@@ -126,9 +176,12 @@ export class PublicReviewController {
 
     // Find the specific review by filtering from published reviews
     // Note: For performance, we might want to add a getPublicReviewById method
-    const allReviews = await this.publicReviewService.getPublishedReviews(storeId, {
-      size: 1000, // Fetch more to find the specific one
-    });
+    const allReviews = await this.publicReviewService.getPublishedReviews(
+      storeId,
+      {
+        size: 1000, // Fetch more to find the specific one
+      },
+    );
 
     const review = allReviews.reviews.find((r) => r._id === id);
     if (!review) {
@@ -143,12 +196,13 @@ export class PublicReviewController {
 
   @Post(':id/helpful')
   @ApiOperation({ summary: 'Mark a review as helpful (public)' })
-  @ApiQuery({ name: 'api_key', required: true, description: 'Store public API key' })
+  @ApiQuery({
+    name: 'api_key',
+    required: true,
+    description: 'Store public API key',
+  })
   @ApiResponse({ status: 200, description: 'Helpful count incremented' })
-  async markHelpful(
-    @Param('id') id: string,
-    @Query('api_key') apiKey: string,
-  ) {
+  async markHelpful(@Param('id') id: string, @Query('api_key') apiKey: string) {
     await this.validateApiKey(apiKey);
     await this.publicReviewService.incrementHelpful(id);
     return { success: true, message: 'Marked as helpful' };
@@ -156,10 +210,17 @@ export class PublicReviewController {
 
   @Get('product/:productId')
   @ApiOperation({ summary: 'Get reviews for a specific product (public)' })
-  @ApiQuery({ name: 'api_key', required: true, description: 'Store public API key' })
+  @ApiQuery({
+    name: 'api_key',
+    required: true,
+    description: 'Store public API key',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'size', required: false, type: Number })
-  @ApiResponse({ status: 200, description: 'Returns product reviews with pagination' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns product reviews with pagination',
+  })
   async getProductReviews(
     @Param('productId') productId: string,
     @Query('api_key') apiKey: string,

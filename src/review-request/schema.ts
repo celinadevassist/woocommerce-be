@@ -27,14 +27,25 @@ export class ReviewRequestItem {
   reviewId?: MongooseSchema.Types.ObjectId;
 }
 
-export const ReviewRequestItemSchema = SchemaFactory.createForClass(ReviewRequestItem);
+export const ReviewRequestItemSchema =
+  SchemaFactory.createForClass(ReviewRequestItem);
 
 @Schema({ timestamps: true, versionKey: false, collection: 'review_requests' })
 export class ReviewRequest extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Order', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Order',
+    required: true,
+    index: true,
+  })
   orderId: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true })
@@ -65,7 +76,12 @@ export class ReviewRequest extends Document {
   tokenExpiresAt: Date;
 
   // Status
-  @Prop({ type: String, enum: Object.values(ReviewRequestStatus), default: ReviewRequestStatus.PENDING, index: true })
+  @Prop({
+    type: String,
+    enum: Object.values(ReviewRequestStatus),
+    default: ReviewRequestStatus.PENDING,
+    index: true,
+  })
   status: ReviewRequestStatus;
 
   // Tracking

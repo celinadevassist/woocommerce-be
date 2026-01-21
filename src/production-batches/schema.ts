@@ -5,7 +5,11 @@ import { ProductionBatchStatus, ProductionBatchType } from './enum';
 // Consumed Material subdocument
 @Schema({ _id: false })
 export class ConsumedMaterial {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Material', required: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Material',
+    required: true,
+  })
   materialId: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: Number, required: true })
@@ -24,24 +28,43 @@ export class ConsumedMaterial {
   totalCost: number;
 }
 
-export const ConsumedMaterialSchema = SchemaFactory.createForClass(ConsumedMaterial);
+export const ConsumedMaterialSchema =
+  SchemaFactory.createForClass(ConsumedMaterial);
 
 // Production Batch schema
 @Schema({ timestamps: true, collection: 'production_batches' })
 export class ProductionBatch extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: String, required: true })
   batchNumber: string;
 
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'SKU', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'SKU',
+    required: true,
+    index: true,
+  })
   skuId: MongooseSchema.Types.ObjectId;
 
-  @Prop({ type: String, enum: Object.values(ProductionBatchType), default: ProductionBatchType.STANDARD })
+  @Prop({
+    type: String,
+    enum: Object.values(ProductionBatchType),
+    default: ProductionBatchType.STANDARD,
+  })
   type: ProductionBatchType;
 
-  @Prop({ type: String, enum: Object.values(ProductionBatchStatus), default: ProductionBatchStatus.PLANNED })
+  @Prop({
+    type: String,
+    enum: Object.values(ProductionBatchStatus),
+    default: ProductionBatchStatus.PLANNED,
+  })
   status: ProductionBatchStatus;
 
   @Prop({ type: Number, required: true, min: 1 })
@@ -87,7 +110,8 @@ export class ProductionBatch extends Document {
   isDeleted: boolean;
 }
 
-export const ProductionBatchSchema = SchemaFactory.createForClass(ProductionBatch);
+export const ProductionBatchSchema =
+  SchemaFactory.createForClass(ProductionBatch);
 
 // Compound index for batch number uniqueness per store
 ProductionBatchSchema.index({ storeId: 1, batchNumber: 1 }, { unique: true });

@@ -7,7 +7,7 @@ export class UpdateMetadataDto {
   @ApiProperty({
     description: 'ID of the user this metadata belongs to',
     example: '60d21b4667d0d8992e610c85',
-    required: false
+    required: false,
   })
   @IsMongoId()
   @IsOptional()
@@ -17,7 +17,7 @@ export class UpdateMetadataDto {
     description: 'Module this metadata is for',
     enum: ModuleType,
     example: ModuleType.EMAIL_MARKETING,
-    required: false
+    required: false,
   })
   @IsEnum(ModuleType)
   @IsOptional()
@@ -25,12 +25,12 @@ export class UpdateMetadataDto {
 
   @ApiProperty({
     description: 'Metadata object containing flexible key-value pairs',
-    example: { 
+    example: {
       settings: { theme: 'light', notifications: false },
-      preferences: { language: 'ar', timezone: 'GMT+3' }
+      preferences: { language: 'ar', timezone: 'GMT+3' },
     },
     type: 'object',
-    required: false
+    required: false,
   })
   @IsObject()
   @IsOptional()
@@ -39,6 +39,8 @@ export class UpdateMetadataDto {
 
 export const UpdateMetadataSchema = Joi.object({
   userId: Joi.string().optional(),
-  forModule: Joi.string().valid(...Object.values(ModuleType)).optional(),
+  forModule: Joi.string()
+    .valid(...Object.values(ModuleType))
+    .optional(),
   meta: Joi.object().optional(),
-}); 
+});

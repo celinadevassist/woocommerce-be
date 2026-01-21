@@ -14,10 +14,22 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiParam, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { CustomerService } from './service';
 import { QueryCustomerDto, QueryCustomerSchema } from './dto.query';
-import { UpdateCustomerDto, UpdateCustomerSchema, AddCustomerNoteDto, AddCustomerNoteSchema } from './dto.update';
+import {
+  UpdateCustomerDto,
+  UpdateCustomerSchema,
+  AddCustomerNoteDto,
+  AddCustomerNoteSchema,
+} from './dto.update';
 import {
   CreateSegmentDto,
   CreateSegmentSchema,
@@ -47,7 +59,12 @@ export class CustomerController {
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'size', required: false, type: Number })
-  @UsePipes(new JoiValidationPipe({ query: QueryCustomerSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      query: QueryCustomerSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async findAll(@User('_id') userId: string, @Query() query: QueryCustomerDto) {
     return this.customerService.findAll(userId, query);
   }
@@ -57,7 +74,10 @@ export class CustomerController {
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: false })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
-  async getStats(@User('_id') userId: string, @Query('storeId') storeId?: string) {
+  async getStats(
+    @User('_id') userId: string,
+    @Query('storeId') storeId?: string,
+  ) {
     return this.customerService.getStats(userId, storeId);
   }
 
@@ -65,7 +85,11 @@ export class CustomerController {
   @ApiOperation({ summary: 'Get customer analytics and insights' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: false })
-  @ApiQuery({ name: 'period', required: false, enum: ['week', 'month', 'quarter', 'year'] })
+  @ApiQuery({
+    name: 'period',
+    required: false,
+    enum: ['week', 'month', 'quarter', 'year'],
+  })
   @ApiResponse({ status: 200, description: 'Analytics retrieved successfully' })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
   async getAnalytics(
@@ -80,7 +104,10 @@ export class CustomerController {
   @ApiOperation({ summary: 'Recalculate all customer stats from orders' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: false })
-  @ApiResponse({ status: 200, description: 'Returns count of updated customers' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns count of updated customers',
+  })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
   async recalculateStats(
     @User('_id') userId: string,
@@ -92,17 +119,29 @@ export class CustomerController {
   @Get('export')
   @ApiOperation({ summary: 'Export customers to CSV' })
   @ApiResponse({ status: 200, description: 'Returns CSV file' })
-  @UsePipes(new JoiValidationPipe({ query: QueryCustomerSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      query: QueryCustomerSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async exportCsv(
     @User('_id') userId: string,
     @Query() query: QueryCustomerDto,
     @Res() res: Response,
   ): Promise<void> {
     const csv = await this.customerService.exportToCsv(userId, query);
-    const filename = `customers-export-${new Date().toISOString().split('T')[0]}.csv`;
+    const filename = `customers-export-${
+      new Date().toISOString().split('T')[0]
+    }.csv`;
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(
+        filename,
+      )}`,
+    );
     res.send(csv);
   }
 
@@ -119,7 +158,12 @@ export class CustomerController {
   @ApiOperation({ summary: 'Update customer' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Customer ID' })
-  @UsePipes(new JoiValidationPipe({ body: UpdateCustomerSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: UpdateCustomerSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async update(
     @User('_id') userId: string,
     @Param('id') id: string,
@@ -134,15 +178,21 @@ export class CustomerController {
   @ApiParam({ name: 'id', description: 'Customer ID' })
   @ApiResponse({ status: 200, description: 'Note added' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
-  @UsePipes(new JoiValidationPipe({ body: AddCustomerNoteSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: AddCustomerNoteSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async addNote(
     @Param('id') id: string,
     @User() user: UserDocument,
     @Body() dto: AddCustomerNoteDto,
   ) {
-    const userName = user.firstName && user.lastName
-      ? `${user.firstName} ${user.lastName}`
-      : user.email;
+    const userName =
+      user.firstName && user.lastName
+        ? `${user.firstName} ${user.lastName}`
+        : user.email;
     return this.customerService.addNote(id, user._id.toString(), userName, dto);
   }
 
@@ -167,7 +217,10 @@ export class CustomerController {
   @ApiOperation({ summary: 'Merge two customers (combine into one)' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Primary customer ID (will be kept)' })
-  @ApiParam({ name: 'secondaryId', description: 'Secondary customer ID (will be merged and deleted)' })
+  @ApiParam({
+    name: 'secondaryId',
+    description: 'Secondary customer ID (will be merged and deleted)',
+  })
   @ApiResponse({ status: 200, description: 'Customers merged successfully' })
   @ApiResponse({ status: 404, description: 'Customer not found' })
   async mergeCustomers(
@@ -189,7 +242,11 @@ export class CustomerController {
     @Param('id') id: string,
     @Body() dto: { phone: string; source?: string },
   ) {
-    return this.customerService.addPhoneNumber(id, dto.phone, dto.source || 'manual');
+    return this.customerService.addPhoneNumber(
+      id,
+      dto.phone,
+      dto.source || 'manual',
+    );
   }
 
   @Delete(':id/phones/:phone')
@@ -199,11 +256,11 @@ export class CustomerController {
   @ApiParam({ name: 'phone', description: 'Phone number (URL encoded)' })
   @ApiResponse({ status: 200, description: 'Phone removed' })
   @ApiResponse({ status: 404, description: 'Customer or phone not found' })
-  async removePhone(
-    @Param('id') id: string,
-    @Param('phone') phone: string,
-  ) {
-    return this.customerService.removePhoneNumber(id, decodeURIComponent(phone));
+  async removePhone(@Param('id') id: string, @Param('phone') phone: string) {
+    return this.customerService.removePhoneNumber(
+      id,
+      decodeURIComponent(phone),
+    );
   }
 
   @Put(':id/phones/:phone/verify')
@@ -219,7 +276,12 @@ export class CustomerController {
     @Body() dto: { isVerified: boolean },
     @User('_id') userId: string,
   ) {
-    return this.customerService.setPhoneVerification(id, decodeURIComponent(phone), dto.isVerified, userId);
+    return this.customerService.setPhoneVerification(
+      id,
+      decodeURIComponent(phone),
+      dto.isVerified,
+      userId,
+    );
   }
 
   @Put(':id/phones/:phone/primary')
@@ -249,7 +311,12 @@ export class CustomerController {
   @Post('segments')
   @ApiOperation({ summary: 'Create a customer segment' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
-  @UsePipes(new JoiValidationPipe({ body: CreateSegmentSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: CreateSegmentSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async createSegment(
     @User('_id') userId: string,
     @Body() dto: CreateSegmentDto,
@@ -261,7 +328,12 @@ export class CustomerController {
   @ApiOperation({ summary: 'Update a customer segment' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'segmentId', description: 'Segment ID' })
-  @UsePipes(new JoiValidationPipe({ body: UpdateSegmentSchema, param: { lang: LanguageSchema } }))
+  @UsePipes(
+    new JoiValidationPipe({
+      body: UpdateSegmentSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async updateSegment(
     @User('_id') userId: string,
     @Param('segmentId') segmentId: string,

@@ -5,7 +5,12 @@ import {
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { InventoryLog, InventoryLogDocument, StockAlert, StockAlertDocument } from './schema';
+import {
+  InventoryLog,
+  InventoryLogDocument,
+  StockAlert,
+  StockAlertDocument,
+} from './schema';
 import { InventoryChangeType, AlertType, AlertStatus } from './enum';
 import {
   IInventoryLog,
@@ -15,17 +20,23 @@ import {
   IStockAlertsResponse,
 } from './interface';
 import { Product, ProductDocument } from '../product/schema';
-import { ProductVariant, ProductVariantDocument } from '../product/variant.schema';
+import {
+  ProductVariant,
+  ProductVariantDocument,
+} from '../product/variant.schema';
 import { Store, StoreDocument } from '../store/schema';
 import { StockStatus } from '../product/enum';
 
 @Injectable()
 export class InventoryService {
   constructor(
-    @InjectModel(InventoryLog.name) private inventoryLogModel: Model<InventoryLogDocument>,
-    @InjectModel(StockAlert.name) private stockAlertModel: Model<StockAlertDocument>,
+    @InjectModel(InventoryLog.name)
+    private inventoryLogModel: Model<InventoryLogDocument>,
+    @InjectModel(StockAlert.name)
+    private stockAlertModel: Model<StockAlertDocument>,
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
-    @InjectModel(ProductVariant.name) private variantModel: Model<ProductVariantDocument>,
+    @InjectModel(ProductVariant.name)
+    private variantModel: Model<ProductVariantDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
   ) {}
 
@@ -51,7 +62,9 @@ export class InventoryService {
 
     const log = await this.inventoryLogModel.create({
       productId: new Types.ObjectId(productId),
-      variantId: options.variantId ? new Types.ObjectId(options.variantId) : undefined,
+      variantId: options.variantId
+        ? new Types.ObjectId(options.variantId)
+        : undefined,
       storeId: product.storeId,
       previousQuantity,
       newQuantity,
@@ -59,7 +72,9 @@ export class InventoryService {
       changeType,
       reason: options.reason,
       reference: options.reference,
-      changedBy: options.changedBy ? new Types.ObjectId(options.changedBy) : undefined,
+      changedBy: options.changedBy
+        ? new Types.ObjectId(options.changedBy)
+        : undefined,
       sku: product.sku,
       productName: product.name,
     });
@@ -114,7 +129,11 @@ export class InventoryService {
     const skip = (page - 1) * size;
 
     const [logs, total] = await Promise.all([
-      this.inventoryLogModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(size),
+      this.inventoryLogModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(size),
       this.inventoryLogModel.countDocuments(filter),
     ]);
 
@@ -167,7 +186,11 @@ export class InventoryService {
     const skip = (page - 1) * size;
 
     const [alerts, total] = await Promise.all([
-      this.stockAlertModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(size),
+      this.stockAlertModel
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(size),
       this.stockAlertModel.countDocuments(filter),
     ]);
 
@@ -185,7 +208,10 @@ export class InventoryService {
   /**
    * Get inventory overview for a store
    */
-  async getOverview(userId: string, storeId?: string): Promise<IInventoryOverview> {
+  async getOverview(
+    userId: string,
+    storeId?: string,
+  ): Promise<IInventoryOverview> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
@@ -199,17 +225,26 @@ export class InventoryService {
       filter.storeId = new Types.ObjectId(storeId);
     }
 
-    const [totalProducts, inStockCount, outOfStockCount, lowStockCount] = await Promise.all([
-      this.productModel.countDocuments(filter),
-      this.productModel.countDocuments({ ...filter, stockStatus: StockStatus.IN_STOCK }),
-      this.productModel.countDocuments({ ...filter, stockStatus: StockStatus.OUT_OF_STOCK }),
-      this.productModel.countDocuments({
-        ...filter,
-        manageStock: true,
-        stockQuantity: { $ne: null },
-        $expr: { $lte: ['$stockQuantity', { $ifNull: ['$lowStockAmount', 10] }] },
-      }),
-    ]);
+    const [totalProducts, inStockCount, outOfStockCount, lowStockCount] =
+      await Promise.all([
+        this.productModel.countDocuments(filter),
+        this.productModel.countDocuments({
+          ...filter,
+          stockStatus: StockStatus.IN_STOCK,
+        }),
+        this.productModel.countDocuments({
+          ...filter,
+          stockStatus: StockStatus.OUT_OF_STOCK,
+        }),
+        this.productModel.countDocuments({
+          ...filter,
+          manageStock: true,
+          stockQuantity: { $ne: null },
+          $expr: {
+            $lte: ['$stockQuantity', { $ifNull: ['$lowStockAmount', 10] }],
+          },
+        }),
+      ]);
 
     return {
       totalProducts,
@@ -241,7 +276,10 @@ export class InventoryService {
   /**
    * Get alert count for dashboard
    */
-  async getAlertCount(userId: string, storeId?: string): Promise<{ lowStock: number; outOfStock: number }> {
+  async getAlertCount(
+    userId: string,
+    storeId?: string,
+  ): Promise<{ lowStock: number; outOfStock: number }> {
     const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
@@ -256,8 +294,14 @@ export class InventoryService {
     }
 
     const [lowStockCount, outOfStockCount] = await Promise.all([
-      this.stockAlertModel.countDocuments({ ...filter, alertType: AlertType.LOW_STOCK }),
-      this.stockAlertModel.countDocuments({ ...filter, alertType: AlertType.OUT_OF_STOCK }),
+      this.stockAlertModel.countDocuments({
+        ...filter,
+        alertType: AlertType.LOW_STOCK,
+      }),
+      this.stockAlertModel.countDocuments({
+        ...filter,
+        alertType: AlertType.OUT_OF_STOCK,
+      }),
     ]);
 
     return {
@@ -267,7 +311,10 @@ export class InventoryService {
   }
 
   // Private helper methods
-  private async checkAndUpdateAlerts(product: ProductDocument, quantity: number): Promise<void> {
+  private async checkAndUpdateAlerts(
+    product: ProductDocument,
+    quantity: number,
+  ): Promise<void> {
     const threshold = product.lowStockAmount || 10;
     const store = await this.storeModel.findById(product.storeId);
     const storeThreshold = store?.settings?.lowStockThreshold || threshold;
@@ -340,7 +387,10 @@ export class InventoryService {
     return stores.map((store) => store._id);
   }
 
-  private async getStoreWithAccess(storeId: string, userId: string): Promise<StoreDocument> {
+  private async getStoreWithAccess(
+    storeId: string,
+    userId: string,
+  ): Promise<StoreDocument> {
     const store = await this.storeModel.findOne({
       _id: new Types.ObjectId(storeId),
       isDeleted: false,

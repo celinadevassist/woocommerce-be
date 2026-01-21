@@ -27,7 +27,10 @@ export class PublicReviewService {
   /**
    * Get published reviews for public display
    */
-  async getPublishedReviews(storeId: string, options: PublicReviewsOptions = {}) {
+  async getPublishedReviews(
+    storeId: string,
+    options: PublicReviewsOptions = {},
+  ) {
     const {
       productId,
       reviewType,
@@ -76,21 +79,33 @@ export class PublicReviewService {
         .sort(sort)
         .skip(skip)
         .limit(size)
-        .select('-internalNotes -moderatedBy -moderatedAt -rejectionReason -isDeleted')
+        .select(
+          '-internalNotes -moderatedBy -moderatedAt -rejectionReason -isDeleted',
+        )
         .lean(),
       this.reviewModel.countDocuments(query),
     ]);
 
     // Get product info for reviews
-    const productIds = [...new Set(reviews.map(r => r.localProductId?.toString()).filter(Boolean))];
-    const products = productIds.length > 0
-      ? await this.productModel.find({ _id: { $in: productIds } }).select('name images').lean()
-      : [];
+    const productIds = [
+      ...new Set(
+        reviews.map((r) => r.localProductId?.toString()).filter(Boolean),
+      ),
+    ];
+    const products =
+      productIds.length > 0
+        ? await this.productModel
+            .find({ _id: { $in: productIds } })
+            .select('name images')
+            .lean()
+        : [];
 
-    const productMap = new Map(products.map(p => [p._id.toString(), p]));
+    const productMap = new Map(products.map((p) => [p._id.toString(), p]));
 
-    const enrichedReviews = reviews.map(review => {
-      const product = review.localProductId ? productMap.get(review.localProductId.toString()) : null;
+    const enrichedReviews = reviews.map((review) => {
+      const product = review.localProductId
+        ? productMap.get(review.localProductId.toString())
+        : null;
       return {
         _id: review._id,
         reviewer: review.reviewer,
@@ -106,11 +121,13 @@ export class PublicReviewService {
         isFeatured: review.isFeatured,
         createdAt: review.createdAt,
         wooCreatedAt: review.wooCreatedAt,
-        product: product ? {
-          _id: product._id,
-          name: product.name,
-          image: product.images?.[0]?.src,
-        } : null,
+        product: product
+          ? {
+              _id: product._id,
+              name: product.name,
+              image: product.images?.[0]?.src,
+            }
+          : null,
       };
     });
 

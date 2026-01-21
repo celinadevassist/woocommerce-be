@@ -5,7 +5,11 @@ import { SKUStatus } from './enum';
 // Bill of Materials sub-document
 @Schema({ _id: false })
 class BOMMaterial {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Material', required: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Material',
+    required: true,
+  })
   materialId: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true })
@@ -20,7 +24,12 @@ class BOMMaterial {
 
 @Schema({ timestamps: true, versionKey: false, collection: 'inventory_skus' })
 export class SKU extends Document {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ required: true })
@@ -38,16 +47,26 @@ export class SKU extends Document {
   @Prop({ default: '' })
   category: string;
 
-  @Prop({ type: String, enum: Object.values(SKUStatus), default: SKUStatus.DRAFT })
+  @Prop({
+    type: String,
+    enum: Object.values(SKUStatus),
+    default: SKUStatus.DRAFT,
+  })
   status: SKUStatus;
 
   @Prop({
-    type: [{
-      materialId: { type: MongooseSchema.Types.ObjectId, ref: 'Material', required: true },
-      quantity: { type: Number, required: true },
-      unit: { type: String, required: true },
-      notes: { type: String },
-    }],
+    type: [
+      {
+        materialId: {
+          type: MongooseSchema.Types.ObjectId,
+          ref: 'Material',
+          required: true,
+        },
+        quantity: { type: Number, required: true },
+        unit: { type: String, required: true },
+        notes: { type: String },
+      },
+    ],
     default: [],
   })
   materials: BOMMaterial[];
@@ -101,7 +120,7 @@ export const SKUSchema = SchemaFactory.createForClass(SKU);
 // Partial unique index - only enforces uniqueness on non-deleted SKUs
 SKUSchema.index(
   { storeId: 1, sku: 1 },
-  { unique: true, partialFilterExpression: { isDeleted: false } }
+  { unique: true, partialFilterExpression: { isDeleted: false } },
 );
 SKUSchema.index({ storeId: 1, status: 1 });
 SKUSchema.index({ storeId: 1, category: 1 });
