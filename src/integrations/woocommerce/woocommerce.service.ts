@@ -52,15 +52,21 @@ export class WooCommerceService implements IPlatformAdapter {
   /**
    * Test connection to WooCommerce store
    */
-  async testConnection(credentials: WooCommerceCredentials): Promise<IConnectionTestResult> {
+  async testConnection(
+    credentials: WooCommerceCredentials,
+  ): Promise<IConnectionTestResult> {
     try {
       // Test basic connection
       const storeInfo = await this.getStoreInfo(credentials);
 
       // Get store settings for currency and timezone
       const settings = await this.getStoreSettings(credentials);
-      const currencySetting = settings.find((s) => s.id === 'woocommerce_currency');
-      const timezoneSetting = settings.find((s) => s.id === 'woocommerce_timezone_string');
+      const currencySetting = settings.find(
+        (s) => s.id === 'woocommerce_currency',
+      );
+      const timezoneSetting = settings.find(
+        (s) => s.id === 'woocommerce_timezone_string',
+      );
 
       return {
         success: true,
@@ -85,7 +91,9 @@ export class WooCommerceService implements IPlatformAdapter {
   /**
    * Get store information
    */
-  async getStoreInfo(credentials: WooCommerceCredentials): Promise<WooStoreInfo> {
+  async getStoreInfo(
+    credentials: WooCommerceCredentials,
+  ): Promise<WooStoreInfo> {
     const response = await this.request<WooStoreInfo>(credentials, 'GET', '');
     return response;
   }
@@ -93,7 +101,9 @@ export class WooCommerceService implements IPlatformAdapter {
   /**
    * Get store settings
    */
-  async getStoreSettings(credentials: WooCommerceCredentials): Promise<WooSettingsGeneral[]> {
+  async getStoreSettings(
+    credentials: WooCommerceCredentials,
+  ): Promise<WooSettingsGeneral[]> {
     const response = await this.request<WooSettingsGeneral[]>(
       credentials,
       'GET',
@@ -108,8 +118,8 @@ export class WooCommerceService implements IPlatformAdapter {
    */
   async getProducts(
     credentials: WooCommerceCredentials,
-    page: number = 1,
-    perPage: number = 100,
+    page = 1,
+    perPage = 100,
     modifiedAfter?: string,
   ): Promise<IPaginatedResult<WooProduct>> {
     const params: Record<string, any> = {
@@ -120,14 +130,23 @@ export class WooCommerceService implements IPlatformAdapter {
     // Add modified_after for delta sync
     if (modifiedAfter) {
       params.modified_after = modifiedAfter;
-      this.logger.log(`[WooCommerce] DELTA SYNC - Fetching products modified after: ${modifiedAfter}`);
+      this.logger.log(
+        `[WooCommerce] DELTA SYNC - Fetching products modified after: ${modifiedAfter}`,
+      );
     } else {
       this.logger.log(`[WooCommerce] FULL SYNC - Fetching all products`);
     }
 
-    this.logger.log(`[WooCommerce] GET products API params: ${JSON.stringify(params)}`);
+    this.logger.log(
+      `[WooCommerce] GET products API params: ${JSON.stringify(params)}`,
+    );
 
-    const response = await this.requestWithHeaders<WooProduct[]>(credentials, 'GET', 'products', params);
+    const response = await this.requestWithHeaders<WooProduct[]>(
+      credentials,
+      'GET',
+      'products',
+      params,
+    );
 
     return {
       data: response.data,
@@ -144,7 +163,11 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     productId: number,
   ): Promise<WooProduct> {
-    return this.request<WooProduct>(credentials, 'GET', `products/${productId}`);
+    return this.request<WooProduct>(
+      credentials,
+      'GET',
+      `products/${productId}`,
+    );
   }
 
   /**
@@ -153,8 +176,8 @@ export class WooCommerceService implements IPlatformAdapter {
   async getProductVariations(
     credentials: WooCommerceCredentials,
     productId: number,
-    page: number = 1,
-    perPage: number = 100,
+    page = 1,
+    perPage = 100,
   ): Promise<IPaginatedResult<WooProductVariation>> {
     const response = await this.requestWithHeaders<WooProductVariation[]>(
       credentials,
@@ -179,7 +202,13 @@ export class WooCommerceService implements IPlatformAdapter {
     productId: number,
     data: WooProductUpdatePayload,
   ): Promise<WooProduct> {
-    return this.request<WooProduct>(credentials, 'PUT', `products/${productId}`, undefined, data);
+    return this.request<WooProduct>(
+      credentials,
+      'PUT',
+      `products/${productId}`,
+      undefined,
+      data,
+    );
   }
 
   /**
@@ -189,7 +218,29 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     data: any,
   ): Promise<WooProduct> {
-    return this.request<WooProduct>(credentials, 'POST', 'products', undefined, data);
+    return this.request<WooProduct>(
+      credentials,
+      'POST',
+      'products',
+      undefined,
+      data,
+    );
+  }
+
+  /**
+   * Delete a product from WooCommerce
+   */
+  async deleteProduct(
+    credentials: WooCommerceCredentials,
+    productId: number,
+    force: boolean = true,
+  ): Promise<WooProduct> {
+    return this.request<WooProduct>(
+      credentials,
+      'DELETE',
+      `products/${productId}`,
+      { force },
+    );
   }
 
   /**
@@ -204,7 +255,13 @@ export class WooCommerceService implements IPlatformAdapter {
       stock_quantity: quantity,
       manage_stock: true,
     };
-    return this.request<WooProduct>(credentials, 'PUT', `products/${productId}`, undefined, payload);
+    return this.request<WooProduct>(
+      credentials,
+      'PUT',
+      `products/${productId}`,
+      undefined,
+      payload,
+    );
   }
 
   /**
@@ -303,7 +360,7 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     productId: number,
     variationId: number,
-    force: boolean = true,
+    force = true,
   ): Promise<WooProductVariation> {
     return this.request<WooProductVariation>(
       credentials,
@@ -319,8 +376,8 @@ export class WooCommerceService implements IPlatformAdapter {
    */
   async getOrders(
     credentials: WooCommerceCredentials,
-    page: number = 1,
-    perPage: number = 100,
+    page = 1,
+    perPage = 100,
     status?: string,
     modifiedAfter?: string,
   ): Promise<IPaginatedResult<WooOrder>> {
@@ -330,12 +387,16 @@ export class WooCommerceService implements IPlatformAdapter {
     // Add modified_after for delta sync
     if (modifiedAfter) {
       params.modified_after = modifiedAfter;
-      this.logger.log(`[WooCommerce] DELTA SYNC - Fetching orders modified after: ${modifiedAfter}`);
+      this.logger.log(
+        `[WooCommerce] DELTA SYNC - Fetching orders modified after: ${modifiedAfter}`,
+      );
     } else {
       this.logger.log(`[WooCommerce] FULL SYNC - Fetching all orders`);
     }
 
-    this.logger.log(`[WooCommerce] GET orders API params: ${JSON.stringify(params)}`);
+    this.logger.log(
+      `[WooCommerce] GET orders API params: ${JSON.stringify(params)}`,
+    );
 
     const response = await this.requestWithHeaders<WooOrder[]>(
       credentials,
@@ -355,7 +416,10 @@ export class WooCommerceService implements IPlatformAdapter {
   /**
    * Get a single order
    */
-  async getOrder(credentials: WooCommerceCredentials, orderId: number): Promise<WooOrder> {
+  async getOrder(
+    credentials: WooCommerceCredentials,
+    orderId: number,
+  ): Promise<WooOrder> {
     return this.request<WooOrder>(credentials, 'GET', `orders/${orderId}`);
   }
 
@@ -367,7 +431,13 @@ export class WooCommerceService implements IPlatformAdapter {
     orderId: number,
     data: { status?: string; customer_note?: string },
   ): Promise<WooOrder> {
-    return this.request<WooOrder>(credentials, 'PUT', `orders/${orderId}`, undefined, data);
+    return this.request<WooOrder>(
+      credentials,
+      'PUT',
+      `orders/${orderId}`,
+      undefined,
+      data,
+    );
   }
 
   /**
@@ -375,8 +445,8 @@ export class WooCommerceService implements IPlatformAdapter {
    */
   async getCustomers(
     credentials: WooCommerceCredentials,
-    page: number = 1,
-    perPage: number = 100,
+    page = 1,
+    perPage = 100,
   ): Promise<IPaginatedResult<WooCustomer>> {
     const response = await this.requestWithHeaders<WooCustomer[]>(
       credentials,
@@ -398,8 +468,8 @@ export class WooCommerceService implements IPlatformAdapter {
    */
   async getReviews(
     credentials: WooCommerceCredentials,
-    page: number = 1,
-    perPage: number = 100,
+    page = 1,
+    perPage = 100,
   ): Promise<IPaginatedResult<WooProductReview>> {
     const response = await this.requestWithHeaders<WooProductReview[]>(
       credentials,
@@ -422,8 +492,8 @@ export class WooCommerceService implements IPlatformAdapter {
   async getProductReviews(
     credentials: WooCommerceCredentials,
     productId: number,
-    page: number = 1,
-    perPage: number = 100,
+    page = 1,
+    perPage = 100,
   ): Promise<IPaginatedResult<WooProductReview>> {
     const response = await this.requestWithHeaders<WooProductReview[]>(
       credentials,
@@ -464,7 +534,12 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     orderId: number,
     data: { amount: string; reason?: string; api_refund?: boolean },
-  ): Promise<{ id: number; reason: string; total: string; date_created: string }> {
+  ): Promise<{
+    id: number;
+    reason: string;
+    total: string;
+    date_created: string;
+  }> {
     return this.request(
       credentials,
       'POST',
@@ -480,12 +555,10 @@ export class WooCommerceService implements IPlatformAdapter {
   async getRefunds(
     credentials: WooCommerceCredentials,
     orderId: number,
-  ): Promise<Array<{ id: number; reason: string; total: string; date_created: string }>> {
-    return this.request(
-      credentials,
-      'GET',
-      `orders/${orderId}/refunds`,
-    );
+  ): Promise<
+    Array<{ id: number; reason: string; total: string; date_created: string }>
+  > {
+    return this.request(credentials, 'GET', `orders/${orderId}/refunds`);
   }
 
   // ==================== CATEGORIES ====================
@@ -495,8 +568,8 @@ export class WooCommerceService implements IPlatformAdapter {
    */
   async getCategories(
     credentials: WooCommerceCredentials,
-    page: number = 1,
-    perPage: number = 100,
+    page = 1,
+    perPage = 100,
   ): Promise<IPaginatedResult<WooCategoryFull>> {
     const response = await this.requestWithHeaders<WooCategoryFull[]>(
       credentials,
@@ -520,7 +593,11 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     categoryId: number,
   ): Promise<WooCategoryFull> {
-    return this.request<WooCategoryFull>(credentials, 'GET', `products/categories/${categoryId}`);
+    return this.request<WooCategoryFull>(
+      credentials,
+      'GET',
+      `products/categories/${categoryId}`,
+    );
   }
 
   /**
@@ -530,7 +607,13 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     data: WooCategoryCreate,
   ): Promise<WooCategoryFull> {
-    return this.request<WooCategoryFull>(credentials, 'POST', 'products/categories', undefined, data);
+    return this.request<WooCategoryFull>(
+      credentials,
+      'POST',
+      'products/categories',
+      undefined,
+      data,
+    );
   }
 
   /**
@@ -556,7 +639,7 @@ export class WooCommerceService implements IPlatformAdapter {
   async deleteCategory(
     credentials: WooCommerceCredentials,
     categoryId: number,
-    force: boolean = true,
+    force = true,
   ): Promise<WooCategoryFull> {
     return this.request<WooCategoryFull>(
       credentials,
@@ -574,7 +657,11 @@ export class WooCommerceService implements IPlatformAdapter {
   async getAttributes(
     credentials: WooCommerceCredentials,
   ): Promise<WooProductAttribute[]> {
-    return this.request<WooProductAttribute[]>(credentials, 'GET', 'products/attributes');
+    return this.request<WooProductAttribute[]>(
+      credentials,
+      'GET',
+      'products/attributes',
+    );
   }
 
   /**
@@ -584,7 +671,11 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     attributeId: number,
   ): Promise<WooProductAttribute> {
-    return this.request<WooProductAttribute>(credentials, 'GET', `products/attributes/${attributeId}`);
+    return this.request<WooProductAttribute>(
+      credentials,
+      'GET',
+      `products/attributes/${attributeId}`,
+    );
   }
 
   /**
@@ -594,7 +685,13 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     data: WooProductAttributeCreate,
   ): Promise<WooProductAttribute> {
-    return this.request<WooProductAttribute>(credentials, 'POST', 'products/attributes', undefined, data);
+    return this.request<WooProductAttribute>(
+      credentials,
+      'POST',
+      'products/attributes',
+      undefined,
+      data,
+    );
   }
 
   /**
@@ -620,7 +717,7 @@ export class WooCommerceService implements IPlatformAdapter {
   async deleteAttribute(
     credentials: WooCommerceCredentials,
     attributeId: number,
-    force: boolean = true,
+    force = true,
   ): Promise<WooProductAttribute> {
     return this.request<WooProductAttribute>(
       credentials,
@@ -638,8 +735,8 @@ export class WooCommerceService implements IPlatformAdapter {
   async getAttributeTerms(
     credentials: WooCommerceCredentials,
     attributeId: number,
-    page: number = 1,
-    perPage: number = 100,
+    page = 1,
+    perPage = 100,
   ): Promise<IPaginatedResult<WooAttributeTerm>> {
     const response = await this.requestWithHeaders<WooAttributeTerm[]>(
       credentials,
@@ -713,7 +810,7 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     attributeId: number,
     termId: number,
-    force: boolean = true,
+    force = true,
   ): Promise<WooAttributeTerm> {
     return this.request<WooAttributeTerm>(
       credentials,
@@ -730,8 +827,8 @@ export class WooCommerceService implements IPlatformAdapter {
    */
   async getTags(
     credentials: WooCommerceCredentials,
-    page: number = 1,
-    perPage: number = 100,
+    page = 1,
+    perPage = 100,
   ): Promise<IPaginatedResult<WooTagFull>> {
     const response = await this.requestWithHeaders<WooTagFull[]>(
       credentials,
@@ -755,7 +852,11 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     tagId: number,
   ): Promise<WooTagFull> {
-    return this.request<WooTagFull>(credentials, 'GET', `products/tags/${tagId}`);
+    return this.request<WooTagFull>(
+      credentials,
+      'GET',
+      `products/tags/${tagId}`,
+    );
   }
 
   /**
@@ -765,7 +866,13 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     data: WooTagCreate,
   ): Promise<WooTagFull> {
-    return this.request<WooTagFull>(credentials, 'POST', 'products/tags', undefined, data);
+    return this.request<WooTagFull>(
+      credentials,
+      'POST',
+      'products/tags',
+      undefined,
+      data,
+    );
   }
 
   /**
@@ -791,7 +898,7 @@ export class WooCommerceService implements IPlatformAdapter {
   async deleteTag(
     credentials: WooCommerceCredentials,
     tagId: number,
-    force: boolean = true,
+    force = true,
   ): Promise<WooTagFull> {
     return this.request<WooTagFull>(
       credentials,
@@ -808,14 +915,14 @@ export class WooCommerceService implements IPlatformAdapter {
   async deleteMedia(
     credentials: WooCommerceCredentials,
     mediaId: number,
-    force: boolean = true,
+    force = true,
   ): Promise<any> {
     // WordPress REST API requires WordPress credentials (username + application password)
     // These are different from WooCommerce API credentials
     if (!credentials.wpUsername || !credentials.wpAppPassword) {
       this.logger.warn(
         `Cannot delete WordPress media ID ${mediaId}: WordPress credentials not configured. ` +
-        `To enable media deletion, configure wpUsername and wpAppPassword in store settings.`
+          `To enable media deletion, configure wpUsername and wpAppPassword in store settings.`,
       );
       return null;
     }
@@ -843,12 +950,16 @@ export class WooCommerceService implements IPlatformAdapter {
       if (statusCode === 401) {
         this.logger.warn(
           `Failed to delete WordPress media ID ${mediaId}: Authentication failed. ` +
-          `Please verify WordPress credentials (wpUsername and wpAppPassword).`
+            `Please verify WordPress credentials (wpUsername and wpAppPassword).`,
         );
       } else if (statusCode === 404) {
-        this.logger.warn(`WordPress media ID ${mediaId} not found (may already be deleted).`);
+        this.logger.warn(
+          `WordPress media ID ${mediaId} not found (may already be deleted).`,
+        );
       } else {
-        this.logger.warn(`Failed to delete WordPress media ID ${mediaId}: ${error.message}`);
+        this.logger.warn(
+          `Failed to delete WordPress media ID ${mediaId}: ${error.message}`,
+        );
       }
       // Don't throw - we don't want to fail the entire operation if media deletion fails
       return null;
@@ -856,12 +967,17 @@ export class WooCommerceService implements IPlatformAdapter {
   }
 
   // Private helper methods
-  private buildApiUrl(credentials: WooCommerceCredentials, endpoint: string): string {
+  private buildApiUrl(
+    credentials: WooCommerceCredentials,
+    endpoint: string,
+  ): string {
     const baseUrl = credentials.url.replace(/\/+$/, '');
     return `${baseUrl}/wp-json/${this.apiVersion}/${endpoint}`;
   }
 
-  private getAuthConfig(credentials: WooCommerceCredentials): AxiosRequestConfig {
+  private getAuthConfig(
+    credentials: WooCommerceCredentials,
+  ): AxiosRequestConfig {
     return {
       auth: {
         username: credentials.consumerKey,
@@ -888,10 +1004,15 @@ export class WooCommerceService implements IPlatformAdapter {
     };
 
     try {
-      const response = await firstValueFrom(this.httpService.request<T>(config));
+      const response = await firstValueFrom(
+        this.httpService.request<T>(config),
+      );
       return response.data;
     } catch (error) {
-      this.logger.error(`WooCommerce API error: ${method} ${endpoint}`, error.message);
+      this.logger.error(
+        `WooCommerce API error: ${method} ${endpoint}`,
+        error.message,
+      );
       throw error;
     }
   }
@@ -913,13 +1034,18 @@ export class WooCommerceService implements IPlatformAdapter {
     };
 
     try {
-      const response = await firstValueFrom(this.httpService.request<T>(config));
+      const response = await firstValueFrom(
+        this.httpService.request<T>(config),
+      );
       return {
         data: response.data,
         headers: response.headers as Record<string, string>,
       };
     } catch (error) {
-      this.logger.error(`WooCommerce API error: ${method} ${endpoint}`, error.message);
+      this.logger.error(
+        `WooCommerce API error: ${method} ${endpoint}`,
+        error.message,
+      );
       throw error;
     }
   }
@@ -955,15 +1081,28 @@ export class WooCommerceService implements IPlatformAdapter {
   /**
    * Get all shipping zones
    */
-  async getShippingZones(credentials: WooCommerceCredentials): Promise<WooShippingZone[]> {
-    return this.request<WooShippingZone[]>(credentials, 'GET', 'shipping/zones');
+  async getShippingZones(
+    credentials: WooCommerceCredentials,
+  ): Promise<WooShippingZone[]> {
+    return this.request<WooShippingZone[]>(
+      credentials,
+      'GET',
+      'shipping/zones',
+    );
   }
 
   /**
    * Get a single shipping zone
    */
-  async getShippingZone(credentials: WooCommerceCredentials, zoneId: number): Promise<WooShippingZone> {
-    return this.request<WooShippingZone>(credentials, 'GET', `shipping/zones/${zoneId}`);
+  async getShippingZone(
+    credentials: WooCommerceCredentials,
+    zoneId: number,
+  ): Promise<WooShippingZone> {
+    return this.request<WooShippingZone>(
+      credentials,
+      'GET',
+      `shipping/zones/${zoneId}`,
+    );
   }
 
   /**
@@ -973,7 +1112,13 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     data: WooShippingZoneCreate,
   ): Promise<WooShippingZone> {
-    return this.request<WooShippingZone>(credentials, 'POST', 'shipping/zones', undefined, data);
+    return this.request<WooShippingZone>(
+      credentials,
+      'POST',
+      'shipping/zones',
+      undefined,
+      data,
+    );
   }
 
   /**
@@ -984,7 +1129,13 @@ export class WooCommerceService implements IPlatformAdapter {
     zoneId: number,
     data: WooShippingZoneUpdate,
   ): Promise<WooShippingZone> {
-    return this.request<WooShippingZone>(credentials, 'PUT', `shipping/zones/${zoneId}`, undefined, data);
+    return this.request<WooShippingZone>(
+      credentials,
+      'PUT',
+      `shipping/zones/${zoneId}`,
+      undefined,
+      data,
+    );
   }
 
   /**
@@ -993,9 +1144,14 @@ export class WooCommerceService implements IPlatformAdapter {
   async deleteShippingZone(
     credentials: WooCommerceCredentials,
     zoneId: number,
-    force: boolean = true,
+    force = true,
   ): Promise<WooShippingZone> {
-    return this.request<WooShippingZone>(credentials, 'DELETE', `shipping/zones/${zoneId}`, { force });
+    return this.request<WooShippingZone>(
+      credentials,
+      'DELETE',
+      `shipping/zones/${zoneId}`,
+      { force },
+    );
   }
 
   // ============== SHIPPING ZONE LOCATIONS ==============
@@ -1007,7 +1163,11 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     zoneId: number,
   ): Promise<WooShippingZoneLocation[]> {
-    return this.request<WooShippingZoneLocation[]>(credentials, 'GET', `shipping/zones/${zoneId}/locations`);
+    return this.request<WooShippingZoneLocation[]>(
+      credentials,
+      'GET',
+      `shipping/zones/${zoneId}/locations`,
+    );
   }
 
   /**
@@ -1036,7 +1196,11 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     zoneId: number,
   ): Promise<WooShippingZoneMethod[]> {
-    return this.request<WooShippingZoneMethod[]>(credentials, 'GET', `shipping/zones/${zoneId}/methods`);
+    return this.request<WooShippingZoneMethod[]>(
+      credentials,
+      'GET',
+      `shipping/zones/${zoneId}/methods`,
+    );
   }
 
   /**
@@ -1096,7 +1260,7 @@ export class WooCommerceService implements IPlatformAdapter {
     credentials: WooCommerceCredentials,
     zoneId: number,
     instanceId: number,
-    force: boolean = true,
+    force = true,
   ): Promise<WooShippingZoneMethod> {
     return this.request<WooShippingZoneMethod>(
       credentials,
@@ -1111,15 +1275,28 @@ export class WooCommerceService implements IPlatformAdapter {
   /**
    * Get all available shipping method types
    */
-  async getShippingMethods(credentials: WooCommerceCredentials): Promise<WooShippingMethod[]> {
-    return this.request<WooShippingMethod[]>(credentials, 'GET', 'shipping_methods');
+  async getShippingMethods(
+    credentials: WooCommerceCredentials,
+  ): Promise<WooShippingMethod[]> {
+    return this.request<WooShippingMethod[]>(
+      credentials,
+      'GET',
+      'shipping_methods',
+    );
   }
 
   /**
    * Get a single shipping method type
    */
-  async getShippingMethod(credentials: WooCommerceCredentials, methodId: string): Promise<WooShippingMethod> {
-    return this.request<WooShippingMethod>(credentials, 'GET', `shipping_methods/${methodId}`);
+  async getShippingMethod(
+    credentials: WooCommerceCredentials,
+    methodId: string,
+  ): Promise<WooShippingMethod> {
+    return this.request<WooShippingMethod>(
+      credentials,
+      'GET',
+      `shipping_methods/${methodId}`,
+    );
   }
 
   // ============== ORDERS BATCH ==============
@@ -1201,7 +1378,13 @@ export class WooCommerceService implements IPlatformAdapter {
     update?: WooOrder[];
     delete?: WooOrder[];
   }> {
-    this.logger.log(`[WooCommerce] BATCH orders: create=${batch.create?.length || 0}, update=${batch.update?.length || 0}, delete=${batch.delete?.length || 0}`);
+    this.logger.log(
+      `[WooCommerce] BATCH orders: create=${
+        batch.create?.length || 0
+      }, update=${batch.update?.length || 0}, delete=${
+        batch.delete?.length || 0
+      }`,
+    );
     return this.request(credentials, 'POST', 'orders/batch', undefined, batch);
   }
 
@@ -1262,7 +1445,13 @@ export class WooCommerceService implements IPlatformAdapter {
       meta_data?: Array<{ key: string; value: string }>;
     },
   ): Promise<WooOrder> {
-    return this.request<WooOrder>(credentials, 'POST', 'orders', undefined, data);
+    return this.request<WooOrder>(
+      credentials,
+      'POST',
+      'orders',
+      undefined,
+      data,
+    );
   }
 
   /**
@@ -1271,9 +1460,11 @@ export class WooCommerceService implements IPlatformAdapter {
   async deleteOrder(
     credentials: WooCommerceCredentials,
     orderId: number,
-    force: boolean = false,
+    force = false,
   ): Promise<WooOrder> {
-    return this.request<WooOrder>(credentials, 'DELETE', `orders/${orderId}`, { force });
+    return this.request<WooOrder>(credentials, 'DELETE', `orders/${orderId}`, {
+      force,
+    });
   }
 
   // ============== DATA (Countries/States) ==============
@@ -1288,8 +1479,15 @@ export class WooCommerceService implements IPlatformAdapter {
   /**
    * Get a single country with its states
    */
-  async getCountry(credentials: WooCommerceCredentials, countryCode: string): Promise<any> {
-    return this.request<any>(credentials, 'GET', `data/countries/${countryCode}`);
+  async getCountry(
+    credentials: WooCommerceCredentials,
+    countryCode: string,
+  ): Promise<any> {
+    return this.request<any>(
+      credentials,
+      'GET',
+      `data/countries/${countryCode}`,
+    );
   }
 
   // ============== CARTFLOW CUSTOM LOCATIONS (via WordPress Plugin) ==============
@@ -1297,7 +1495,10 @@ export class WooCommerceService implements IPlatformAdapter {
   /**
    * Build URL for CartFlow Locations plugin API
    */
-  private buildCartFlowApiUrl(credentials: WooCommerceCredentials, endpoint: string): string {
+  private buildCartFlowApiUrl(
+    credentials: WooCommerceCredentials,
+    endpoint: string,
+  ): string {
     const baseUrl = credentials.url.replace(/\/+$/, '');
     return `${baseUrl}/wp-json/cartflow/v1/${endpoint}`;
   }
@@ -1320,10 +1521,15 @@ export class WooCommerceService implements IPlatformAdapter {
     };
 
     try {
-      const response = await firstValueFrom(this.httpService.request<T>(config));
+      const response = await firstValueFrom(
+        this.httpService.request<T>(config),
+      );
       return response.data;
     } catch (error) {
-      this.logger.error(`CartFlow Locations API error: ${method} ${endpoint}`, error.message);
+      this.logger.error(
+        `CartFlow Locations API error: ${method} ${endpoint}`,
+        error.message,
+      );
       throw error;
     }
   }
@@ -1331,7 +1537,9 @@ export class WooCommerceService implements IPlatformAdapter {
   /**
    * Get all custom states from CartFlow Locations plugin
    */
-  async getCustomStates(credentials: WooCommerceCredentials): Promise<Record<string, Record<string, string>>> {
+  async getCustomStates(
+    credentials: WooCommerceCredentials,
+  ): Promise<Record<string, Record<string, string>>> {
     return this.cartflowRequest<Record<string, Record<string, string>>>(
       credentials,
       'GET',
@@ -1348,12 +1556,11 @@ export class WooCommerceService implements IPlatformAdapter {
     stateCode: string,
     stateName: string,
   ): Promise<{ success: boolean; message: string; state: any }> {
-    return this.cartflowRequest(
-      credentials,
-      'POST',
-      'locations/states',
-      { country_code: countryCode, state_code: stateCode, state_name: stateName },
-    );
+    return this.cartflowRequest(credentials, 'POST', 'locations/states', {
+      country_code: countryCode,
+      state_code: stateCode,
+      state_name: stateName,
+    });
   }
 
   /**
@@ -1396,7 +1603,12 @@ export class WooCommerceService implements IPlatformAdapter {
     countryCode: string,
     states: Array<{ code: string; name: string; groups?: string[] }>,
     groups?: Array<{ name: string; color?: string; description?: string }>,
-  ): Promise<{ success: boolean; message: string; states: Record<string, string>; groups_synced?: number }> {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    states: Record<string, string>;
+    groups_synced?: number;
+  }> {
     return this.cartflowRequest(
       credentials,
       'POST',
@@ -1408,7 +1620,9 @@ export class WooCommerceService implements IPlatformAdapter {
   /**
    * Get all countries with states (including custom) from CartFlow Locations plugin
    */
-  async getCountriesWithCustomStates(credentials: WooCommerceCredentials): Promise<any[]> {
+  async getCountriesWithCustomStates(
+    credentials: WooCommerceCredentials,
+  ): Promise<any[]> {
     return this.cartflowRequest<any[]>(
       credentials,
       'GET',

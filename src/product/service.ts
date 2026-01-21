@@ -686,6 +686,66 @@ export class ProductService {
   }
 
   /**
+   * Delete a product and all its variants
+   */
+  async delete(
+    id: string,
+    userId: string,
+    deleteFromWoo = true,
+  ): Promise<{ success: boolean; message: string; deletedVariants: number }> {
+    const product = await this.productModel.findOne({
+      _id: new Types.ObjectId(id),
+      isDeleted: false,
+    });
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    await this.verifyStoreAccess(product.storeId.toString(), userId);
+
+    // Delete from WooCommerce first
+    if (deleteFromWoo && product.externalId) {
+      const store = await this.storeModel
+        .findById(product.storeId)
+        .select('+credentials');
+      if (store?.url && store?.credentials?.consumerKey && store?.credentials?.consumerSecret) {
+        try {
+          await this.wooCommerceService.deleteProduct(
+            {
+              url: store.url,
+              consumerKey: store.credentials.consumerKey,
+              consumerSecret: store.credentials.consumerSecret,
+            },
+            product.externalId,
+          );
+        } catch (error) {
+          this.logger.error(
+            `Failed to delete product from WooCommerce: ${error.message}`,
+          );
+          // Continue with local deletion even if WooCommerce fails
+        }
+      }
+    }
+
+    // Soft delete all variants belonging to this product
+    const variantDeleteResult = await this.variantModel.updateMany(
+      { productId: product._id, isDeleted: false },
+      { $set: { isDeleted: true } },
+    );
+
+    // Soft delete the product
+    product.isDeleted = true;
+    await product.save();
+
+    return {
+      success: true,
+      message: 'Product and all variants deleted successfully',
+      deletedVariants: variantDeleteResult.modifiedCount,
+    };
+  }
+
+  /**
    * Update product stock
    */
   async updateStock(

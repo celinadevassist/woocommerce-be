@@ -18,9 +18,30 @@ import { Response } from 'express';
 import { Multer } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse, ApiQuery, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiConsumes,
+  ApiBody,
+} from '@nestjs/swagger';
 import { ProductService } from './service';
-import { UpdateProductDto, UpdateProductSchema, UpdateStockDto, UpdateStockSchema, BulkUpdateProductDto, BulkUpdateProductSchema, BulkUpdateVariantDto, BulkUpdateVariantSchema, CreateProductDto, CreateProductSchema, UpdateVariantDto, UpdateVariantSchema } from './dto.update';
+import {
+  UpdateProductDto,
+  UpdateProductSchema,
+  UpdateStockDto,
+  UpdateStockSchema,
+  BulkUpdateProductDto,
+  BulkUpdateProductSchema,
+  BulkUpdateVariantDto,
+  BulkUpdateVariantSchema,
+  CreateProductDto,
+  CreateProductSchema,
+  UpdateVariantDto,
+  UpdateVariantSchema,
+} from './dto.update';
 import { QueryProductDto, QueryProductSchema } from './dto.query';
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
 import { User } from '../decorators/user.decorator';
@@ -59,7 +80,12 @@ export class ProductController {
   @ApiOperation({ summary: 'Create a new product' })
   @ApiResponse({ status: 201, description: 'Product created successfully' })
   @ApiResponse({ status: 400, description: 'Invalid input' })
-  @ApiQuery({ name: 'pushToWoo', required: false, type: Boolean, description: 'Push to WooCommerce (default: true)' })
+  @ApiQuery({
+    name: 'pushToWoo',
+    required: false,
+    type: Boolean,
+    description: 'Push to WooCommerce (default: true)',
+  })
   @UsePipes(
     new JoiValidationPipe({
       body: CreateProductSchema,
@@ -73,12 +99,19 @@ export class ProductController {
     @Param('lang') lang: string,
   ) {
     const shouldPush = pushToWoo !== 'false';
-    return await this.productService.create(user._id.toString(), dto, shouldPush);
+    return await this.productService.create(
+      user._id.toString(),
+      dto,
+      shouldPush,
+    );
   }
 
   @Get('low-stock')
   @ApiOperation({ summary: 'Get low stock products' })
-  @ApiResponse({ status: 200, description: 'Low stock products retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Low stock products retrieved successfully',
+  })
   @ApiQuery({ name: 'storeId', required: false })
   @ApiQuery({ name: 'threshold', required: false, type: Number })
   @UsePipes(
@@ -130,11 +163,21 @@ export class ProductController {
     @User() user: UserDocument,
     @Res() res: Response,
   ): Promise<void> {
-    const csv = await this.productService.exportToCsv(user._id.toString(), query);
-    const filename = `products-export-${new Date().toISOString().split('T')[0]}.csv`;
+    const csv = await this.productService.exportToCsv(
+      user._id.toString(),
+      query,
+    );
+    const filename = `products-export-${
+      new Date().toISOString().split('T')[0]
+    }.csv`;
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(
+        filename,
+      )}`,
+    );
     res.send(csv);
   }
 
@@ -142,14 +185,32 @@ export class ProductController {
   @ApiOperation({ summary: 'Get all variants with filters and pagination' })
   @ApiResponse({ status: 200, description: 'Variants retrieved successfully' })
   @ApiQuery({ name: 'storeId', required: false })
-  @ApiQuery({ name: 'productId', required: false, description: 'Filter by parent product ID' })
+  @ApiQuery({
+    name: 'productId',
+    required: false,
+    description: 'Filter by parent product ID',
+  })
   @ApiQuery({ name: 'keyword', required: false })
   @ApiQuery({ name: 'stockStatus', required: false })
   @ApiQuery({ name: 'status', required: false })
   @ApiQuery({ name: 'lowStock', required: false, type: Boolean })
-  @ApiQuery({ name: 'minPrice', required: false, type: Number, description: 'Minimum price filter' })
-  @ApiQuery({ name: 'maxPrice', required: false, type: Number, description: 'Maximum price filter' })
-  @ApiQuery({ name: 'attributes', required: false, description: 'JSON string of attribute filters' })
+  @ApiQuery({
+    name: 'minPrice',
+    required: false,
+    type: Number,
+    description: 'Minimum price filter',
+  })
+  @ApiQuery({
+    name: 'maxPrice',
+    required: false,
+    type: Number,
+    description: 'Maximum price filter',
+  })
+  @ApiQuery({
+    name: 'attributes',
+    required: false,
+    description: 'JSON string of attribute filters',
+  })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'size', required: false, type: Number })
   @ApiQuery({ name: 'sortBy', required: false })
@@ -205,7 +266,10 @@ export class ProductController {
 
   @Get('variants/attributes')
   @ApiOperation({ summary: 'Get all unique variant attributes for filtering' })
-  @ApiResponse({ status: 200, description: 'Attributes retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Attributes retrieved successfully',
+  })
   @ApiQuery({ name: 'storeId', required: false })
   @UsePipes(
     new JoiValidationPipe({
@@ -217,7 +281,10 @@ export class ProductController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.productService.getVariantAttributes(user._id.toString(), storeId);
+    return await this.productService.getVariantAttributes(
+      user._id.toString(),
+      storeId,
+    );
   }
 
   @Get('variants/:variantId')
@@ -234,14 +301,22 @@ export class ProductController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.productService.findVariantById(variantId, user._id.toString());
+    return await this.productService.findVariantById(
+      variantId,
+      user._id.toString(),
+    );
   }
 
   @Patch('variants/:variantId')
   @ApiOperation({ summary: 'Update a single variant' })
   @ApiResponse({ status: 200, description: 'Variant updated successfully' })
   @ApiResponse({ status: 404, description: 'Variant not found' })
-  @ApiQuery({ name: 'pushToWoo', required: false, type: Boolean, description: 'Push to WooCommerce (default: true)' })
+  @ApiQuery({
+    name: 'pushToWoo',
+    required: false,
+    type: Boolean,
+    description: 'Push to WooCommerce (default: true)',
+  })
   @UsePipes(
     new JoiValidationPipe({
       body: UpdateVariantSchema,
@@ -256,14 +331,24 @@ export class ProductController {
     @Param('lang') lang: string,
   ) {
     const shouldPush = pushToWoo !== 'false';
-    return await this.productService.updateVariant(variantId, user._id.toString(), dto, shouldPush);
+    return await this.productService.updateVariant(
+      variantId,
+      user._id.toString(),
+      dto,
+      shouldPush,
+    );
   }
 
   @Delete('variants/:variantId')
   @ApiOperation({ summary: 'Delete a variant' })
   @ApiResponse({ status: 200, description: 'Variant deleted successfully' })
   @ApiResponse({ status: 404, description: 'Variant not found' })
-  @ApiQuery({ name: 'deleteFromWoo', required: false, type: Boolean, description: 'Delete from WooCommerce (default: true)' })
+  @ApiQuery({
+    name: 'deleteFromWoo',
+    required: false,
+    type: Boolean,
+    description: 'Delete from WooCommerce (default: true)',
+  })
   @UsePipes(
     new JoiValidationPipe({
       param: { lang: LanguageSchema },
@@ -276,7 +361,11 @@ export class ProductController {
     @Param('lang') lang: string,
   ) {
     const shouldDelete = deleteFromWoo !== 'false';
-    return await this.productService.deleteVariant(variantId, user._id.toString(), shouldDelete);
+    return await this.productService.deleteVariant(
+      variantId,
+      user._id.toString(),
+      shouldDelete,
+    );
   }
 
   @Get(':id')
@@ -315,7 +404,32 @@ export class ProductController {
     @Param('lang') lang: string,
   ) {
     const shouldPush = pushToWoo !== 'false';
-    return await this.productService.update(id, user._id.toString(), dto, shouldPush);
+    return await this.productService.update(
+      id,
+      user._id.toString(),
+      dto,
+      shouldPush,
+    );
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a product and all its variants' })
+  @ApiResponse({ status: 200, description: 'Product deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Product not found' })
+  @ApiQuery({ name: 'deleteFromWoo', required: false, type: Boolean, description: 'Delete from WooCommerce (default: true)' })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async delete(
+    @Param('id') id: string,
+    @Query('deleteFromWoo') deleteFromWoo: string,
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    const shouldDelete = deleteFromWoo !== 'false';
+    return await this.productService.delete(id, user._id.toString(), shouldDelete);
   }
 
   @Patch(':id/stock')
@@ -337,7 +451,12 @@ export class ProductController {
     @Param('lang') lang: string,
   ) {
     const shouldPush = pushToWoo !== 'false';
-    return await this.productService.updateStock(id, user._id.toString(), dto, shouldPush);
+    return await this.productService.updateStock(
+      id,
+      user._id.toString(),
+      dto,
+      shouldPush,
+    );
   }
 
   @Post(':id/sync')
@@ -378,7 +497,11 @@ export class ProductController {
     @Param('lang') lang: string,
   ) {
     const shouldPush = pushToWoo !== 'false';
-    return await this.productService.bulkUpdate(user._id.toString(), dto, shouldPush);
+    return await this.productService.bulkUpdate(
+      user._id.toString(),
+      dto,
+      shouldPush,
+    );
   }
 
   @Post('variants/bulk-update')
@@ -398,7 +521,11 @@ export class ProductController {
     @Param('lang') lang: string,
   ) {
     const shouldPush = pushToWoo !== 'false';
-    return await this.productService.bulkUpdateVariants(user._id.toString(), dto, shouldPush);
+    return await this.productService.bulkUpdateVariants(
+      user._id.toString(),
+      dto,
+      shouldPush,
+    );
   }
 
   @Post('variants/search')
@@ -410,7 +537,8 @@ export class ProductController {
     }),
   )
   async searchVariantsByAttributes(
-    @Body() body: { storeId: string; filters: { name: string; values: string[] }[] },
+    @Body()
+    body: { storeId: string; filters: { name: string; values: string[] }[] },
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
@@ -423,7 +551,10 @@ export class ProductController {
 
   @Post(':id/generate-variations')
   @ApiOperation({ summary: 'Generate variations from attribute combinations' })
-  @ApiResponse({ status: 201, description: 'Variations generated successfully' })
+  @ApiResponse({
+    status: 201,
+    description: 'Variations generated successfully',
+  })
   @UsePipes(
     new JoiValidationPipe({
       param: { lang: LanguageSchema },
@@ -435,7 +566,11 @@ export class ProductController {
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
-    return await this.productService.generateVariations(id, user._id.toString(), body);
+    return await this.productService.generateVariations(
+      id,
+      user._id.toString(),
+      body,
+    );
   }
 
   // ==================== IMAGE MANAGEMENT ====================
@@ -481,7 +616,16 @@ export class ProductController {
   @ApiQuery({ name: 'pushToWoo', required: false, type: Boolean })
   async updateImages(
     @Param('id') id: string,
-    @Body() body: { images: { src: string; alt?: string; name?: string; position?: number; externalId?: number }[] },
+    @Body()
+    body: {
+      images: {
+        src: string;
+        alt?: string;
+        name?: string;
+        position?: number;
+        externalId?: number;
+      }[];
+    },
     @Query('pushToWoo') pushToWoo: string,
     @User() user: UserDocument,
   ) {
@@ -581,13 +725,13 @@ export class ProductController {
     ];
 
     const BOM = '\uFEFF';
-    const csv = BOM + [
-      headers.join(','),
-      exampleRow.join(','),
-    ].join('\n');
+    const csv = BOM + [headers.join(','), exampleRow.join(',')].join('\n');
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="products-import-template.csv"');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="products-import-template.csv"',
+    );
     res.send(csv);
   }
 }
