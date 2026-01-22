@@ -371,6 +371,32 @@ export class WooCommerceService implements IPlatformAdapter {
   }
 
   /**
+   * Batch update/delete variations for a variable product
+   * Supports create, update, and delete in a single request
+   */
+  async batchVariations(
+    credentials: WooCommerceCredentials,
+    productId: number,
+    operations: {
+      create?: Array<any>;
+      update?: Array<{ id: number; [key: string]: any }>;
+      delete?: number[];
+    },
+  ): Promise<{
+    create?: WooProductVariation[];
+    update?: WooProductVariation[];
+    delete?: WooProductVariation[];
+  }> {
+    return this.request(
+      credentials,
+      'POST',
+      `products/${productId}/variations/batch`,
+      undefined,
+      operations,
+    );
+  }
+
+  /**
    * Get orders with pagination
    * @param modifiedAfter - ISO8601 date string to fetch only orders modified after this date (delta sync)
    */

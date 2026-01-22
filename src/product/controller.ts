@@ -44,6 +44,7 @@ import {
 } from './dto.update';
 import { QueryProductDto, QueryProductSchema } from './dto.query';
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
+import * as Joi from 'joi';
 import { User } from '../decorators/user.decorator';
 import { UserDocument } from '../schema/user.schema';
 import { LanguageSchema } from '../dtos/lang.dto';
@@ -524,6 +525,31 @@ export class ProductController {
     return await this.productService.bulkUpdateVariants(
       user._id.toString(),
       dto,
+      shouldPush,
+    );
+  }
+
+  @Post('variants/bulk-delete')
+  @ApiOperation({ summary: 'Bulk delete multiple variants' })
+  @ApiResponse({ status: 200, description: 'Variants deleted successfully' })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+      body: Joi.object({
+        variantIds: Joi.array().items(Joi.string()).min(1).required(),
+      }),
+    }),
+  )
+  async bulkDeleteVariants(
+    @Body() dto: { variantIds: string[] },
+    @Query('pushToWoo') pushToWoo: string,
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    const shouldPush = pushToWoo !== 'false';
+    return await this.productService.bulkDeleteVariants(
+      user._id.toString(),
+      dto.variantIds,
       shouldPush,
     );
   }

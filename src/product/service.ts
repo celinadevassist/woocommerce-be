@@ -226,7 +226,7 @@ export class ProductService {
       sale_price: dto.salePrice || '',
       manage_stock: dto.manageStock ?? false,
       stock_quantity: dto.stockQuantity,
-      stock_status: dto.stockStatus || 'instock',
+      stock_status: dto.type === 'variable' ? 'instock' : (dto.stockStatus || 'instock'),
       weight: dto.weight || '',
       categories: dto.categories?.map((id) => ({ id })) || [],
       tags: dto.tags?.map((id) => ({ id })) || [],
@@ -996,6 +996,149 @@ export class ProductService {
     }
 
     return { updated, failed, results };
+  }
+
+  /**
+   * Bulk delete multiple variants
+   */
+  async bulkDeleteVariants(
+    userId: string,
+    variantIds: string[],
+    pushToWoo = true,
+  ): Promise<{
+    deleted: number;
+    failed: number;
+    results: { id: string; success: boolean; error?: string }[];
+  }> {
+    const results: { id: string; success: boolean; error?: string }[] = [];
+    let deleted = 0;
+    let failed = 0;
+
+    // Group variants by parent product for batch WooCommerce operations
+    const variantsByProduct = new Map<
+      string,
+      { variant: any; productId: string; parentExternalId: number }[]
+    >();
+
+    // First, gather all variants and group by product
+    for (const variantId of variantIds) {
+      try {
+        const variant = await this.variantModel.findOne({
+          _id: new Types.ObjectId(variantId),
+          isDeleted: false,
+        });
+
+        if (!variant) {
+          results.push({
+            id: variantId,
+            success: false,
+            error: 'Variant not found',
+          });
+          failed++;
+          continue;
+        }
+
+        await this.verifyStoreAccess(variant.storeId.toString(), userId);
+
+        const productKey = variant.productId.toString();
+        if (!variantsByProduct.has(productKey)) {
+          variantsByProduct.set(productKey, []);
+        }
+        variantsByProduct.get(productKey).push({
+          variant,
+          productId: productKey,
+          parentExternalId: variant.parentExternalId,
+        });
+      } catch (error) {
+        results.push({ id: variantId, success: false, error: error.message });
+        failed++;
+      }
+    }
+
+    // Process each product group
+    for (const [productId, variants] of variantsByProduct) {
+      try {
+        // Get store credentials
+        const firstVariant = variants[0].variant;
+        const store = await this.storeModel
+          .findById(firstVariant.storeId)
+          .select('+credentials');
+
+        if (!store) {
+          for (const v of variants) {
+            results.push({
+              id: v.variant._id.toString(),
+              success: false,
+              error: 'Store not found',
+            });
+            failed++;
+          }
+          continue;
+        }
+
+        // Delete from WooCommerce using batch API if pushing to WooCommerce
+        if (pushToWoo && variants[0].parentExternalId) {
+          const credentials = {
+            url: store.url,
+            consumerKey: store.credentials.consumerKey,
+            consumerSecret: store.credentials.consumerSecret,
+          };
+
+          const deleteIds = variants
+            .filter((v) => v.variant.externalId)
+            .map((v) => v.variant.externalId);
+
+          if (deleteIds.length > 0) {
+            try {
+              await this.wooCommerceService.batchVariations(
+                credentials,
+                variants[0].parentExternalId,
+                { delete: deleteIds },
+              );
+            } catch (wooError) {
+              this.logger.warn(
+                `Failed to batch delete variants from WooCommerce: ${wooError.message}`,
+              );
+            }
+          }
+        }
+
+        // Soft delete in local database
+        for (const v of variants) {
+          try {
+            v.variant.isDeleted = true;
+            await v.variant.save();
+
+            // Update parent product's variation count
+            await this.productModel.findByIdAndUpdate(productId, {
+              $inc: { variationCount: -1 },
+              $pull: { variationIds: v.variant.externalId },
+            });
+
+            results.push({ id: v.variant._id.toString(), success: true });
+            deleted++;
+          } catch (err) {
+            results.push({
+              id: v.variant._id.toString(),
+              success: false,
+              error: err.message,
+            });
+            failed++;
+          }
+        }
+      } catch (error) {
+        for (const v of variants) {
+          results.push({
+            id: v.variant._id.toString(),
+            success: false,
+            error: error.message,
+          });
+          failed++;
+        }
+      }
+    }
+
+    return { deleted, failed, results };
   }
 
   /**
@@ -2858,7 +3001,7 @@ export class ProductService {
       regularPrice?: string;
       sku?: string;
     } = {},
-  ): Promise<{ created: number; variations: any[] }> {
+  ): Promise<{ created: number; skipped: number; variations: any[]; message?: string }> {
     // Get the product
     const product = await this.productModel.findOne({
       _id: new Types.ObjectId(productId),
@@ -2901,7 +3044,44 @@ export class ProductService {
     };
 
     const optionArrays = variationAttributes.map((attr) => attr.options);
-    const combinations = generateCombinations(optionArrays);
+    const allCombinations = generateCombinations(optionArrays);
+
+    // Get existing variations for this product
+    const existingVariations = await this.variantModel.find({
+      productId: product._id,
+      isDeleted: false,
+    });
+
+    // Create a set of existing attribute combinations for fast lookup
+    // Key format: "attrName1:option1|attrName2:option2" (sorted by attribute name)
+    const existingCombinationKeys = new Set(
+      existingVariations.map((variant) => {
+        const sortedAttrs = [...(variant.attributes || [])]
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map((a) => `${a.name.toLowerCase()}:${a.option.toLowerCase()}`)
+          .join('|');
+        return sortedAttrs;
+      }),
+    );
+
+    // Filter out combinations that already exist
+    const combinations = allCombinations.filter((combo) => {
+      const comboKey = variationAttributes
+        .map((attr, i) => `${attr.name.toLowerCase()}:${combo[i].toLowerCase()}`)
+        .sort()
+        .join('|');
+      return !existingCombinationKeys.has(comboKey);
+    });
+
+    // If all combinations already exist, return early
+    if (combinations.length === 0) {
+      return {
+        created: 0,
+        skipped: allCombinations.length,
+        variations: [],
+        message: 'All variation combinations already exist',
+      };
+    }
 
     // Get store credentials
     const store = await this.storeModel
@@ -2983,8 +3163,10 @@ export class ProductService {
       product.variationCount = product.variationIds.length;
       await product.save();
 
+      const skippedCount = allCombinations.length - combinations.length;
       return {
         created: createdVariations.length,
+        skipped: skippedCount,
         variations: createdVariations,
       };
     } catch (error) {
