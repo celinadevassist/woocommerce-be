@@ -96,6 +96,6 @@ export const QueryCategorySchema = Joi.object().keys({
   parentId: Joi.string().optional().allow(null, ''),
   keyword: Joi.string().optional(),
   page: Joi.number().min(1).optional(),
-  size: Joi.number().min(1).max(100).optional(),
+  size: Joi.number().min(1).optional(),
   tree: Joi.boolean().optional(),
 });

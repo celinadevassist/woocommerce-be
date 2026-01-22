@@ -53,5 +53,5 @@ export const QueryTagSchema = Joi.object().keys({
   storeId: Joi.string().optional(),
   keyword: Joi.string().optional(),
   page: Joi.number().min(1).optional(),
-  size: Joi.number().min(1).max(100).optional(),
+  size: Joi.number().min(1).optional(),
 });
