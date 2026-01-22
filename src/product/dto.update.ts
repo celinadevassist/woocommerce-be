@@ -312,7 +312,7 @@ const ProductDimensionsJoiSchema = Joi.object().keys({
 
 export const UpdateProductSchema = Joi.object().keys({
   name: Joi.string().min(1).max(255).optional(),
-  slug: Joi.string().optional(),
+  slug: Joi.string().allow('').optional(),
   type: Joi.string()
     .valid(...Object.values(ProductType))
     .optional(),
