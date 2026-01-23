@@ -72,8 +72,8 @@ export class ProductMetaData {
   @Prop({ required: true })
   key: string;
 
-  @Prop()
-  value?: string;
+  @Prop({ type: MongooseSchema.Types.Mixed })
+  value?: any; // Can be string, array, object, etc. from WooCommerce
 }
 
 export const ProductMetaDataSchema =

@@ -138,6 +138,12 @@ export class UpdateProductDto {
   @ApiPropertyOptional({ description: 'Sale price' })
   salePrice?: string;
 
+  @ApiPropertyOptional({ description: 'Current price (computed from regular/sale)' })
+  price?: string;
+
+  @ApiPropertyOptional({ description: 'Is product on sale' })
+  onSale?: boolean;
+
   @ApiPropertyOptional({ description: 'Sale start date' })
   dateOnSaleFrom?: string;
 
@@ -329,6 +335,8 @@ export const UpdateProductSchema = Joi.object().keys({
   globalUniqueId: Joi.string().allow('').optional(),
   regularPrice: Joi.string().allow('', null).optional(),
   salePrice: Joi.string().allow('', null).optional(),
+  price: Joi.string().allow('', null).optional(),
+  onSale: Joi.boolean().optional(),
   dateOnSaleFrom: Joi.string().allow(null, '').optional(),
   dateOnSaleFromGmt: Joi.string().allow(null, '').optional(),
   dateOnSaleTo: Joi.string().allow(null, '').optional(),

@@ -563,6 +563,8 @@ export class ProductService {
     // Pricing fields
     if (dto.regularPrice !== undefined) product.regularPrice = dto.regularPrice;
     if (dto.salePrice !== undefined) product.salePrice = dto.salePrice;
+    if (dto.price !== undefined) product.price = dto.price;
+    if (dto.onSale !== undefined) product.onSale = dto.onSale;
     if (dto.dateOnSaleFrom !== undefined)
       product.dateOnSaleFrom = dto.dateOnSaleFrom
         ? new Date(dto.dateOnSaleFrom)
