@@ -327,8 +327,8 @@ export const UpdateProductSchema = Joi.object().keys({
   shortDescription: Joi.string().allow('').optional(),
   sku: Joi.string().allow('').optional(),
   globalUniqueId: Joi.string().allow('').optional(),
-  regularPrice: Joi.string().allow('').optional(),
-  salePrice: Joi.string().allow('').optional(),
+  regularPrice: Joi.string().allow('', null).optional(),
+  salePrice: Joi.string().allow('', null).optional(),
   dateOnSaleFrom: Joi.string().allow(null, '').optional(),
   dateOnSaleFromGmt: Joi.string().allow(null, '').optional(),
   dateOnSaleTo: Joi.string().allow(null, '').optional(),
@@ -409,8 +409,8 @@ export const BulkUpdateProductSchema = Joi.object().keys({
   stockStatus: Joi.string()
     .valid(...Object.values(StockStatus))
     .optional(),
-  regularPrice: Joi.string().optional(),
-  salePrice: Joi.string().allow('').optional(),
+  regularPrice: Joi.string().allow('', null).optional(),
+  salePrice: Joi.string().allow('', null).optional(),
   manageStock: Joi.boolean().optional(),
   lowStockAmount: Joi.number().min(0).allow(null).optional(),
   priceAdjustment: Joi.object({
@@ -442,8 +442,8 @@ export const BulkUpdateVariantSchema = Joi.object().keys({
   stockStatus: Joi.string()
     .valid(...Object.values(StockStatus))
     .optional(),
-  regularPrice: Joi.string().optional(),
-  salePrice: Joi.string().allow('').optional(),
+  regularPrice: Joi.string().allow('', null).optional(),
+  salePrice: Joi.string().allow('', null).optional(),
   manageStock: Joi.boolean().optional(),
   status: Joi.string()
     .valid('publish', 'pending', 'draft', 'private')
@@ -660,8 +660,8 @@ export const CreateProductSchema = Joi.object().keys({
   shortDescription: Joi.string().allow('').optional(),
   sku: Joi.string().allow('').optional(),
   globalUniqueId: Joi.string().allow('').optional(),
-  regularPrice: Joi.string().optional(),
-  salePrice: Joi.string().allow('').optional(),
+  regularPrice: Joi.string().allow('', null).optional(),
+  salePrice: Joi.string().allow('', null).optional(),
   dateOnSaleFrom: Joi.string().allow(null, '').optional(),
   dateOnSaleFromGmt: Joi.string().allow(null, '').optional(),
   dateOnSaleTo: Joi.string().allow(null, '').optional(),
@@ -741,8 +741,8 @@ export class UpdateVariantDto {
 }
 
 export const UpdateVariantSchema = Joi.object().keys({
-  regularPrice: Joi.string().optional(),
-  salePrice: Joi.string().allow('').optional(),
+  regularPrice: Joi.string().allow('', null).optional(),
+  salePrice: Joi.string().allow('', null).optional(),
   sku: Joi.string().allow('').optional(),
   manageStock: Joi.boolean().optional(),
   stockQuantity: Joi.number().min(0).optional(),
