@@ -3,7 +3,7 @@
  * Plugin Name: CartFlow Bridge
  * Plugin URI: https://cartflow.app
  * Description: REST API bridge for CartFlow to manage WordPress & WooCommerce settings that lack native API support
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: CartFlow
  * Author URI: https://cartflow.app
  * License: GPL v2 or later
@@ -33,6 +33,29 @@ class CartFlow_Bridge {
         add_action('rest_api_init', array($this, 'register_rest_routes'));
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_init', array($this, 'register_settings'));
+
+        // Smart Shipping: Hide other methods when free shipping is available
+        if (get_option('cartflow_hide_shipping_when_free', 'yes') === 'yes') {
+            add_filter('woocommerce_package_rates', array($this, 'hide_shipping_when_free_available'), 100);
+        }
+    }
+
+    /**
+     * Hide other shipping methods when free shipping is available
+     * This prevents customers from seeing paid options when they qualify for free shipping
+     */
+    public function hide_shipping_when_free_available($rates) {
+        $free_shipping = array();
+
+        // Find free shipping methods
+        foreach ($rates as $rate_id => $rate) {
+            if ('free_shipping' === $rate->method_id) {
+                $free_shipping[$rate_id] = $rate;
+            }
+        }
+
+        // If free shipping exists, only return free shipping options
+        return !empty($free_shipping) ? $free_shipping : $rates;
     }
 
     /**
@@ -216,6 +239,28 @@ class CartFlow_Bridge {
         register_rest_route($this->namespace, '/system/themes', array(
             'methods' => 'GET',
             'callback' => array($this, 'get_themes'),
+            'permission_callback' => array($this, 'check_permission'),
+        ));
+
+        // ==================== PLUGIN INFO ====================
+
+        register_rest_route($this->namespace, '/plugin/info', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'get_plugin_info'),
+            'permission_callback' => array($this, 'check_permission'),
+        ));
+
+        // ==================== CARTFLOW FEATURES ====================
+
+        register_rest_route($this->namespace, '/features/shipping', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'get_shipping_features'),
+            'permission_callback' => array($this, 'check_permission'),
+        ));
+
+        register_rest_route($this->namespace, '/features/shipping', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'update_shipping_features'),
             'permission_callback' => array($this, 'check_permission'),
         ));
     }
@@ -1076,6 +1121,58 @@ class CartFlow_Bridge {
         return rest_ensure_response($result);
     }
 
+    // ==================== PLUGIN INFO ====================
+
+    public function get_plugin_info($request) {
+        // Get plugin data from the plugin file header
+        if (!function_exists('get_plugin_data')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+
+        $plugin_data = get_plugin_data(__FILE__);
+
+        return rest_ensure_response(array(
+            'name' => $plugin_data['Name'],
+            'version' => $plugin_data['Version'],
+            'author' => $plugin_data['Author'],
+            'description' => $plugin_data['Description'],
+            'plugin_uri' => $plugin_data['PluginURI'],
+            'requires_wp' => $plugin_data['RequiresWP'] ?? '5.0',
+            'requires_php' => $plugin_data['RequiresPHP'] ?? '7.4',
+            'features' => array(
+                'smart_shipping' => array(
+                    'enabled' => get_option('cartflow_hide_shipping_when_free', 'yes') === 'yes',
+                    'description' => 'Automatically hide paid shipping when free shipping is available',
+                ),
+            ),
+        ));
+    }
+
+    // ==================== CARTFLOW FEATURES ====================
+
+    public function get_shipping_features($request) {
+        return rest_ensure_response(array(
+            'hide_when_free_available' => get_option('cartflow_hide_shipping_when_free', 'yes') === 'yes',
+        ));
+    }
+
+    public function update_shipping_features($request) {
+        $params = $request->get_json_params();
+        $updated = array();
+
+        if (isset($params['hide_when_free_available'])) {
+            $value = $params['hide_when_free_available'] ? 'yes' : 'no';
+            update_option('cartflow_hide_shipping_when_free', $value);
+            $updated['hide_when_free_available'] = $params['hide_when_free_available'];
+        }
+
+        return rest_ensure_response(array(
+            'success' => true,
+            'message' => __('Shipping features updated.', 'cartflow-bridge'),
+            'updated' => $updated,
+        ));
+    }
+
     // ==================== HELPERS ====================
 
     private function format_states($states) {
@@ -1119,19 +1216,34 @@ class CartFlow_Bridge {
 
     public function register_settings() {
         register_setting('cartflow_bridge', 'cartflow_bridge_api_key');
+        register_setting('cartflow_bridge', 'cartflow_hide_shipping_when_free');
     }
 
     public function render_admin_page() {
         $api_key = get_option('cartflow_bridge_api_key', '');
+        $hide_shipping_when_free = get_option('cartflow_hide_shipping_when_free', 'yes');
 
         if (isset($_POST['generate_api_key']) && check_admin_referer('cartflow_bridge_nonce')) {
             $api_key = wp_generate_password(32, false);
             update_option('cartflow_bridge_api_key', $api_key);
             echo '<div class="notice notice-success"><p>' . __('API Key generated!', 'cartflow-bridge') . '</p></div>';
         }
+
+        if (isset($_POST['save_shipping_settings']) && check_admin_referer('cartflow_bridge_shipping_nonce')) {
+            $hide_shipping_when_free = isset($_POST['hide_shipping_when_free']) ? 'yes' : 'no';
+            update_option('cartflow_hide_shipping_when_free', $hide_shipping_when_free);
+            echo '<div class="notice notice-success"><p>' . __('Shipping settings saved!', 'cartflow-bridge') . '</p></div>';
+        }
+
+        // Get plugin version
+        if (!function_exists('get_plugin_data')) {
+            require_once ABSPATH . 'wp-admin/includes/plugin.php';
+        }
+        $plugin_data = get_plugin_data(__FILE__);
+        $plugin_version = $plugin_data['Version'];
         ?>
         <div class="wrap">
-            <h1><?php _e('CartFlow Bridge', 'cartflow-bridge'); ?></h1>
+            <h1><?php _e('CartFlow Bridge', 'cartflow-bridge'); ?> <small style="font-size: 14px; color: #666;">v<?php echo esc_html($plugin_version); ?></small></h1>
             <p><?php _e('REST API bridge for CartFlow to manage WordPress & WooCommerce settings.', 'cartflow-bridge'); ?></p>
 
             <h2><?php _e('Authentication', 'cartflow-bridge'); ?></h2>
@@ -1155,6 +1267,32 @@ class CartFlow_Bridge {
                     </td>
                 </tr>
             </table>
+
+            <hr>
+
+            <h2><?php _e('Smart Features', 'cartflow-bridge'); ?></h2>
+            <p><?php _e('CartFlow Bridge includes smart features to enhance your WooCommerce store.', 'cartflow-bridge'); ?></p>
+
+            <form method="post">
+                <?php wp_nonce_field('cartflow_bridge_shipping_nonce'); ?>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row"><?php _e('Smart Shipping', 'cartflow-bridge'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="hide_shipping_when_free" value="1" <?php checked($hide_shipping_when_free, 'yes'); ?>>
+                                <?php _e('Hide paid shipping methods when free shipping is available', 'cartflow-bridge'); ?>
+                            </label>
+                            <p class="description">
+                                <?php _e('When a customer qualifies for free shipping, this will automatically hide other paid shipping options (like flat rate) to prevent confusion. Customers will only see free shipping as an option.', 'cartflow-bridge'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+                <p class="submit">
+                    <input type="submit" name="save_shipping_settings" class="button-primary" value="<?php _e('Save Features', 'cartflow-bridge'); ?>">
+                </p>
+            </form>
 
             <hr>
 

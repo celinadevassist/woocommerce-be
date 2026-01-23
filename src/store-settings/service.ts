@@ -184,36 +184,91 @@ export class StoreSettingsService {
   // ============== PLUGIN STATUS ==============
 
   /**
-   * Check if CartFlow Bridge plugin is installed
+   * Check if CartFlow Bridge plugin is installed and get version info
    */
   async checkPluginStatus(
     storeId: string,
     userId: string,
-  ): Promise<{ installed: boolean; version?: string; message: string }> {
+  ): Promise<{
+    installed: boolean;
+    version?: string;
+    features?: Record<string, any>;
+    message: string;
+  }> {
     const store = await this.getStoreWithAccess(storeId, userId);
     const credentials = this.getCredentials(store);
 
     try {
-      const systemInfo = await this.pluginRequest<any>(
+      // Try the new plugin/info endpoint first (v1.1.0+)
+      const pluginInfo = await this.pluginRequest<any>(
         credentials,
         'GET',
-        'system/info',
+        'plugin/info',
       );
       return {
         installed: true,
-        version: systemInfo.cartflow_bridge_version || '1.0.0',
+        version: pluginInfo.version || '1.0.0',
+        features: pluginInfo.features || {},
         message: 'CartFlow Bridge plugin is installed and active',
       };
     } catch (error) {
+      // Fall back to system/info for older versions
       if (error instanceof NotFoundException) {
-        return {
-          installed: false,
-          message:
-            'CartFlow Bridge plugin is not installed. Please download and install it from the Plugins page.',
-        };
+        try {
+          await this.pluginRequest<any>(credentials, 'GET', 'system/info');
+          return {
+            installed: true,
+            version: '1.0.0', // Older version without plugin/info endpoint
+            message: 'CartFlow Bridge plugin is installed (version 1.0.0)',
+          };
+        } catch {
+          return {
+            installed: false,
+            message:
+              'CartFlow Bridge plugin is not installed. Please download and install it from the Plugins page.',
+          };
+        }
       }
       throw error;
     }
+  }
+
+  /**
+   * Get detailed plugin info including version and features
+   */
+  async getPluginInfo(
+    storeId: string,
+    userId: string,
+  ): Promise<{
+    name: string;
+    version: string;
+    features: Record<string, any>;
+  }> {
+    const store = await this.getStoreWithAccess(storeId, userId);
+    const credentials = this.getCredentials(store);
+    return this.pluginRequest(credentials, 'GET', 'plugin/info');
+  }
+
+  /**
+   * Get shipping features settings
+   */
+  async getShippingFeatures(storeId: string, userId: string): Promise<any> {
+    const store = await this.getStoreWithAccess(storeId, userId);
+    const credentials = this.getCredentials(store);
+    return this.pluginRequest(credentials, 'GET', 'features/shipping');
+  }
+
+  /**
+   * Update shipping features settings
+   */
+  async updateShippingFeatures(
+    storeId: string,
+    userId: string,
+    data: { hide_when_free_available: boolean },
+  ): Promise<any> {
+    const store = await this.getStoreWithAccess(storeId, userId);
+    const credentials = this.getCredentials(store);
+    return this.pluginRequest(credentials, 'POST', 'features/shipping', data);
   }
 
   // ============== GENERAL SETTINGS ==============

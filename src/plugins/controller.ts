@@ -16,6 +16,11 @@ export class PluginsController {
     this.pluginsDir = path.join(__dirname, '..', '..', 'plugins-assets');
   }
 
+  // Latest plugin versions - update these when releasing new versions
+  private readonly latestVersions = {
+    'cartflow-bridge': '1.1.0',
+  };
+
   @Get()
   @ApiOperation({ summary: 'Get list of available plugins for download' })
   @ApiResponse({ status: 200, description: 'List of available plugins' })
@@ -24,10 +29,11 @@ export class PluginsController {
       {
         id: 'cartflow-bridge',
         name: 'CartFlow Bridge',
-        version: '1.0.0',
+        version: this.latestVersions['cartflow-bridge'],
         description:
           'REST API bridge for CartFlow to manage WordPress & WooCommerce settings that lack native API support',
         features: [
+          'Smart Shipping: Auto-hide paid shipping when free shipping qualifies',
           'Manage Site Title, Tagline, Admin Email',
           'Configure Timezone, Date/Time Format',
           'Control User Registration & Default Roles',
@@ -115,12 +121,39 @@ export class PluginsController {
       'cartflow-bridge': {
         id: 'cartflow-bridge',
         name: 'CartFlow Bridge',
-        version: '1.0.0',
+        version: this.latestVersions['cartflow-bridge'],
         description:
           'REST API bridge for CartFlow to manage WordPress & WooCommerce settings',
         author: 'CartFlow',
         license: 'GPL v2 or later',
+        changelog: [
+          {
+            version: '1.1.0',
+            changes: [
+              'Added Smart Shipping: Automatically hides paid shipping methods when free shipping is available',
+              'Added plugin info endpoint for version checking',
+              'Added shipping features settings endpoint',
+            ],
+          },
+          {
+            version: '1.0.0',
+            changes: ['Initial release'],
+          },
+        ],
         endpoints: [
+          {
+            category: 'Plugin Info',
+            methods: ['GET'],
+            path: '/wp-json/cartflow/v1/plugin/info',
+            description: 'Get plugin version and feature status',
+          },
+          {
+            category: 'Smart Features',
+            methods: ['GET', 'POST'],
+            path: '/wp-json/cartflow/v1/features/shipping',
+            description:
+              'Configure smart shipping (hide paid methods when free shipping qualifies)',
+          },
           {
             category: 'General Settings',
             methods: ['GET', 'POST'],
@@ -177,7 +210,7 @@ export class PluginsController {
           'Go to WordPress Admin > Plugins > Add New > Upload Plugin',
           'Select the ZIP file and click "Install Now"',
           'Activate the plugin',
-          'Go to CartFlow Bridge in the admin menu to see available endpoints',
+          'Go to CartFlow Bridge in the admin menu to see available endpoints and configure features',
         ],
         authentication:
           'Uses WooCommerce API credentials (consumer_key & consumer_secret)',
@@ -189,5 +222,16 @@ export class PluginsController {
     }
 
     return plugins[pluginId];
+  }
+
+  @Get(':pluginId/latest-version')
+  @ApiOperation({ summary: 'Get the latest version of a plugin' })
+  @ApiResponse({ status: 200, description: 'Latest plugin version' })
+  async getLatestVersion(@Param('pluginId') pluginId: string) {
+    const version = this.latestVersions[pluginId];
+    if (!version) {
+      return { error: 'Plugin not found' };
+    }
+    return { pluginId, version };
   }
 }

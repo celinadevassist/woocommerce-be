@@ -45,6 +45,52 @@ export class StoreSettingsController {
     );
   }
 
+  @Get('plugin-info')
+  @ApiOperation({ summary: 'Get CartFlow Bridge plugin info and version' })
+  @ApiQuery({ name: 'storeId', required: true })
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async getPluginInfo(
+    @Query('storeId') storeId: string,
+    @User() user: UserDocument,
+  ) {
+    return await this.storeSettingsService.getPluginInfo(
+      storeId,
+      user._id.toString(),
+    );
+  }
+
+  // ============== SHIPPING FEATURES ==============
+
+  @Get('features/shipping')
+  @ApiOperation({ summary: 'Get shipping features settings' })
+  @ApiQuery({ name: 'storeId', required: true })
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async getShippingFeatures(
+    @Query('storeId') storeId: string,
+    @User() user: UserDocument,
+  ) {
+    return await this.storeSettingsService.getShippingFeatures(
+      storeId,
+      user._id.toString(),
+    );
+  }
+
+  @Post('features/shipping')
+  @ApiOperation({ summary: 'Update shipping features settings' })
+  @ApiQuery({ name: 'storeId', required: true })
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async updateShippingFeatures(
+    @Query('storeId') storeId: string,
+    @Body() data: { hide_when_free_available: boolean },
+    @User() user: UserDocument,
+  ) {
+    return await this.storeSettingsService.updateShippingFeatures(
+      storeId,
+      user._id.toString(),
+      data,
+    );
+  }
+
   // ============== GENERAL SETTINGS ==============
 
   @Get('general')
