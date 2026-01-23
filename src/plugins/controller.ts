@@ -12,8 +12,8 @@ export class PluginsController {
 
   constructor() {
     // Plugins are stored in the plugins-assets folder at the app root
-    // In compiled code: __dirname = dist/plugins, go up 2 levels to reach app root
-    this.pluginsDir = path.join(__dirname, '..', '..', 'plugins-assets');
+    // Use process.cwd() for reliable path resolution in both dev and compiled modes
+    this.pluginsDir = path.join(process.cwd(), 'plugins-assets');
   }
 
   // Latest plugin versions - update these when releasing new versions
