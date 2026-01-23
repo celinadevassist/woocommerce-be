@@ -36,7 +36,7 @@ class CartFlow_Bridge {
 
         // Smart Shipping: Hide other methods when free shipping is available
         if (get_option('cartflow_hide_shipping_when_free', 'yes') === 'yes') {
-            add_filter('woocommerce_package_rates', array($this, 'hide_shipping_when_free_available'), 100);
+            add_filter('woocommerce_package_rates', array($this, 'hide_shipping_when_free_available'), 100, 2);
         }
     }
 
@@ -44,18 +44,28 @@ class CartFlow_Bridge {
      * Hide other shipping methods when free shipping is available
      * This prevents customers from seeing paid options when they qualify for free shipping
      */
-    public function hide_shipping_when_free_available($rates) {
+    public function hide_shipping_when_free_available($rates, $package = array()) {
+        // Safety checks - don't filter if rates is empty or not an array
+        if (empty($rates) || !is_array($rates)) {
+            return $rates;
+        }
+
         $free_shipping = array();
 
         // Find free shipping methods
         foreach ($rates as $rate_id => $rate) {
-            if ('free_shipping' === $rate->method_id) {
+            if (is_object($rate) && isset($rate->method_id) && 'free_shipping' === $rate->method_id) {
                 $free_shipping[$rate_id] = $rate;
             }
         }
 
-        // If free shipping exists, only return free shipping options
-        return !empty($free_shipping) ? $free_shipping : $rates;
+        // Only filter if free shipping is actually available
+        // If no free shipping found, return ALL original rates unchanged
+        if (empty($free_shipping)) {
+            return $rates;
+        }
+
+        return $free_shipping;
     }
 
     /**
