@@ -1,4 +1,4 @@
-import { Controller, Get, Res, Param } from '@nestjs/common';
+import { Controller, Get, Res, Param, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { Response } from 'express';
 import * as fs from 'fs';
@@ -8,12 +8,21 @@ import * as archiver from 'archiver';
 @ApiTags('Plugins')
 @Controller(':lang/plugins')
 export class PluginsController {
+  private readonly logger = new Logger(PluginsController.name);
   private readonly pluginsDir: string;
 
   constructor() {
-    // Plugins are stored in the plugins-assets folder at the app root
-    // Use process.cwd() for reliable path resolution in both dev and compiled modes
-    this.pluginsDir = path.join(process.cwd(), 'plugins-assets');
+    // Try multiple possible paths for plugins-assets directory
+    // This handles different environments (dev, compiled, Docker, etc.)
+    const possiblePaths = [
+      path.join(process.cwd(), 'plugins-assets'), // From current working directory
+      path.join(__dirname, '..', '..', 'plugins-assets'), // From dist/plugins (compiled)
+      path.join(__dirname, '..', 'plugins-assets'), // From dist (if flat structure)
+      path.join(__dirname, '..', '..', '..', 'plugins-assets'), // Alternative compiled structure
+    ];
+
+    this.pluginsDir = possiblePaths.find((p) => fs.existsSync(p)) || possiblePaths[0];
+    this.logger.log(`Plugins directory resolved to: ${this.pluginsDir}`);
   }
 
   // Latest plugin versions - update these when releasing new versions
