@@ -736,8 +736,8 @@ export class UpdateVariantDto {
   @ApiPropertyOptional({ description: 'Description' })
   description?: string;
 
-  @ApiPropertyOptional({ description: 'Variant image' })
-  image?: { src: string; alt?: string };
+  @ApiPropertyOptional({ description: 'Variant image (null to remove)' })
+  image?: { src: string; alt?: string } | null;
 }
 
 export const UpdateVariantSchema = Joi.object().keys({
@@ -757,5 +757,7 @@ export const UpdateVariantSchema = Joi.object().keys({
   image: Joi.object({
     src: Joi.string().uri().required(),
     alt: Joi.string().allow('').optional(),
-  }).optional(),
+  })
+    .allow(null)
+    .optional(),
 });
