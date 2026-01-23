@@ -1398,10 +1398,12 @@ export class ProductService {
 
   /**
    * Get all unique variant attributes for filtering
+   * @param categoryId - Optional category ID or slug to filter attributes by products in that category
    */
   async getVariantAttributes(
     userId: string,
     storeId?: string,
+    categoryId?: string,
   ): Promise<{ [attributeName: string]: string[] }> {
     const storeIds = await this.getUserStoreIds(userId);
 
@@ -1412,6 +1414,37 @@ export class ProductService {
 
     if (storeId) {
       filter.storeId = new Types.ObjectId(storeId);
+    }
+
+    // If categoryId is provided, first get all product IDs in that category
+    let productIdsInCategory: Types.ObjectId[] | null = null;
+    if (categoryId && storeId) {
+      const categoryFilter: any = {
+        storeId: new Types.ObjectId(storeId),
+        isDeleted: false,
+        type: 'variable', // Only variable products have variants
+      };
+
+      // Check if categoryId is a slug or ObjectId
+      if (Types.ObjectId.isValid(categoryId)) {
+        categoryFilter['categories.externalId'] = parseInt(categoryId);
+      } else {
+        // It's a slug
+        categoryFilter['categories.slug'] = categoryId;
+      }
+
+      const productsInCategory = await this.productModel.find(
+        categoryFilter,
+        { _id: 1 },
+      );
+      productIdsInCategory = productsInCategory.map((p) => p._id);
+
+      // If no products in category, return empty
+      if (productIdsInCategory.length === 0) {
+        return {};
+      }
+
+      filter.productId = { $in: productIdsInCategory };
     }
 
     const result = await this.variantModel.aggregate([
@@ -1444,11 +1477,13 @@ export class ProductService {
 
   /**
    * Search variants by attributes
+   * @param categoryId - Optional category ID or slug to filter variants by products in that category
    */
   async searchVariantsByAttributes(
     userId: string,
     storeId: string,
     attributeFilters: { name: string; values: string[] }[],
+    categoryId?: string,
   ): Promise<{ variants: IProductVariant[]; total: number }> {
     const storeIds = await this.getUserStoreIds(userId);
 
@@ -1459,6 +1494,34 @@ export class ProductService {
 
     if (storeId) {
       filter.storeId = new Types.ObjectId(storeId);
+    }
+
+    // If categoryId is provided, first get all product IDs in that category
+    if (categoryId && storeId) {
+      const categoryFilter: any = {
+        storeId: new Types.ObjectId(storeId),
+        isDeleted: false,
+        type: 'variable',
+      };
+
+      // Check if categoryId is a slug or numeric external ID
+      if (/^\d+$/.test(categoryId)) {
+        categoryFilter['categories.externalId'] = parseInt(categoryId);
+      } else {
+        categoryFilter['categories.slug'] = categoryId;
+      }
+
+      const productsInCategory = await this.productModel.find(
+        categoryFilter,
+        { _id: 1 },
+      );
+      const productIdsInCategory = productsInCategory.map((p) => p._id);
+
+      if (productIdsInCategory.length === 0) {
+        return { variants: [], total: 0 };
+      }
+
+      filter.productId = { $in: productIdsInCategory };
     }
 
     if (attributeFilters && attributeFilters.length > 0) {
@@ -2291,6 +2354,7 @@ export class ProductService {
     query: {
       storeId?: string;
       productId?: string;
+      categoryId?: string;
       keyword?: string;
       stockStatus?: string;
       status?: string;
@@ -2317,6 +2381,39 @@ export class ProductService {
     if (query.storeId) {
       filter.storeId = new Types.ObjectId(query.storeId);
     }
+
+    // Category filter - find products in category first, then filter variants
+    if (query.categoryId && query.storeId) {
+      const categoryFilter: any = {
+        storeId: new Types.ObjectId(query.storeId),
+        isDeleted: false,
+        type: 'variable',
+      };
+
+      // Check if categoryId is a slug or numeric external ID
+      if (/^\d+$/.test(query.categoryId)) {
+        categoryFilter['categories.externalId'] = parseInt(query.categoryId);
+      } else {
+        categoryFilter['categories.slug'] = query.categoryId;
+      }
+
+      const productsInCategory = await this.productModel.find(
+        categoryFilter,
+        { _id: 1 },
+      );
+      const productIdsInCategory = productsInCategory.map((p) => p._id);
+
+      if (productIdsInCategory.length === 0) {
+        // No products in this category, return empty result
+        return {
+          variants: [],
+          pagination: { total: 0, page: query.page || 1, size: query.size || 50, pages: 0 },
+        };
+      }
+
+      filter.productId = { $in: productIdsInCategory };
+    }
+
     if (query.productId) {
       filter.productId = new Types.ObjectId(query.productId);
     }

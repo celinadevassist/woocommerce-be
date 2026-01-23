@@ -191,6 +191,11 @@ export class ProductController {
     required: false,
     description: 'Filter by parent product ID',
   })
+  @ApiQuery({
+    name: 'categoryId',
+    required: false,
+    description: 'Filter by category (slug or external ID)',
+  })
   @ApiQuery({ name: 'keyword', required: false })
   @ApiQuery({ name: 'stockStatus', required: false })
   @ApiQuery({ name: 'status', required: false })
@@ -224,6 +229,7 @@ export class ProductController {
   async findAllVariants(
     @Query('storeId') storeId: string,
     @Query('productId') productId: string,
+    @Query('categoryId') categoryId: string,
     @Query('keyword') keyword: string,
     @Query('stockStatus') stockStatus: string,
     @Query('status') status: string,
@@ -251,6 +257,7 @@ export class ProductController {
     return await this.productService.findAllVariants(user._id.toString(), {
       storeId,
       productId,
+      categoryId,
       keyword,
       stockStatus,
       status,
@@ -272,6 +279,7 @@ export class ProductController {
     description: 'Attributes retrieved successfully',
   })
   @ApiQuery({ name: 'storeId', required: false })
+  @ApiQuery({ name: 'categoryId', required: false, description: 'Filter attributes by category' })
   @UsePipes(
     new JoiValidationPipe({
       param: { lang: LanguageSchema },
@@ -279,12 +287,14 @@ export class ProductController {
   )
   async getVariantAttributes(
     @Query('storeId') storeId: string,
+    @Query('categoryId') categoryId: string,
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
     return await this.productService.getVariantAttributes(
       user._id.toString(),
       storeId,
+      categoryId,
     );
   }
 
@@ -564,7 +574,11 @@ export class ProductController {
   )
   async searchVariantsByAttributes(
     @Body()
-    body: { storeId: string; filters: { name: string; values: string[] }[] },
+    body: {
+      storeId: string;
+      filters: { name: string; values: string[] }[];
+      categoryId?: string;
+    },
     @User() user: UserDocument,
     @Param('lang') lang: string,
   ) {
@@ -572,6 +586,7 @@ export class ProductController {
       user._id.toString(),
       body.storeId,
       body.filters,
+      body.categoryId,
     );
   }
 
