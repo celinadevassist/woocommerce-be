@@ -94,6 +94,21 @@ export class ProductService {
   }
 
   /**
+   * Validate that sale price is not greater than regular price
+   */
+  private validatePrices(regularPrice?: string, salePrice?: string): void {
+    if (regularPrice && salePrice) {
+      const regular = parseFloat(regularPrice);
+      const sale = parseFloat(salePrice);
+      if (!isNaN(regular) && !isNaN(sale) && sale > regular) {
+        throw new BadRequestException(
+          'Sale price cannot be greater than regular price',
+        );
+      }
+    }
+  }
+
+  /**
    * Get products with filtering and pagination
    */
   async findAll(
@@ -211,6 +226,9 @@ export class ProductService {
   ): Promise<IProduct> {
     // Verify user has access to store
     await this.verifyStoreAccess(dto.storeId, userId);
+
+    // Validate prices
+    this.validatePrices(dto.regularPrice, dto.salePrice);
 
     // Prepare WooCommerce product data
     const wooProductData: any = {
@@ -522,6 +540,11 @@ export class ProductService {
 
     await this.verifyStoreAccess(product.storeId.toString(), userId);
 
+    // Validate prices - use provided values or fall back to existing
+    const regularPrice = dto.regularPrice ?? product.regularPrice;
+    const salePrice = dto.salePrice ?? product.salePrice;
+    this.validatePrices(regularPrice, salePrice);
+
     // Update local product - basic fields
     if (dto.name) product.name = dto.name;
     if (dto.slug) product.slug = dto.slug;
@@ -827,6 +850,11 @@ export class ProductService {
 
         await this.verifyStoreAccess(product.storeId.toString(), userId);
 
+        // Validate prices if being updated
+        const regularPrice = dto.regularPrice ?? product.regularPrice;
+        const salePrice = dto.salePrice ?? product.salePrice;
+        this.validatePrices(regularPrice, salePrice);
+
         // Apply updates
         if (dto.status !== undefined) {
           product.status = dto.status;
@@ -931,6 +959,11 @@ export class ProductService {
         }
 
         await this.verifyStoreAccess(variant.storeId.toString(), userId);
+
+        // Validate prices if being updated
+        const regularPrice = dto.regularPrice ?? variant.regularPrice;
+        const salePrice = dto.salePrice ?? variant.salePrice;
+        this.validatePrices(regularPrice, salePrice);
 
         if (dto.status !== undefined) {
           variant.status = dto.status;
@@ -1160,6 +1193,11 @@ export class ProductService {
     }
 
     await this.verifyStoreAccess(variant.storeId.toString(), userId);
+
+    // Validate prices - use provided values or fall back to existing
+    const regularPrice = dto.regularPrice ?? variant.regularPrice;
+    const salePrice = dto.salePrice ?? variant.salePrice;
+    this.validatePrices(regularPrice, salePrice);
 
     // Update variant fields
     if (dto.regularPrice !== undefined) {
