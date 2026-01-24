@@ -14,9 +14,10 @@ export enum ImportSource {
 }
 
 export enum PricingMode {
-  KEEP = 'keep',
-  MARKUP = 'markup',
-  FIXED = 'fixed',
+  EMPTY = 'empty', // Keep prices empty (default)
+  KEEP = 'keep', // Use original Shopify prices
+  MARKUP = 'markup', // Apply markup to Shopify prices
+  FIXED = 'fixed', // Set fixed price for all products
 }
 
 export enum MarkupType {

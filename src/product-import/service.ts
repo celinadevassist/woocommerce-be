@@ -532,7 +532,12 @@ export class ProductImportService {
   /**
    * Calculate price based on settings (for simple products)
    */
-  private calculatePrice(originalPrice: string, settings: IImportSettings): string {
+  private calculatePrice(originalPrice: string, settings: IImportSettings): string | undefined {
+    // Empty mode - don't set any price
+    if (settings.pricing.mode === PricingMode.EMPTY) {
+      return undefined;
+    }
+
     const price = parseFloat(originalPrice) || 0;
 
     switch (settings.pricing.mode) {
@@ -552,7 +557,7 @@ export class ProductImportService {
         return (settings.pricing.fixedPrice || 0).toFixed(2);
 
       default:
-        return price.toFixed(2);
+        return undefined;
     }
   }
 
@@ -560,7 +565,12 @@ export class ProductImportService {
    * Calculate variation price based on settings
    * For variations, we use the variation-specific markup settings if mode is 'markup'
    */
-  private calculateVariationPrice(originalPrice: string, settings: IImportSettings): string {
+  private calculateVariationPrice(originalPrice: string, settings: IImportSettings): string | undefined {
+    // If main pricing mode is EMPTY, variations should also be empty
+    if (settings.pricing.mode === PricingMode.EMPTY) {
+      return undefined;
+    }
+
     const price = parseFloat(originalPrice) || 0;
 
     // If variationPriceMode is 'original', keep the original price as-is
