@@ -358,7 +358,7 @@ export class ProductImportService {
     product: ISelectedProduct,
     settings: IImportSettings,
   ): Promise<IImportResult> {
-    this.logger.debug(`Importing product: ${product.title}`);
+    this.logger.log(`[Import] Starting product: ${product.title} (${product.images?.length || 0} images)`);
 
     // Prepare WooCommerce product data
     const wooProduct = this.prepareWooCommerceProduct(product, settings);
@@ -370,8 +370,11 @@ export class ProductImportService {
       consumerSecret: store.credentials.consumerSecret,
     };
 
-    // Create product in WooCommerce
+    // Create product in WooCommerce (images can take a long time to download)
+    this.logger.log(`[Import] Creating product in WooCommerce: ${product.title}`);
+    const startTime = Date.now();
     const createdProduct = await this.wooCommerceService.createProduct(credentials, wooProduct);
+    this.logger.log(`[Import] Product created in WooCommerce in ${Date.now() - startTime}ms: ${product.title} (ID: ${createdProduct.id})`);
 
     // Save to local database
     const localProduct = new this.productModel({
@@ -469,11 +472,21 @@ export class ProductImportService {
       manage_stock: settings.manageStock,
       categories: settings.categories?.map((catId) => ({ id: parseInt(catId, 10) })) || [],
       tags: settings.tags?.map((tag) => ({ name: tag })) || [],
-      images: product.images?.map((img) => ({
+    };
+
+    // Handle images with optional limit (images slow down import significantly)
+    if (settings.maxImages !== 0) {
+      let productImages = product.images || [];
+      if (settings.maxImages !== undefined && settings.maxImages > 0) {
+        productImages = productImages.slice(0, settings.maxImages);
+      }
+      wooProduct.images = productImages.map((img) => ({
         src: img.src,
         alt: img.alt || product.title,
-      })) || [],
-    };
+      }));
+    } else {
+      wooProduct.images = []; // maxImages = 0 means no images
+    }
 
     // Add sale price if compare_at_price exists
     if (compareAtPrice && parseFloat(compareAtPrice) > parseFloat(basePrice)) {

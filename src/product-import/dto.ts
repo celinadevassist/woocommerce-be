@@ -126,6 +126,9 @@ export class ImportSettingsDto {
 
   @ApiPropertyOptional({ description: 'Variation markup value' })
   variationMarkupValue?: number;
+
+  @ApiPropertyOptional({ description: 'Max images per product (0 = no images, undefined = all)' })
+  maxImages?: number;
 }
 
 // ============ Execute Import DTO ============
@@ -232,6 +235,7 @@ const ImportSettingsSchema = Joi.object().keys({
     then: Joi.required(),
     otherwise: Joi.optional(),
   }),
+  maxImages: Joi.number().integer().min(0).optional(),
 });
 
 export const ExecuteImportSchema = Joi.object().keys({

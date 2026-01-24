@@ -62,6 +62,7 @@ export class ProductImport {
       variationPriceMode: { type: String, enum: ['original', 'markup'] },
       variationMarkupType: { type: String, enum: ['percentage', 'fixed'] },
       variationMarkupValue: { type: Number },
+      maxImages: { type: Number },
     }),
   )
   settings: IImportSettings;

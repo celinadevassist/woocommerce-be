@@ -126,6 +126,9 @@ export interface IImportSettings {
   variationPriceMode?: 'original' | 'markup';
   variationMarkupType?: 'percentage' | 'fixed';
   variationMarkupValue?: number;
+
+  // Images
+  maxImages?: number; // Limit number of images per product (0 = no images, undefined = all)
 }
 
 // Import job result for tracking
