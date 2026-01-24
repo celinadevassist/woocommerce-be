@@ -130,14 +130,13 @@ export class ImportSettingsDto {
   @ApiPropertyOptional({ description: 'Max images per product (0 = no images, undefined = all)' })
   maxImages?: number;
 
-  @ApiPropertyOptional({ description: 'Attribute mapping from Shopify to WooCommerce' })
-  attributeMapping?: {
-    [shopifyAttributeName: string]: {
-      wooAttributeId?: number;
-      wooAttributeName?: string;
-      createTerms?: boolean;
-    };
-  };
+  @ApiPropertyOptional({ description: 'Selected attributes for variable products' })
+  attributes?: {
+    name: string;
+    options: string[];
+    visible?: boolean;
+    variation?: boolean;
+  }[];
 }
 
 // ============ Execute Import DTO ============
@@ -245,12 +244,12 @@ const ImportSettingsSchema = Joi.object().keys({
     otherwise: Joi.optional(),
   }),
   maxImages: Joi.number().integer().min(0).optional(),
-  attributeMapping: Joi.object().pattern(
-    Joi.string(), // Shopify attribute name as key
+  attributes: Joi.array().items(
     Joi.object({
-      wooAttributeId: Joi.number().integer().optional(),
-      wooAttributeName: Joi.string().optional(),
-      createTerms: Joi.boolean().default(true),
+      name: Joi.string().required(),
+      options: Joi.array().items(Joi.string()).default([]),
+      visible: Joi.boolean().default(true),
+      variation: Joi.boolean().default(true),
     }),
   ).optional(),
 });

@@ -499,40 +499,27 @@ export class ProductImportService {
       wooProduct.stock_quantity = settings.stockQuantity;
     }
 
-    // Add attributes for variable products (with mapping support)
-    if (product.type === 'variable' && product.options?.length > 0) {
-      wooProduct.attributes = product.options.map((opt) => {
-        const mapping = settings.attributeMapping?.[opt.name];
-
-        if (mapping?.wooAttributeId) {
-          // Use existing WooCommerce global attribute by ID
-          return {
-            id: mapping.wooAttributeId,
-            position: opt.position,
-            visible: true,
-            variation: true,
-            options: opt.values,
-          };
-        } else if (mapping?.wooAttributeName) {
-          // Use custom attribute name
-          return {
-            name: mapping.wooAttributeName,
-            position: opt.position,
-            visible: true,
-            variation: true,
-            options: opt.values,
-          };
-        } else {
-          // No mapping, use original Shopify attribute name
-          return {
-            name: opt.name,
-            position: opt.position,
-            visible: true,
-            variation: true,
-            options: opt.values,
-          };
-        }
-      });
+    // Add attributes for variable products
+    if (product.type === 'variable') {
+      // Use selected attributes from settings if provided, otherwise use product options
+      if (settings.attributes && settings.attributes.length > 0) {
+        wooProduct.attributes = settings.attributes.map((attr, idx) => ({
+          name: attr.name,
+          position: idx,
+          visible: attr.visible ?? true,
+          variation: attr.variation ?? true,
+          options: attr.options || [],
+        }));
+      } else if (product.options?.length > 0) {
+        // Fallback to product options from source
+        wooProduct.attributes = product.options.map((opt) => ({
+          name: opt.name,
+          position: opt.position,
+          visible: true,
+          variation: true,
+          options: opt.values,
+        }));
+      }
     }
 
     return wooProduct;
@@ -608,8 +595,17 @@ export class ProductImportService {
       consumerSecret: store.credentials.consumerSecret,
     };
 
+    // Use settings.attributes if provided, otherwise use product.options
+    const attributesToUse = settings.attributes && settings.attributes.length > 0
+      ? settings.attributes.map((attr, idx) => ({
+          name: attr.name,
+          position: idx,
+          values: attr.options || [],
+        }))
+      : product.options || [];
+
     // Generate all combinations of options
-    const combinations = this.generateAttributeCombinations(product.options);
+    const combinations = this.generateAttributeCombinations(attributesToUse);
 
     this.logger.debug(`Generating ${combinations.length} variations for product ${product.title}`);
 
@@ -628,22 +624,11 @@ export class ProductImportService {
         const variantPrice = matchingVariant?.price || product.variants[0]?.price || '0';
         const calculatedPrice = this.calculateVariationPrice(variantPrice, settings);
 
-        // Map attributes using the attribute mapping
-        const mappedAttributes = combination.map((attr) => {
-          const mapping = settings.attributeMapping?.[attr.name];
-          if (mapping?.wooAttributeId) {
-            // Use WooCommerce attribute ID with the mapped name
-            return {
-              id: mapping.wooAttributeId,
-              name: mapping.wooAttributeName || attr.name,
-              option: attr.value,
-            };
-          } else if (mapping?.wooAttributeName) {
-            return { name: mapping.wooAttributeName, option: attr.value };
-          } else {
-            return { name: attr.name, option: attr.value };
-          }
-        });
+        // Map attributes for variation
+        const mappedAttributes = combination.map((attr) => ({
+          name: attr.name,
+          option: attr.value,
+        }));
 
         const variationData = {
           regular_price: calculatedPrice,
