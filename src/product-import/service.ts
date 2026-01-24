@@ -632,7 +632,12 @@ export class ProductImportService {
         const mappedAttributes = combination.map((attr) => {
           const mapping = settings.attributeMapping?.[attr.name];
           if (mapping?.wooAttributeId) {
-            return { id: mapping.wooAttributeId, option: attr.value };
+            // Use WooCommerce attribute ID with the mapped name
+            return {
+              id: mapping.wooAttributeId,
+              name: mapping.wooAttributeName || attr.name,
+              option: attr.value,
+            };
           } else if (mapping?.wooAttributeName) {
             return { name: mapping.wooAttributeName, option: attr.value };
           } else {
