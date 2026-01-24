@@ -1354,12 +1354,28 @@ export class ProductService {
       throw new NotFoundException('Parent product not found');
     }
 
+    // Check if product has externalId (is synced to WooCommerce)
+    if (!product.externalId) {
+      this.logger.warn(`Cannot sync variant - parent product ${product._id} has no externalId`);
+      throw new BadRequestException('Parent product is not synced to WooCommerce');
+    }
+
+    // Check if variant has externalId
+    if (!variant.externalId) {
+      this.logger.warn(`Cannot sync variant ${variant._id} - has no externalId`);
+      throw new BadRequestException('Variant is not synced to WooCommerce');
+    }
+
     const store = await this.storeModel
       .findById(variant.storeId)
       .select('+credentials');
 
     if (!store) {
       throw new NotFoundException('Store not found');
+    }
+
+    if (!store.credentials?.consumerKey || !store.credentials?.consumerSecret) {
+      throw new BadRequestException('Store credentials are not configured');
     }
 
     const credentials = {
