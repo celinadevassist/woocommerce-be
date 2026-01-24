@@ -129,6 +129,15 @@ export interface IImportSettings {
 
   // Images
   maxImages?: number; // Limit number of images per product (0 = no images, undefined = all)
+
+  // Attribute mapping (Shopify attribute name -> WooCommerce attribute ID or name)
+  attributeMapping?: {
+    [shopifyAttributeName: string]: {
+      wooAttributeId?: number; // WooCommerce global attribute ID
+      wooAttributeName?: string; // Or custom attribute name
+      createTerms?: boolean; // Create missing terms automatically
+    };
+  };
 }
 
 // Import job result for tracking

@@ -140,6 +140,29 @@ export class ProductImportController {
     );
   }
 
+  @Get('attributes/:storeId')
+  @ApiOperation({
+    summary: 'Get WooCommerce attributes for a store',
+    description: 'Returns all product attributes from the WooCommerce store for mapping',
+  })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'], description: 'Language' })
+  @ApiParam({ name: 'storeId', description: 'Store ID' })
+  @ApiResponse({ status: 200, description: 'Attributes retrieved successfully' })
+  @ApiResponse({ status: 403, description: 'No access to store' })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: {
+        lang: LanguageSchema,
+        storeId: Joi.string()
+          .regex(/^[a-f\d]{24}$/i)
+          .required(),
+      },
+    }),
+  )
+  async getStoreAttributes(@Param('storeId') storeId: string, @User() user: UserDocument) {
+    return await this.productImportService.getStoreAttributes(storeId, user._id.toString());
+  }
+
   @Post('cancel/:jobId')
   @ApiOperation({
     summary: 'Cancel a running import',

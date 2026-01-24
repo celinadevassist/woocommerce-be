@@ -499,15 +499,40 @@ export class ProductImportService {
       wooProduct.stock_quantity = settings.stockQuantity;
     }
 
-    // Add attributes for variable products
+    // Add attributes for variable products (with mapping support)
     if (product.type === 'variable' && product.options?.length > 0) {
-      wooProduct.attributes = product.options.map((opt) => ({
-        name: opt.name,
-        position: opt.position,
-        visible: true,
-        variation: true,
-        options: opt.values,
-      }));
+      wooProduct.attributes = product.options.map((opt) => {
+        const mapping = settings.attributeMapping?.[opt.name];
+
+        if (mapping?.wooAttributeId) {
+          // Use existing WooCommerce global attribute by ID
+          return {
+            id: mapping.wooAttributeId,
+            position: opt.position,
+            visible: true,
+            variation: true,
+            options: opt.values,
+          };
+        } else if (mapping?.wooAttributeName) {
+          // Use custom attribute name
+          return {
+            name: mapping.wooAttributeName,
+            position: opt.position,
+            visible: true,
+            variation: true,
+            options: opt.values,
+          };
+        } else {
+          // No mapping, use original Shopify attribute name
+          return {
+            name: opt.name,
+            position: opt.position,
+            visible: true,
+            variation: true,
+            options: opt.values,
+          };
+        }
+      });
     }
 
     return wooProduct;
@@ -603,16 +628,25 @@ export class ProductImportService {
         const variantPrice = matchingVariant?.price || product.variants[0]?.price || '0';
         const calculatedPrice = this.calculateVariationPrice(variantPrice, settings);
 
+        // Map attributes using the attribute mapping
+        const mappedAttributes = combination.map((attr) => {
+          const mapping = settings.attributeMapping?.[attr.name];
+          if (mapping?.wooAttributeId) {
+            return { id: mapping.wooAttributeId, option: attr.value };
+          } else if (mapping?.wooAttributeName) {
+            return { name: mapping.wooAttributeName, option: attr.value };
+          } else {
+            return { name: attr.name, option: attr.value };
+          }
+        });
+
         const variationData = {
           regular_price: calculatedPrice,
           sku: matchingVariant?.sku || '',
           stock_status: settings.stockStatus,
           manage_stock: settings.manageStock,
           stock_quantity: settings.manageStock ? settings.stockQuantity || 0 : undefined,
-          attributes: combination.map((attr) => ({
-            name: attr.name,
-            option: attr.value,
-          })),
+          attributes: mappedAttributes,
         };
 
         // Handle sale price
@@ -748,6 +782,30 @@ export class ProductImportService {
       page,
       pages: Math.ceil(total / limit),
     };
+  }
+
+  /**
+   * Get WooCommerce attributes for a store
+   */
+  async getStoreAttributes(
+    storeId: string,
+    userId: string,
+  ): Promise<{ attributes: any[] }> {
+    const store = await this.verifyStoreAccess(storeId, userId, true);
+
+    const credentials = {
+      url: store.url,
+      consumerKey: store.credentials.consumerKey,
+      consumerSecret: store.credentials.consumerSecret,
+    };
+
+    try {
+      const attributes = await this.wooCommerceService.getAttributes(credentials);
+      return { attributes };
+    } catch (error) {
+      this.logger.error(`Failed to get store attributes: ${error.message}`);
+      return { attributes: [] };
+    }
   }
 
   /**

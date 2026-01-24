@@ -63,6 +63,7 @@ export class ProductImport {
       variationMarkupType: { type: String, enum: ['percentage', 'fixed'] },
       variationMarkupValue: { type: Number },
       maxImages: { type: Number },
+      attributeMapping: { type: MongooseSchema.Types.Mixed },
     }),
   )
   settings: IImportSettings;
