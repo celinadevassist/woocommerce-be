@@ -133,6 +133,7 @@ export interface IImportSettings {
 
   // Selected attributes for variable products
   attributes?: {
+    id?: number; // WooCommerce attribute ID for global attributes
     name: string;
     options: string[];
     visible?: boolean;

@@ -64,6 +64,7 @@ export class ProductImport {
       variationMarkupValue: { type: Number },
       maxImages: { type: Number },
       attributes: [{
+        id: { type: Number }, // WooCommerce attribute ID for global attributes
         name: { type: String },
         options: [{ type: String }],
         visible: { type: Boolean },

@@ -132,6 +132,7 @@ export class ImportSettingsDto {
 
   @ApiPropertyOptional({ description: 'Selected attributes for variable products' })
   attributes?: {
+    id?: number; // WooCommerce attribute ID for global attributes
     name: string;
     options: string[];
     visible?: boolean;
@@ -169,6 +170,11 @@ const VariantOptionSchema = Joi.object().keys({
   value: Joi.string().required(),
 });
 
+const VariantImageSchema = Joi.object().keys({
+  src: Joi.string().uri().required(),
+  alt: Joi.string().allow('').optional(),
+});
+
 const VariantSchema = Joi.object().keys({
   externalId: Joi.string().required(),
   title: Joi.string().required(),
@@ -179,6 +185,7 @@ const VariantSchema = Joi.object().keys({
   available: Joi.boolean().optional(),
   weight: Joi.number().optional(),
   weightUnit: Joi.string().optional(),
+  image: VariantImageSchema.optional(), // Variant-specific image
 });
 
 const OptionSchema = Joi.object().keys({
@@ -246,6 +253,7 @@ const ImportSettingsSchema = Joi.object().keys({
   maxImages: Joi.number().integer().min(0).optional(),
   attributes: Joi.array().items(
     Joi.object({
+      id: Joi.number().optional(), // WooCommerce attribute ID for global attributes
       name: Joi.string().required(),
       options: Joi.array().items(Joi.string()).default([]),
       visible: Joi.boolean().default(true),

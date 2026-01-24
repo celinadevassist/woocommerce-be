@@ -939,6 +939,10 @@ export class ProductService {
     failed: number;
     results: { id: string; success: boolean; error?: string }[];
   }> {
+    this.logger.log(`[BulkUpdate] Starting bulk update for ${dto.variantIds?.length || 0} variants`);
+    this.logger.log(`[BulkUpdate] pushToWoo: ${pushToWoo}`);
+    this.logger.log(`[BulkUpdate] DTO: ${JSON.stringify({ ...dto, variantIds: dto.variantIds?.length + ' items' })}`);
+
     const results: { id: string; success: boolean; error?: string }[] = [];
     let updated = 0;
     let failed = 0;
@@ -1012,14 +1016,22 @@ export class ProductService {
         variant.pendingSync = !pushToWoo;
         await variant.save();
 
+        this.logger.log(`[BulkUpdate] Variant ${variantId} saved locally. regularPrice: ${variant.regularPrice}, salePrice: ${variant.salePrice}, pushToWoo: ${pushToWoo}, externalId: ${variant.externalId}`);
+
         if (pushToWoo && variant.externalId) {
           try {
+            this.logger.log(`[BulkUpdate] Syncing variant ${variantId} to WooCommerce...`);
             await this.syncVariantToWoo(variant);
+            this.logger.log(`[BulkUpdate] Variant ${variantId} synced successfully`);
           } catch (syncError) {
-            this.logger.warn(
-              `Failed to sync variant ${variantId} to WooCommerce: ${syncError.message}`,
+            this.logger.error(
+              `[BulkUpdate] Failed to sync variant ${variantId} to WooCommerce: ${syncError.message}`,
+              syncError.stack,
             );
+            // Still mark as success for local update, but log the sync failure
           }
+        } else {
+          this.logger.log(`[BulkUpdate] Skipping WooCommerce sync for variant ${variantId} - pushToWoo: ${pushToWoo}, externalId: ${variant.externalId}`);
         }
 
         results.push({ id: variantId, success: true });
@@ -1385,9 +1397,7 @@ export class ProductService {
     };
 
     const updateData: any = {
-      regular_price: variant.regularPrice,
-      sale_price: variant.salePrice,
-      sku: variant.sku,
+      sku: variant.sku || '',
       status: variant.status as 'publish' | 'pending' | 'draft' | 'private',
       manage_stock: variant.manageStock,
       stock_quantity: variant.stockQuantity,
@@ -1397,10 +1407,24 @@ export class ProductService {
         | 'onbackorder',
     };
 
+    // Only include prices if they have values
+    // WooCommerce requires string prices, and empty string clears the price
+    if (variant.regularPrice !== undefined && variant.regularPrice !== null) {
+      updateData.regular_price = String(variant.regularPrice);
+    }
+    if (variant.salePrice !== undefined && variant.salePrice !== null) {
+      updateData.sale_price = String(variant.salePrice);
+    } else {
+      // If no sale price, explicitly set to empty string to clear it
+      updateData.sale_price = '';
+    }
+
     // Include image if it exists
     if (variant.image?.src) {
       updateData.image = { src: variant.image.src };
     }
+
+    this.logger.log(`[Sync] Updating variation ${variant.externalId} with data: ${JSON.stringify(updateData)}`);
 
     await this.wooCommerceService.updateVariation(
       credentials,
@@ -1408,6 +1432,8 @@ export class ProductService {
       variant.externalId,
       updateData,
     );
+
+    this.logger.log(`[Sync] Successfully synced variation ${variant.externalId} to WooCommerce`);
 
     variant.pendingSync = false;
     variant.lastSyncedAt = new Date();

@@ -392,7 +392,8 @@ export class ProductImportService {
       catalogVisibility: settings.catalogVisibility || 'visible',
       description: product.description || '',
       shortDescription: '',
-      sku: product.variants[0]?.sku || '',
+      // SKU intentionally left empty - user will set manually
+      sku: '',
       price: this.calculatePrice(product.variants[0]?.price, settings),
       regularPrice: this.calculatePrice(product.variants[0]?.price, settings),
       salePrice: product.variants[0]?.compareAtPrice
@@ -463,6 +464,9 @@ export class ProductImportService {
     const calculatedPrice = this.calculatePrice(basePrice, settings);
     const compareAtPrice = product.variants[0]?.compareAtPrice;
 
+    // Debug: Log received attributes
+    this.logger.log(`[Import] Received attributes from settings: ${JSON.stringify(settings.attributes)}`);
+
     const wooProduct: any = {
       name: product.title,
       type: product.type,
@@ -470,7 +474,8 @@ export class ProductImportService {
       catalog_visibility: settings.catalogVisibility || 'visible',
       description: product.description || '',
       short_description: '',
-      sku: product.variants[0]?.sku || '',
+      // SKU intentionally left empty - user will set manually
+      sku: '',
       stock_status: settings.stockStatus,
       manage_stock: settings.manageStock,
       categories: settings.categories?.map((catId) => ({ id: parseInt(catId, 10) })) || [],
@@ -509,25 +514,64 @@ export class ProductImportService {
 
     // Add attributes for variable products
     if (product.type === 'variable') {
+      // Get the attribute names that exist on this specific Shopify product
+      const productAttributeNames = (product.options || []).map(opt => opt.name.toLowerCase());
+
       // Use selected attributes from settings if provided, otherwise use product options
       if (settings.attributes && settings.attributes.length > 0) {
-        wooProduct.attributes = settings.attributes.map((attr, idx) => ({
-          name: attr.name,
-          position: idx,
-          visible: attr.visible ?? true,
-          variation: attr.variation ?? true,
-          options: attr.options || [],
-        }));
+        // Filter to only include attributes that:
+        // 1. Have options selected
+        // 2. Exist on this specific product (by name match)
+        const validAttributes = settings.attributes.filter(attr => {
+          const hasOptions = attr.options && attr.options.length > 0;
+          const existsOnProduct = productAttributeNames.includes(attr.name.toLowerCase());
+          return hasOptions && existsOnProduct;
+        });
+
+        this.logger.log(`[Import] Product "${product.title}" - Valid attributes (matching product): ${JSON.stringify(validAttributes.map(a => a.name))}`);
+
+        if (validAttributes.length > 0) {
+          wooProduct.attributes = validAttributes.map((attr, idx) => {
+            const attrData: any = {
+              position: idx,
+              visible: attr.visible ?? true,
+              variation: attr.variation ?? true,
+              options: attr.options,
+            };
+
+            // Use attribute ID for global WooCommerce attributes (preferred)
+            // Fall back to name for local/custom attributes
+            if (attr.id) {
+              attrData.id = attr.id;
+            } else {
+              attrData.name = attr.name;
+            }
+
+            return attrData;
+          });
+        } else {
+          // No matching attributes from settings, use product's own options
+          this.logger.log(`[Import] No matching user attributes, using product's original attributes`);
+          wooProduct.attributes = product.options.map((opt, idx) => ({
+            name: opt.name,
+            position: idx,
+            visible: true,
+            variation: true,
+            options: opt.values,
+          }));
+        }
       } else if (product.options?.length > 0) {
-        // Fallback to product options from source
-        wooProduct.attributes = product.options.map((opt) => ({
+        // Fallback to product options from source (local attributes by name)
+        wooProduct.attributes = product.options.map((opt, idx) => ({
           name: opt.name,
-          position: opt.position,
+          position: idx,
           visible: true,
           variation: true,
           options: opt.values,
         }));
       }
+
+      this.logger.log(`[Import] Final WooCommerce attributes: ${JSON.stringify(wooProduct.attributes)}`);
     }
 
     return wooProduct;
@@ -567,18 +611,23 @@ export class ProductImportService {
 
   /**
    * Calculate variation price based on settings
-   * For variations, we use the variation-specific markup settings if mode is 'markup'
+   * If main pricing mode is 'empty', variations are also empty (user will set prices manually)
+   * Otherwise, uses variationPriceMode settings
    */
   private calculateVariationPrice(originalPrice: string, settings: IImportSettings): string | undefined {
     // If main pricing mode is EMPTY, variations should also be empty
+    // User wants to set all prices manually
     if (settings.pricing.mode === PricingMode.EMPTY) {
       return undefined;
     }
 
     const price = parseFloat(originalPrice) || 0;
 
-    // If variationPriceMode is 'original', keep the original price as-is
+    // If variationPriceMode is 'original' (default), keep the original price from source
     if (settings.variationPriceMode === 'original' || !settings.variationPriceMode) {
+      if (price === 0) {
+        return undefined;
+      }
       return price.toFixed(2);
     }
 
@@ -587,6 +636,10 @@ export class ProductImportService {
       const markupType = settings.variationMarkupType || 'percentage';
       const markupValue = settings.variationMarkupValue || 0;
 
+      if (price === 0) {
+        return undefined;
+      }
+
       if (markupType === 'percentage') {
         return (price * (1 + markupValue / 100)).toFixed(2);
       } else {
@@ -594,7 +647,7 @@ export class ProductImportService {
       }
     }
 
-    return price.toFixed(2);
+    return price > 0 ? price.toFixed(2) : undefined;
   }
 
   /**
@@ -613,17 +666,51 @@ export class ProductImportService {
       consumerSecret: store.credentials.consumerSecret,
     };
 
-    // Use settings.attributes if provided, otherwise use product.options
-    const attributesToUse = settings.attributes && settings.attributes.length > 0
-      ? settings.attributes.map((attr, idx) => ({
-          name: attr.name,
-          position: idx,
-          values: attr.options || [],
-        }))
-      : product.options || [];
+    // Get the attribute names that exist on this specific Shopify product
+    const productAttributeNames = (product.options || []).map(opt => opt.name.toLowerCase());
+    this.logger.log(`[Import] Product "${product.title}" has attributes: ${productAttributeNames.join(', ')}`);
+
+    // Use settings.attributes if provided, but ONLY for attributes that exist on this product
+    // This ensures we don't create variations with attributes the product doesn't have
+    let attributesToUse: { id?: number; name: string; position: number; values: string[] }[] = [];
+
+    if (settings.attributes && settings.attributes.length > 0) {
+      // Filter settings.attributes to only include those that match this product's attributes
+      const matchingAttributes = settings.attributes.filter(attr => {
+        const attrNameLower = attr.name.toLowerCase();
+        const hasOptions = attr.options && attr.options.length > 0;
+        const existsOnProduct = productAttributeNames.includes(attrNameLower);
+
+        if (!existsOnProduct) {
+          this.logger.log(`[Import] Skipping attribute "${attr.name}" - not present on product "${product.title}"`);
+        }
+
+        return hasOptions && existsOnProduct;
+      });
+
+      attributesToUse = matchingAttributes.map((attr, idx) => ({
+        id: attr.id, // WooCommerce attribute ID for global attributes
+        name: attr.name,
+        position: idx,
+        values: attr.options,
+      }));
+    }
+
+    // If no matching attributes from settings, fall back to product's own options
+    if (attributesToUse.length === 0) {
+      attributesToUse = (product.options || []).map((opt, idx) => ({
+        name: opt.name,
+        position: idx,
+        values: opt.values,
+      }));
+      this.logger.log(`[Import] Using product's original attributes (no matching user-selected attributes)`);
+    }
+
+    this.logger.log(`[Import] Attributes for variation generation: ${JSON.stringify(attributesToUse)}`);
 
     // Generate all combinations of options
     const combinations = this.generateAttributeCombinations(attributesToUse);
+    this.logger.log(`[Import] Generated ${combinations.length} variation combinations`);
 
     this.logger.debug(`Generating ${combinations.length} variations for product ${product.title}`);
 
@@ -642,14 +729,21 @@ export class ProductImportService {
         const variantPrice = matchingVariant?.price || product.variants[0]?.price || '0';
         const calculatedPrice = this.calculateVariationPrice(variantPrice, settings);
 
-        // Map attributes for variation
-        const mappedAttributes = combination.map((attr) => ({
-          name: attr.name,
-          option: attr.value,
-        }));
+        // Map attributes for variation - use ID for global attributes
+        const mappedAttributes = combination.map((attr) => {
+          const attrData: any = { option: attr.value };
+          // Use attribute ID for global WooCommerce attributes (preferred)
+          if (attr.id) {
+            attrData.id = attr.id;
+          } else {
+            attrData.name = attr.name;
+          }
+          return attrData;
+        });
 
         const variationData: any = {
-          sku: matchingVariant?.sku || '',
+          // SKU intentionally left empty - user will set manually
+          sku: '',
           stock_status: settings.stockStatus,
           manage_stock: settings.manageStock,
           stock_quantity: settings.manageStock ? settings.stockQuantity || 0 : undefined,
@@ -676,6 +770,14 @@ export class ProductImportService {
           }
         }
 
+        // Log variation data for debugging
+        this.logger.log(`[Import] Creating variation with data: ${JSON.stringify({
+          attributes: variationData.attributes,
+          regular_price: variationData.regular_price,
+          stock_status: variationData.stock_status,
+          manage_stock: variationData.manage_stock,
+        })}`);
+
         await this.wooCommerceService.createVariation(
           credentials,
           wooProductId,
@@ -695,15 +797,15 @@ export class ProductImportService {
    * Generate all combinations of attribute options
    */
   private generateAttributeCombinations(
-    options: { name: string; values: string[] }[],
-  ): { name: string; value: string }[][] {
+    options: { id?: number; name: string; values: string[] }[],
+  ): { id?: number; name: string; value: string }[][] {
     if (!options || options.length === 0) {
       return [];
     }
 
-    const result: { name: string; value: string }[][] = [];
+    const result: { id?: number; name: string; value: string }[][] = [];
 
-    const generate = (index: number, current: { name: string; value: string }[]) => {
+    const generate = (index: number, current: { id?: number; name: string; value: string }[]) => {
       if (index === options.length) {
         result.push([...current]);
         return;
@@ -711,7 +813,7 @@ export class ProductImportService {
 
       const option = options[index];
       for (const value of option.values) {
-        current.push({ name: option.name, value });
+        current.push({ id: option.id, name: option.name, value });
         generate(index + 1, current);
         current.pop();
       }
