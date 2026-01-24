@@ -471,12 +471,16 @@ export class ProductImportService {
       description: product.description || '',
       short_description: '',
       sku: product.variants[0]?.sku || '',
-      regular_price: calculatedPrice,
       stock_status: settings.stockStatus,
       manage_stock: settings.manageStock,
       categories: settings.categories?.map((catId) => ({ id: parseInt(catId, 10) })) || [],
       tags: settings.tags?.map((tag) => ({ name: tag })) || [],
     };
+
+    // Only set price if not empty mode
+    if (calculatedPrice !== undefined) {
+      wooProduct.regular_price = calculatedPrice;
+    }
 
     // Handle images with optional limit (images slow down import significantly)
     if (settings.maxImages !== 0) {
@@ -492,8 +496,8 @@ export class ProductImportService {
       wooProduct.images = []; // maxImages = 0 means no images
     }
 
-    // Add sale price if compare_at_price exists
-    if (compareAtPrice && parseFloat(compareAtPrice) > parseFloat(basePrice)) {
+    // Add sale price if compare_at_price exists and prices are not empty
+    if (calculatedPrice !== undefined && compareAtPrice && parseFloat(compareAtPrice) > parseFloat(basePrice)) {
       wooProduct.regular_price = this.calculatePrice(compareAtPrice, settings);
       wooProduct.sale_price = calculatedPrice;
     }
@@ -645,7 +649,6 @@ export class ProductImportService {
         }));
 
         const variationData: any = {
-          regular_price: calculatedPrice,
           sku: matchingVariant?.sku || '',
           stock_status: settings.stockStatus,
           manage_stock: settings.manageStock,
@@ -653,13 +656,18 @@ export class ProductImportService {
           attributes: mappedAttributes,
         };
 
+        // Only set price if not empty mode
+        if (calculatedPrice !== undefined) {
+          variationData.regular_price = calculatedPrice;
+        }
+
         // Include variant image if available
         if (matchingVariant?.image?.src) {
           variationData.image = { src: matchingVariant.image.src };
         }
 
-        // Handle sale price
-        if (matchingVariant?.compareAtPrice) {
+        // Handle sale price (only if prices are not empty)
+        if (calculatedPrice !== undefined && matchingVariant?.compareAtPrice) {
           const comparePrice = parseFloat(matchingVariant.compareAtPrice);
           const regularPrice = parseFloat(variantPrice);
           if (comparePrice > regularPrice) {
