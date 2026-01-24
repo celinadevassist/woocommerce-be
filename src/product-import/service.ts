@@ -782,34 +782,40 @@ export class ProductImportService {
           variationData,
         );
 
-        // Generate variation title from attribute values (e.g., "Gold / Large")
-        const variationTitle = combination.map((attr) => attr.value).join(' / ');
+        // Get variation title from WooCommerce response attributes (e.g., "Gold / Large")
+        const variationTitle = createdVariation.attributes?.map((attr) => attr.option).join(' / ') || 'Variant';
 
-        // Save variation to local database
+        // Save variation to local database using WooCommerce response data
         const localVariant = new this.variantModel({
           productId: new Types.ObjectId(localProductId),
           storeId: store._id,
           externalId: createdVariation.id,
           parentExternalId: wooProductId,
-          sku: '', // SKU intentionally left empty
+          sku: createdVariation.sku || '',
+          permalink: createdVariation.permalink,
           description: variationTitle,
-          price: calculatedPrice || undefined,
-          regularPrice: variationData.regular_price || undefined,
-          salePrice: variationData.sale_price || undefined,
-          onSale: !!variationData.sale_price,
-          status: 'publish',
-          purchasable: true,
-          virtual: false,
-          downloadable: false,
-          manageStock: settings.manageStock || false,
-          stockQuantity: settings.manageStock ? settings.stockQuantity || 0 : null,
-          stockStatus: settings.stockStatus || 'instock',
-          image: matchingVariant?.image ? { src: matchingVariant.image.src, alt: matchingVariant.image.alt || variationTitle } : undefined,
-          attributes: combination.map((attr) => ({
+          price: createdVariation.price || undefined,
+          regularPrice: createdVariation.regular_price || undefined,
+          salePrice: createdVariation.sale_price || undefined,
+          onSale: createdVariation.on_sale || false,
+          status: createdVariation.status || 'publish',
+          purchasable: createdVariation.purchasable ?? true,
+          virtual: createdVariation.virtual || false,
+          downloadable: createdVariation.downloadable || false,
+          manageStock: createdVariation.manage_stock || false,
+          stockQuantity: createdVariation.stock_quantity,
+          stockStatus: createdVariation.stock_status || 'instock',
+          weight: createdVariation.weight,
+          dimensions: createdVariation.dimensions,
+          image: createdVariation.image?.src ? { src: createdVariation.image.src, alt: createdVariation.image.alt || variationTitle } : undefined,
+          // Use attributes from WooCommerce response
+          attributes: (createdVariation.attributes || []).map((attr) => ({
             externalId: attr.id,
             name: attr.name,
-            option: attr.value,
+            option: attr.option,
           })),
+          dateCreatedWoo: createdVariation.date_created ? new Date(createdVariation.date_created) : undefined,
+          dateModifiedWoo: createdVariation.date_modified ? new Date(createdVariation.date_modified) : undefined,
           lastSyncedAt: new Date(),
           pendingSync: false,
           isDeleted: false,
