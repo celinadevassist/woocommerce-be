@@ -59,7 +59,9 @@ export class ProductImport {
       manageStock: { type: Boolean },
       stockQuantity: { type: Number },
       autoGenerateVariations: { type: Boolean },
-      variationPriceMode: { type: String, enum: ['parent', 'original'] },
+      variationPriceMode: { type: String, enum: ['original', 'markup'] },
+      variationMarkupType: { type: String, enum: ['percentage', 'fixed'] },
+      variationMarkupValue: { type: Number },
     }),
   )
   settings: IImportSettings;

@@ -501,7 +501,7 @@ export class ProductImportService {
   }
 
   /**
-   * Calculate price based on settings
+   * Calculate price based on settings (for simple products)
    */
   private calculatePrice(originalPrice: string, settings: IImportSettings): string {
     const price = parseFloat(originalPrice) || 0;
@@ -525,6 +525,33 @@ export class ProductImportService {
       default:
         return price.toFixed(2);
     }
+  }
+
+  /**
+   * Calculate variation price based on settings
+   * For variations, we use the variation-specific markup settings if mode is 'markup'
+   */
+  private calculateVariationPrice(originalPrice: string, settings: IImportSettings): string {
+    const price = parseFloat(originalPrice) || 0;
+
+    // If variationPriceMode is 'original', keep the original price as-is
+    if (settings.variationPriceMode === 'original' || !settings.variationPriceMode) {
+      return price.toFixed(2);
+    }
+
+    // If variationPriceMode is 'markup', apply the variation-specific markup
+    if (settings.variationPriceMode === 'markup') {
+      const markupType = settings.variationMarkupType || 'percentage';
+      const markupValue = settings.variationMarkupValue || 0;
+
+      if (markupType === 'percentage') {
+        return (price * (1 + markupValue / 100)).toFixed(2);
+      } else {
+        return (price + markupValue).toFixed(2);
+      }
+    }
+
+    return price.toFixed(2);
   }
 
   /**
@@ -561,10 +588,7 @@ export class ProductImportService {
         );
 
         const variantPrice = matchingVariant?.price || product.variants[0]?.price || '0';
-        const calculatedPrice =
-          settings.variationPriceMode === 'original'
-            ? this.calculatePrice(variantPrice, settings)
-            : this.calculatePrice(product.variants[0]?.price || '0', settings);
+        const calculatedPrice = this.calculateVariationPrice(variantPrice, settings);
 
         const variationData = {
           regular_price: calculatedPrice,
@@ -583,7 +607,7 @@ export class ProductImportService {
           const comparePrice = parseFloat(matchingVariant.compareAtPrice);
           const regularPrice = parseFloat(variantPrice);
           if (comparePrice > regularPrice) {
-            variationData.regular_price = this.calculatePrice(matchingVariant.compareAtPrice, settings);
+            variationData.regular_price = this.calculateVariationPrice(matchingVariant.compareAtPrice, settings);
             (variationData as any).sale_price = calculatedPrice;
           }
         }

@@ -123,7 +123,9 @@ export interface IImportSettings {
 
   // Variations
   autoGenerateVariations?: boolean;
-  variationPriceMode?: 'parent' | 'original';
+  variationPriceMode?: 'original' | 'markup';
+  variationMarkupType?: 'percentage' | 'fixed';
+  variationMarkupValue?: number;
 }
 
 // Import job result for tracking

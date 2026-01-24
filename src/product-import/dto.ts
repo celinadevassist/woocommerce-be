@@ -118,8 +118,14 @@ export class ImportSettingsDto {
   @ApiPropertyOptional({ description: 'Auto-generate variations for variable products', default: true })
   autoGenerateVariations?: boolean;
 
-  @ApiPropertyOptional({ enum: ['parent', 'original'], description: 'Variation price mode' })
-  variationPriceMode?: 'parent' | 'original';
+  @ApiPropertyOptional({ enum: ['original', 'markup'], description: 'Variation price mode' })
+  variationPriceMode?: 'original' | 'markup';
+
+  @ApiPropertyOptional({ enum: ['percentage', 'fixed'], description: 'Variation markup type' })
+  variationMarkupType?: 'percentage' | 'fixed';
+
+  @ApiPropertyOptional({ description: 'Variation markup value' })
+  variationMarkupValue?: number;
 }
 
 // ============ Execute Import DTO ============
@@ -215,7 +221,17 @@ const ImportSettingsSchema = Joi.object().keys({
   manageStock: Joi.boolean().default(false),
   stockQuantity: Joi.number().integer().min(0).optional(),
   autoGenerateVariations: Joi.boolean().default(true),
-  variationPriceMode: Joi.string().valid('parent', 'original').default('original'),
+  variationPriceMode: Joi.string().valid('original', 'markup').default('original'),
+  variationMarkupType: Joi.string().valid('percentage', 'fixed').when('variationPriceMode', {
+    is: 'markup',
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
+  variationMarkupValue: Joi.number().when('variationPriceMode', {
+    is: 'markup',
+    then: Joi.required(),
+    otherwise: Joi.optional(),
+  }),
 });
 
 export const ExecuteImportSchema = Joi.object().keys({
