@@ -33,6 +33,7 @@ export interface IExternalVariant {
   available: boolean;
   weight?: number;
   weightUnit?: string;
+  image?: { src: string; alt?: string }; // Variant-specific image
 }
 
 export interface IExternalOption {

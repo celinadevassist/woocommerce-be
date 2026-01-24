@@ -190,6 +190,9 @@ export class ProductImportService {
               variantOptions.push({ name: product.options[2].name, value: v.option3 });
             }
 
+            // Find variant-specific image (Shopify images have variant_ids array)
+            const variantImage = product.images.find((img) => img.variant_ids?.includes(v.id));
+
             return {
               externalId: String(v.id),
               title: v.title,
@@ -200,6 +203,7 @@ export class ProductImportService {
               available: v.available,
               weight: v.grams,
               weightUnit: 'g',
+              image: variantImage ? { src: variantImage.src, alt: variantImage.alt || product.title } : undefined,
             };
           })
         : [];
@@ -630,7 +634,7 @@ export class ProductImportService {
           option: attr.value,
         }));
 
-        const variationData = {
+        const variationData: any = {
           regular_price: calculatedPrice,
           sku: matchingVariant?.sku || '',
           stock_status: settings.stockStatus,
@@ -638,6 +642,11 @@ export class ProductImportService {
           stock_quantity: settings.manageStock ? settings.stockQuantity || 0 : undefined,
           attributes: mappedAttributes,
         };
+
+        // Include variant image if available
+        if (matchingVariant?.image?.src) {
+          variationData.image = { src: matchingVariant.image.src };
+        }
 
         // Handle sale price
         if (matchingVariant?.compareAtPrice) {
