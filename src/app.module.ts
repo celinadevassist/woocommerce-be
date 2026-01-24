@@ -46,6 +46,7 @@ import { ShippingModule } from './shipping/module';
 import { PluginsModule } from './plugins/module';
 import { StoreSettingsModule } from './store-settings/module';
 import { LocationLibraryModule } from './location-library/module';
+import { ProductImportModule } from './product-import/module';
 
 @Module({
   imports: [
@@ -99,6 +100,7 @@ import { LocationLibraryModule } from './location-library/module';
     PluginsModule,
     StoreSettingsModule,
     LocationLibraryModule,
+    ProductImportModule,
   ],
   controllers: [HealthController],
   providers: [ValidationPipe],
