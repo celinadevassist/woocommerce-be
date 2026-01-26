@@ -1,0 +1,39 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\003-replace-dangerous-eval-usage-for-dynamic-imports-w/**)",
+      "Write(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\003-replace-dangerous-eval-usage-for-dynamic-imports-w/**)",
+      "Edit(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\003-replace-dangerous-eval-usage-for-dynamic-imports-w/**)",
+      "Glob(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\003-replace-dangerous-eval-usage-for-dynamic-imports-w/**)",
+      "Grep(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\003-replace-dangerous-eval-usage-for-dynamic-imports-w/**)",
+      "Read(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\003-replace-dangerous-eval-usage-for-dynamic-imports-w\\.auto-claude\\specs\\003-replace-dangerous-eval-usage-for-dynamic-imports-w/**)",
+      "Write(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\003-replace-dangerous-eval-usage-for-dynamic-imports-w\\.auto-claude\\specs\\003-replace-dangerous-eval-usage-for-dynamic-imports-w/**)",
+      "Edit(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\003-replace-dangerous-eval-usage-for-dynamic-imports-w\\.auto-claude\\specs\\003-replace-dangerous-eval-usage-for-dynamic-imports-w/**)",
+      "Read(G:\\Woocommerce Management System\\back-end\\.auto-claude/**)",
+      "Write(G:\\Woocommerce Management System\\back-end\\.auto-claude/**)",
+      "Edit(G:\\Woocommerce Management System\\back-end\\.auto-claude/**)",
+      "Glob(G:\\Woocommerce Management System\\back-end\\.auto-claude/**)",
+      "Grep(G:\\Woocommerce Management System\\back-end\\.auto-claude/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)",
+      "mcp__graphiti-memory__search_nodes(*)",
+      "mcp__graphiti-memory__search_facts(*)",
+      "mcp__graphiti-memory__add_episode(*)",
+      "mcp__graphiti-memory__get_episodes(*)",
+      "mcp__graphiti-memory__get_entity_edge(*)"
+    ]
+  }
+}

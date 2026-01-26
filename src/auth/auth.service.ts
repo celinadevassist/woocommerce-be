@@ -406,7 +406,6 @@ export class AuthService {
     }
 
     // Generate new verification token
-    const { nanoid } = await eval('import("nanoid")');
     const verificationToken = nanoid(32);
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
