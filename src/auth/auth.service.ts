@@ -13,6 +13,7 @@ import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { config } from '../config.manager';
 import { sign, verify } from 'jsonwebtoken';
+import { nanoid } from 'nanoid';
 
 import { RoleService, SMSService, EmailService } from '../services';
 import { MailrelayService } from '../services/mailrelay.service';
