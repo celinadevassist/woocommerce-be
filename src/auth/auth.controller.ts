@@ -33,7 +33,7 @@ import { UserDocument } from 'src/schema';
 export class AuthController {
   constructor(private authService: AuthService) {}
   @Post('signup')
-  @Throttle([{ ttl: 3600000, limit: 3 }])
+  @Throttle({ default: { ttl: 3600000, limit: 3 } })
   @UsePipes(
     new JoiValidationPipe({
       body: SignUpSchema,
@@ -50,7 +50,7 @@ export class AuthController {
   }
 
   @Post('signin')
-  @Throttle([{ ttl: 60000, limit: 5 }])
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @UsePipes(
     new JoiValidationPipe({
       body: SignInSchema,
@@ -67,7 +67,7 @@ export class AuthController {
   }
 
   @Get('forgot-password/:email')
-  @Throttle([{ ttl: 3600000, limit: 3 }])
+  @Throttle({ default: { ttl: 3600000, limit: 3 } })
   @UsePipes(
     new JoiValidationPipe({
       param: {
@@ -84,7 +84,7 @@ export class AuthController {
   }
 
   @Post('reset-password')
-  @Throttle([{ ttl: 3600000, limit: 5 }])
+  @Throttle({ default: { ttl: 3600000, limit: 5 } })
   @UsePipes(
     new JoiValidationPipe({
       param: {
