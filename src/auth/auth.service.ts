@@ -84,7 +84,6 @@ export class AuthService {
     // console.log(user)
 
     // Generate email verification token
-    const { nanoid } = await eval('import("nanoid")');
     user.emailVerificationToken = nanoid(32);
     user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     user.emailVerified = false;
