@@ -33,6 +33,7 @@ import { UserDocument } from 'src/schema';
 export class AuthController {
   constructor(private authService: AuthService) {}
   @Post('signup')
+  @Throttle([{ ttl: 3600000, limit: 3 }])
   @UsePipes(
     new JoiValidationPipe({
       body: SignUpSchema,
