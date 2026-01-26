@@ -593,7 +593,7 @@ export class AuthService {
       },
       process.env.JWT_SECRET || config.jwt.secret,
       {
-        // expiresIn: process.env.JWT_EXPIRATION || config.jwt.expiration,
+        expiresIn: process.env.JWT_EXPIRATION || config.jwt.expiration,
       },
     );
     return token;
