@@ -84,6 +84,7 @@ export class AuthController {
   }
 
   @Post('reset-password')
+  @Throttle([{ ttl: 3600000, limit: 5 }])
   @UsePipes(
     new JoiValidationPipe({
       param: {
