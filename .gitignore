@@ -42,3 +42,13 @@ lerna-debug.log*
 
 # Auto Claude data directory
 .auto-claude/
+
+# Claude Code settings (local IDE config)
+.claude_settings.json
+
+# Runtime files
+server.pid
+
+# Auto Claude metadata
+.auto-claude-security.json
+.auto-claude-status
