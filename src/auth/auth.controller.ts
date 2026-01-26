@@ -10,6 +10,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
 import { Scopes, User } from '../decorators';
 
@@ -48,6 +49,7 @@ export class AuthController {
   }
 
   @Post('signin')
+  @Throttle([{ ttl: 60000, limit: 5 }])
   @UsePipes(
     new JoiValidationPipe({
       body: SignInSchema,
