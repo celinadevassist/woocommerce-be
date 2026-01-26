@@ -1,0 +1,39 @@
+{
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
+  "permissions": {
+    "defaultMode": "acceptEdits",
+    "allow": [
+      "Read(./**)",
+      "Write(./**)",
+      "Edit(./**)",
+      "Glob(./**)",
+      "Grep(./**)",
+      "Read(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\004-implement-rate-limiting-on-authentication-endpoint/**)",
+      "Write(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\004-implement-rate-limiting-on-authentication-endpoint/**)",
+      "Edit(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\004-implement-rate-limiting-on-authentication-endpoint/**)",
+      "Glob(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\004-implement-rate-limiting-on-authentication-endpoint/**)",
+      "Grep(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\004-implement-rate-limiting-on-authentication-endpoint/**)",
+      "Read(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\004-implement-rate-limiting-on-authentication-endpoint\\.auto-claude\\specs\\004-implement-rate-limiting-on-authentication-endpoint/**)",
+      "Write(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\004-implement-rate-limiting-on-authentication-endpoint\\.auto-claude\\specs\\004-implement-rate-limiting-on-authentication-endpoint/**)",
+      "Edit(G:\\Woocommerce Management System\\back-end\\.auto-claude\\worktrees\\tasks\\004-implement-rate-limiting-on-authentication-endpoint\\.auto-claude\\specs\\004-implement-rate-limiting-on-authentication-endpoint/**)",
+      "Read(G:\\Woocommerce Management System\\back-end\\.auto-claude/**)",
+      "Write(G:\\Woocommerce Management System\\back-end\\.auto-claude/**)",
+      "Edit(G:\\Woocommerce Management System\\back-end\\.auto-claude/**)",
+      "Glob(G:\\Woocommerce Management System\\back-end\\.auto-claude/**)",
+      "Grep(G:\\Woocommerce Management System\\back-end\\.auto-claude/**)",
+      "Bash(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "mcp__context7__resolve-library-id(*)",
+      "mcp__context7__get-library-docs(*)",
+      "mcp__graphiti-memory__search_nodes(*)",
+      "mcp__graphiti-memory__search_facts(*)",
+      "mcp__graphiti-memory__add_episode(*)",
+      "mcp__graphiti-memory__get_episodes(*)",
+      "mcp__graphiti-memory__get_entity_edge(*)"
+    ]
+  }
+}
