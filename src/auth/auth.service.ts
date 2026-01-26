@@ -244,7 +244,6 @@ export class AuthService {
     this.logger.log(`   User found: ${exist._id}`);
 
     // Generate password reset token
-    const { nanoid } = await eval('import("nanoid")');
     const resetToken = nanoid(32);
     const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
