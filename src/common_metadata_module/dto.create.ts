@@ -34,6 +34,7 @@ export class CreateMetadataDto {
       },
     },
     type: 'object',
+    additionalProperties: true,
   })
   @IsObject()
   @IsNotEmpty()

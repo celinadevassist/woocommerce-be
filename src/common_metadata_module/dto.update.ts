@@ -30,7 +30,7 @@ export class UpdateMetadataDto {
       preferences: { language: 'ar', timezone: 'GMT+3' },
     },
     type: 'object',
-    required: false,
+    additionalProperties: true,
   })
   @IsObject()
   @IsOptional()
