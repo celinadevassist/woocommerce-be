@@ -67,6 +67,7 @@ export class AuthController {
   }
 
   @Get('forgot-password/:email')
+  @Throttle([{ ttl: 3600000, limit: 3 }])
   @UsePipes(
     new JoiValidationPipe({
       param: {
