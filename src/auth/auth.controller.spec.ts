@@ -1,8 +1,9 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, HttpStatus } from '@nestjs/common';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
 import * as request from 'supertest';
+import { CustomThrottlerGuard } from '../guards/throttle.guard';
 
 // Mock dependencies to avoid circular dependency issues
 jest.mock('../services/users.service', () => ({
@@ -51,7 +52,7 @@ describe('AuthController Rate Limiting (Integration)', () => {
         AuthService,
         {
           provide: APP_GUARD,
-          useClass: ThrottlerGuard,
+          useClass: CustomThrottlerGuard,
         },
       ],
     }).compile();
