@@ -4,9 +4,11 @@ import {
   Post,
   Param,
   Query,
+  Res,
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiTags,
@@ -121,6 +123,53 @@ export class InventoryController {
       alertId,
       user._id.toString(),
     );
+  }
+
+  @Get('logs/export')
+  @ApiOperation({ summary: 'Export inventory change logs to CSV' })
+  @ApiResponse({ status: 200, description: 'Returns CSV file' })
+  @ApiQuery({ name: 'productId', required: false })
+  @ApiQuery({ name: 'storeId', required: false })
+  @ApiQuery({ name: 'changeType', required: false, enum: InventoryChangeType })
+  @ApiQuery({ name: 'startDate', required: false })
+  @ApiQuery({ name: 'endDate', required: false })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async exportLogs(
+    @Query('productId') productId: string,
+    @Query('storeId') storeId: string,
+    @Query('changeType') changeType: InventoryChangeType,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    const csv = await this.inventoryService.exportToCsv(
+      user._id.toString(),
+      {
+        productId,
+        storeId,
+        changeType,
+        startDate: startDate ? new Date(startDate) : undefined,
+        endDate: endDate ? new Date(endDate) : undefined,
+      },
+    );
+    const filename = `inventory-logs-export-${
+      new Date().toISOString().split('T')[0]
+    }.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(
+        filename,
+      )}`,
+    );
+    res.send(csv);
   }
 
   @Get('logs')
