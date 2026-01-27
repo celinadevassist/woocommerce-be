@@ -152,3 +152,47 @@ export class InvalidInputException extends BusinessException {
     );
   }
 }
+
+// Authentication specific exceptions
+export class AuthenticationFailedException extends BusinessException {
+  constructor(reason: string = 'Invalid credentials') {
+    super(
+      BusinessErrorCode.AUTHENTICATION_FAILED,
+      'Authentication failed',
+      {
+        reason,
+        action: 'check_credentials',
+      },
+      HttpStatus.UNAUTHORIZED,
+    );
+  }
+}
+
+export class TokenExpiredException extends BusinessException {
+  constructor(tokenType: string = 'token') {
+    super(
+      BusinessErrorCode.TOKEN_EXPIRED,
+      `${tokenType} has expired`,
+      {
+        tokenType,
+        action: 'request_new_token',
+      },
+      HttpStatus.UNAUTHORIZED,
+    );
+  }
+}
+
+export class SystemErrorException extends BusinessException {
+  constructor(operation: string, reason?: string) {
+    super(
+      BusinessErrorCode.SYSTEM_ERROR,
+      `System error during ${operation}`,
+      {
+        operation,
+        reason,
+        action: 'try_again_later',
+      },
+      HttpStatus.INTERNAL_SERVER_ERROR,
+    );
+  }
+}

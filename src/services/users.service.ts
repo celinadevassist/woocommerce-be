@@ -1,30 +1,33 @@
 import {
-  BadRequestException,
-  ConflictException,
   forwardRef,
   Inject,
   Injectable,
-  InternalServerErrorException,
-  UnauthorizedException,
   HttpStatus,
-  ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import * as bcrypt from 'bcryptjs';
 import { Model, Types } from 'mongoose';
 import { QueryUserDTO, PaginationQueryDTO } from '../dtos';
 import { SMSService } from './sms.service';
-import { generateBussinessError } from '../handlers/error-creator';
 import { AuthService } from 'src/auth/auth.service';
 import { ImageService } from './image.service';
 import getUserAttreputes from './getUserAttreputes';
 import { User, UserDocument } from 'src/schema';
-import { BusinessException } from 'src/exceptions/business.exception';
-import { ErrorCodes } from 'src/constants/error-codes';
+import {
+  BusinessException,
+  SystemErrorException,
+  ResourceNotFoundException,
+  DuplicateResourceException,
+  AccessDeniedException,
+} from 'src/shared/exceptions/business.exception';
+import { BusinessErrorCode } from 'src/shared/exceptions/business-error.codes';
 import { S3UploadService } from 'src/modules/s3-upload';
 
 @Injectable()
 export class UserService {
+  private readonly logger = new Logger(UserService.name);
+
   constructor(
     @InjectModel(User.name) private readonly userModel: Model<UserDocument>, // 👈 Changed from 'users'
     @Inject(forwardRef(() => SMSService))
@@ -40,10 +43,7 @@ export class UserService {
     const toUnset = {};
     const exist = await this.userModel.findOne({ _id: creator._id });
     if (!exist) {
-      throw new BusinessException(
-        ErrorCodes.USER_NOT_FOUND,
-        HttpStatus.NOT_FOUND,
-      );
+      throw new ResourceNotFoundException('User', creator._id);
     }
 
     if (userData.password) {
@@ -59,10 +59,7 @@ export class UserService {
         email: userData.email,
       });
       if (repeatedEmail) {
-        throw new BusinessException(
-          ErrorCodes.USER_EMAIL_ALREADY_EXISTS,
-          HttpStatus.CONFLICT,
-        );
+        throw new DuplicateResourceException('User', 'email', userData.email);
       }
     }
 
@@ -88,15 +85,13 @@ export class UserService {
   ): Promise<any> {
     const exist = await this.userModel.findOne({ _id: userId });
     if (!exist) {
-      throw new BusinessException(
-        ErrorCodes.USER_NOT_FOUND,
-        HttpStatus.NOT_FOUND,
-      );
+      throw new ResourceNotFoundException('User', userId);
     }
 
     // Check if S3 is configured
     if (!this.s3UploadService.isConfigured()) {
-      throw new BadRequestException(
+      throw new SystemErrorException(
+        'uploading profile image',
         'S3 is not configured. Please check AWS credentials.',
       );
     }
@@ -105,9 +100,9 @@ export class UserService {
     if (exist.imageS3Key) {
       try {
         await this.s3UploadService.deleteFile(exist.imageS3Key);
-        console.log(`Deleted old profile image: ${exist.imageS3Key}`);
+        this.logger.log(`Deleted old profile image: ${exist.imageS3Key}`);
       } catch (error) {
-        console.error('Failed to delete old profile image from S3:', error);
+        this.logger.error('Failed to delete old profile image from S3:', error);
         // Continue with upload even if deletion fails
       }
     }
@@ -138,19 +133,16 @@ export class UserService {
   async deleteProfileImage(userId: string): Promise<any> {
     const exist = await this.userModel.findOne({ _id: userId });
     if (!exist) {
-      throw new BusinessException(
-        ErrorCodes.USER_NOT_FOUND,
-        HttpStatus.NOT_FOUND,
-      );
+      throw new ResourceNotFoundException('User', userId);
     }
 
     // If user has S3 image, delete it
     if (exist.imageS3Key) {
       try {
         await this.s3UploadService.deleteFile(exist.imageS3Key);
-        console.log(`Deleted profile image: ${exist.imageS3Key}`);
+        this.logger.log(`Deleted profile image: ${exist.imageS3Key}`);
       } catch (error) {
-        console.error('Failed to delete profile image from S3:', error);
+        this.logger.error('Failed to delete profile image from S3:', error);
         // Continue with database update even if S3 deletion fails
       }
     }
@@ -170,15 +162,14 @@ export class UserService {
 
   async getProfile(id: string, creator, lang): Promise<any> {
     try {
-      const user = await this.userModel.findOne({ _id: creator._id })
+      const user = await this.userModel.findOne({ _id: creator._id });
       if (!user) {
-        throw new BusinessException(
-          ErrorCodes.USER_NOT_FOUND,
-          HttpStatus.NOT_FOUND,
-        );
+        throw new ResourceNotFoundException('User', creator._id);
       }
 
-      const profileImage = await this.imageService.findOne({ userId: creator._id });
+      const profileImage = await this.imageService.findOne({
+        userId: creator._id,
+      });
 
       // Create a user object with the image URL from profile
       const userObject = user.toObject();
@@ -192,10 +183,7 @@ export class UserService {
       };
     } catch (err) {
       if (err instanceof BusinessException) throw err;
-      throw new BusinessException(
-        ErrorCodes.INTERNAL_SERVER_ERROR,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new SystemErrorException('fetching user profile', err?.message);
     }
   }
 
@@ -203,10 +191,7 @@ export class UserService {
     if ((userData?.email && userData.email != '') || 0) {
       const userExist = await this.userModel.findOne({ email: userData.email });
       if (userExist)
-        throw new BusinessException(
-          ErrorCodes.USER_EMAIL_ALREADY_EXISTS,
-          HttpStatus.CONFLICT,
-        );
+        throw new DuplicateResourceException('User', 'email', userData.email);
     }
     const newUser = await this.userModel.create(userData);
     return newUser;
@@ -221,10 +206,7 @@ export class UserService {
     const toUnset = {};
     const exist = await this.userModel.findOne({ _id: id });
     if (!exist) {
-      throw new BusinessException(
-        ErrorCodes.USER_NOT_FOUND,
-        HttpStatus.NOT_FOUND,
-      );
+      throw new ResourceNotFoundException('User', id);
     }
 
     if (userData.email && userData.email !== exist?.email) {
@@ -232,10 +214,7 @@ export class UserService {
         email: userData.email,
       });
       if (repeatedEmail) {
-        throw new BusinessException(
-          ErrorCodes.USER_EMAIL_ALREADY_EXISTS,
-          HttpStatus.CONFLICT,
-        );
+        throw new DuplicateResourceException('User', 'email', userData.email);
       }
     }
 
@@ -259,25 +238,23 @@ export class UserService {
     const userDate = await this.userModel.findOne({ _id: id });
 
     if (!userDate) {
-      throw new BusinessException(
-        ErrorCodes.USER_NOT_FOUND,
-        HttpStatus.NOT_FOUND,
-      );
+      throw new ResourceNotFoundException('User', id);
     }
 
     if (data.role === userDate.role)
       throw new BusinessException(
-        ErrorCodes.BAD_REQUEST,
-        HttpStatus.BAD_REQUEST,
+        BusinessErrorCode.INVALID_INPUT,
+        'Role is already set to the requested value',
+        { currentRole: userDate.role, requestedRole: data.role },
       );
 
     let admins = [];
     if (data.role === 'user') {
       admins = await this.userModel.find({ role: 'admin' });
       if (admins.length === 1)
-        throw new BusinessException(
-          ErrorCodes.LAST_ADMIN_REMOVAL,
-          HttpStatus.FORBIDDEN,
+        throw new AccessDeniedException(
+          'role change',
+          'Cannot remove the last admin user',
         );
     }
     data['updatedAt'] = new Date();
@@ -323,10 +300,7 @@ export class UserService {
   async getOne(id: string): Promise<any> {
     const data = await this.userModel.findOne({ _id: id });
     if (data) return data;
-    throw new BusinessException(
-      ErrorCodes.USER_NOT_FOUND,
-      HttpStatus.NOT_FOUND,
-    );
+    throw new ResourceNotFoundException('User', id);
   }
 
   async remove(
@@ -335,17 +309,11 @@ export class UserService {
   ): Promise<{ message: string; deletedCount: number }> {
     const user = await this.userModel.findById(id);
     if (!user) {
-      throw new BusinessException(
-        ErrorCodes.USER_NOT_FOUND,
-        HttpStatus.NOT_FOUND,
-      );
+      throw new ResourceNotFoundException('User', id);
     }
 
     if (user.role === 'admin') {
-      throw new BusinessException(
-        ErrorCodes.ADMIN_DELETION_NOT_ALLOWED,
-        HttpStatus.FORBIDDEN,
-      );
+      throw new AccessDeniedException('user deletion', 'Cannot delete admin users');
     }
     const response = await this.userModel.deleteOne({ _id: id });
     return {
@@ -418,15 +386,15 @@ export class UserService {
     pagination: PaginationQueryDTO = { page: 1, limit: 10 },
   ): Promise<any> {
     try {
-      console.log(
+      this.logger.log(
         'getCommunityVisibleUsers called with user:',
         user?._id ? user._id.toString() : 'undefined',
       );
 
       // const isAuthenticated = !!(user && (user._id));
       // if (!isAuthenticated) {
-      //   console.log('User is not authenticated');
-      //   throw new ForbiddenException('Not allowed to access this community. You have to be a member.');
+      //   this.logger.log('User is not authenticated');
+      //   throw new AccessDeniedException('community', 'You must be a member to access this community');
       // }
 
       // Set defaults if not provided
@@ -456,10 +424,10 @@ export class UserService {
         filter.location = { $regex: pagination.location, $options: 'i' };
       }
 
-      console.log('Query filter:', filter);
+      this.logger.log('Query filter:', filter);
 
       // Find all users matching the filter
-      console.log('Searching for users with filter');
+      this.logger.log('Searching for users with filter');
       const total = await this.userModel.countDocuments(filter);
       const users = await this.userModel
         .find(filter)
@@ -467,7 +435,7 @@ export class UserService {
         .limit(limit)
         .lean();
 
-      console.log(`Found ${users?.length || 0} users matching the filter`);
+      this.logger.log(`Found ${users?.length || 0} users matching the filter`);
       if (!users || users.length === 0) {
         return {
           data: [],
@@ -511,14 +479,11 @@ export class UserService {
         },
       };
     } catch (error) {
-      console.error('Error in getCommunityVisibleUsers:', error);
-      if (error instanceof ForbiddenException) {
+      this.logger.error('Error in getCommunityVisibleUsers:', error);
+      if (error instanceof BusinessException) {
         throw error;
       }
-      throw new BusinessException(
-        ErrorCodes.INTERNAL_SERVER_ERROR,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new SystemErrorException('fetching community users', error?.message);
     }
   }
 }

@@ -1,10 +1,7 @@
 import {
-  ConflictException,
   Injectable,
   Inject,
   forwardRef,
-  InternalServerErrorException,
-  UnauthorizedException,
   Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -13,17 +10,23 @@ import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { config } from '../config.manager';
 import { sign, verify } from 'jsonwebtoken';
-import { nanoid } from 'nanoid';
 
 import { RoleService, SMSService, EmailService } from '../services';
 import { MailrelayService } from '../services/mailrelay.service';
 import { MailerService } from '../services/mailer.service';
-import { generateBussinessError } from '../handlers/error-creator';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 import { ImageService } from 'src/services/image.service';
 import getUserAttreputes from 'src/services/getUserAttreputes';
 import { User, UserDocument } from 'src/schema';
+import {
+  DuplicateResourceException,
+  ResourceNotFoundException,
+  AuthenticationFailedException,
+  TokenExpiredException,
+  SystemErrorException,
+  ValidationException,
+} from 'src/shared/exceptions/business.exception';
 
 @Injectable()
 export class AuthService {
@@ -58,7 +61,7 @@ export class AuthService {
     let exist = await this.userModel.findOne({ email: user.email });
 
     if (exist) {
-      generateBussinessError('user_already_exist', lang, 409);
+      throw new DuplicateResourceException('User', 'email', user.email);
     }
     // //create general type role to use the regions and metadata in creating profile data other thsn this will give 403 forbidden
     // user.role = 'user';
@@ -84,6 +87,7 @@ export class AuthService {
     // console.log(user)
 
     // Generate email verification token
+    const { nanoid } = await eval('import("nanoid")');
     user.emailVerificationToken = nanoid(32);
     user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     user.emailVerified = false;
@@ -169,21 +173,20 @@ export class AuthService {
       .select('+password +hashKey');
 
     if (!exist) {
-      generateBussinessError('email_not_exist', lang, 401);
+      throw new ResourceNotFoundException('User', normalizedEmail);
     }
     if (!exist.password) {
-      generateBussinessError(
-        'Click On Forget Your Password, And Create New Password To Your Account',
-        lang,
-        401,
+      throw new ValidationException(
+        'password',
+        'No password set for this account. Please use forgot password to create a new one',
       );
     }
     // if (exist.status === 'NEW') {
-    //   generateBussinessError('phone_need_verification', lang, 409);
+    //   throw new ValidationException('account', 'Phone verification required');
     // }
 
     if (!(await this.validatePassword(exist, user.password))) {
-      generateBussinessError('wrong_password', lang, 401);
+      throw new AuthenticationFailedException('Invalid email or password');
     }
     const token = await this.retrieveToken(exist._id, exist.mobile, exist.role);
 
@@ -238,12 +241,13 @@ export class AuthService {
     const exist = await this.findUserByEmail(email);
     if (!exist) {
       this.logger.warn(`   User not found: ${email}`);
-      generateBussinessError('email_not_exist', lang, 401);
+      throw new ResourceNotFoundException('User', email);
     }
 
     this.logger.log(`   User found: ${exist._id}`);
 
     // Generate password reset token
+    const { nanoid } = await eval('import("nanoid")');
     const resetToken = nanoid(32);
     const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
@@ -307,7 +311,7 @@ export class AuthService {
         error,
       );
       this.logger.error(`   Error details: ${JSON.stringify(error)}`);
-      generateBussinessError('email_send_failed', lang, 500);
+      throw new SystemErrorException('sending password reset email', error?.message || 'Email service unavailable');
     }
   }
 
@@ -322,7 +326,7 @@ export class AuthService {
     });
 
     if (!exist) {
-      generateBussinessError('invalid_or_expired_token', lang, 401);
+      throw new TokenExpiredException('Password reset token');
     }
 
     // Update password
@@ -359,7 +363,7 @@ export class AuthService {
     });
 
     if (!exist) {
-      generateBussinessError('invalid_or_expired_token', lang, 401);
+      throw new TokenExpiredException('Email verification token');
     }
 
     await this.userModel.findOneAndUpdate(
@@ -391,7 +395,7 @@ export class AuthService {
     const exist = await this.userModel.findById(userId);
 
     if (!exist) {
-      generateBussinessError('user_not_found', lang, 404);
+      throw new ResourceNotFoundException('User', userId);
     }
 
     if (exist.emailVerified) {
@@ -406,6 +410,7 @@ export class AuthService {
     }
 
     // Generate new verification token
+    const { nanoid } = await eval('import("nanoid")');
     const verificationToken = nanoid(32);
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
@@ -441,7 +446,7 @@ export class AuthService {
         `Failed to resend verification email to ${exist.email}:`,
         error,
       );
-      generateBussinessError('email_send_failed', lang, 500);
+      throw new SystemErrorException('sending verification email', error?.message || 'Email service unavailable');
     }
   }
 
@@ -465,7 +470,7 @@ export class AuthService {
   async changePassword(data, creator, lang): Promise<{ message: any }> {
     const exist = await this.findUserExistance(creator._id);
     if (!exist) {
-      generateBussinessError('email_not_exist', lang, 401);
+      throw new ResourceNotFoundException('User', creator._id);
     }
     const hashKey = await bcrypt.genSalt();
     const password = await this.encryptPassword(data.newPassword, hashKey);
@@ -591,7 +596,7 @@ export class AuthService {
       },
       process.env.JWT_SECRET || config.jwt.secret,
       {
-        expiresIn: process.env.JWT_EXPIRATION || config.jwt.expiration,
+        // expiresIn: process.env.JWT_EXPIRATION || config.jwt.expiration,
       },
     );
     return token;
