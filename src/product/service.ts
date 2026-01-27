@@ -34,6 +34,7 @@ import {
   WooProductVariation,
 } from '../integrations/woocommerce/woocommerce.types';
 import { S3UploadService } from '../modules/s3-upload/s3-upload.service';
+import { SearchAnalyticsService } from '../modules/search-analytics/search-analytics.service';
 
 @Injectable()
 export class ProductService {
@@ -48,6 +49,7 @@ export class ProductService {
     @InjectModel(Tag.name) private tagModel: Model<TagDocument>,
     private readonly wooCommerceService: WooCommerceService,
     private readonly s3UploadService: S3UploadService,
+    private readonly searchAnalyticsService: SearchAnalyticsService,
   ) {}
 
   /**
