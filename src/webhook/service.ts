@@ -65,7 +65,7 @@ export class WebhookService {
     if (signature !== expectedSignature) {
       this.logger.error(`Invalid webhook signature for store ${storeId}`);
       throw new AuthenticationFailedException(
-        'Webhook signature verification failed. Ensure the webhook secret in your WooCommerce store matches the secret configured in this system.',
+        'Webhook signature verification failed. Ensure the webhook secret in your WooCommerce store matches the secret configured in this system',
       );
     }
 
