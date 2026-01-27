@@ -51,6 +51,7 @@ export class CustomerController {
 
   @Get()
   @ApiOperation({ summary: 'Get all customers with filtering' })
+  @ApiResponse({ status: 200, description: 'Customers retrieved successfully' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: false })
   @ApiQuery({ name: 'status', enum: CustomerStatus, required: false })
@@ -71,6 +72,7 @@ export class CustomerController {
 
   @Get('stats')
   @ApiOperation({ summary: 'Get customer statistics' })
+  @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: false })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
@@ -147,6 +149,8 @@ export class CustomerController {
 
   @Get(':id')
   @ApiOperation({ summary: 'Get customer by ID' })
+  @ApiResponse({ status: 200, description: 'Customer retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Customer not found' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Customer ID' })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
@@ -156,6 +160,8 @@ export class CustomerController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Update customer' })
+  @ApiResponse({ status: 200, description: 'Customer updated successfully' })
+  @ApiResponse({ status: 404, description: 'Customer not found' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'id', description: 'Customer ID' })
   @UsePipes(
@@ -302,6 +308,7 @@ export class CustomerController {
 
   @Get('segments/list')
   @ApiOperation({ summary: 'Get all customer segments' })
+  @ApiResponse({ status: 200, description: 'Segments retrieved successfully' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
   async getSegments(@User('_id') userId: string) {
@@ -310,6 +317,8 @@ export class CustomerController {
 
   @Post('segments')
   @ApiOperation({ summary: 'Create a customer segment' })
+  @ApiResponse({ status: 201, description: 'Segment created successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @UsePipes(
     new JoiValidationPipe({
@@ -326,6 +335,8 @@ export class CustomerController {
 
   @Patch('segments/:segmentId')
   @ApiOperation({ summary: 'Update a customer segment' })
+  @ApiResponse({ status: 200, description: 'Segment updated successfully' })
+  @ApiResponse({ status: 404, description: 'Segment not found' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'segmentId', description: 'Segment ID' })
   @UsePipes(
@@ -344,6 +355,8 @@ export class CustomerController {
 
   @Delete('segments/:segmentId')
   @ApiOperation({ summary: 'Delete a customer segment' })
+  @ApiResponse({ status: 200, description: 'Segment deleted successfully' })
+  @ApiResponse({ status: 404, description: 'Segment not found' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'segmentId', description: 'Segment ID' })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
@@ -357,6 +370,8 @@ export class CustomerController {
 
   @Get('segments/:segmentId/customers')
   @ApiOperation({ summary: 'Get customers in a segment' })
+  @ApiResponse({ status: 200, description: 'Customers retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Segment not found' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiParam({ name: 'segmentId', description: 'Segment ID' })
   @ApiQuery({ name: 'page', required: false, type: Number })
