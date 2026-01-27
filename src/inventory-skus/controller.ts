@@ -7,9 +7,11 @@ import {
   Body,
   Param,
   Query,
+  Res,
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiTags,
@@ -17,6 +19,7 @@ import {
   ApiBearerAuth,
   ApiParam,
   ApiQuery,
+  ApiResponse,
 } from '@nestjs/swagger';
 import { InventorySKUsService } from './service';
 import {
@@ -80,6 +83,30 @@ export class InventorySKUsController {
     @Query('storeId') storeId: string,
   ) {
     return this.skusService.getCategories(userId, storeId);
+  }
+
+  @Get('export')
+  @ApiOperation({ summary: 'Export SKUs to CSV' })
+  @ApiResponse({ status: 200, description: 'Returns CSV file' })
+  @UsePipes(new JoiValidationPipe({ query: QuerySKUSchema }))
+  async exportCsv(
+    @User('_id') userId: string,
+    @Query() query: QuerySKUDto,
+    @Res() res: Response,
+  ): Promise<void> {
+    const csv = await this.skusService.exportToCsv(userId, query);
+    const filename = `inventory-skus-export-${
+      new Date().toISOString().split('T')[0]
+    }.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(
+        filename,
+      )}`,
+    );
+    res.send(csv);
   }
 
   // Parameterized routes come after static routes
