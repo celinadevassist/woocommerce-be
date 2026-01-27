@@ -73,3 +73,82 @@ export class PaymentRequiredException extends BusinessException {
     );
   }
 }
+
+// Common error scenarios
+export class ResourceNotFoundException extends BusinessException {
+  constructor(resourceType: string, identifier: string | number) {
+    super(
+      BusinessErrorCode.RESOURCE_NOT_FOUND_DETAILED,
+      `${resourceType} not found`,
+      {
+        resourceType,
+        identifier,
+        action: 'verify_id',
+      },
+      HttpStatus.NOT_FOUND,
+    );
+  }
+}
+
+export class ValidationException extends BusinessException {
+  constructor(field: string, reason: string, constraints?: Record<string, any>) {
+    super(
+      BusinessErrorCode.VALIDATION_FAILED,
+      `Validation failed for ${field}: ${reason}`,
+      {
+        field,
+        reason,
+        constraints,
+        action: 'check_input',
+      },
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+}
+
+export class AccessDeniedException extends BusinessException {
+  constructor(resource: string, reason?: string) {
+    super(
+      BusinessErrorCode.ACCESS_DENIED,
+      `Access denied to ${resource}${reason ? ': ' + reason : ''}`,
+      {
+        resource,
+        reason,
+        action: 'check_permissions',
+      },
+      HttpStatus.FORBIDDEN,
+    );
+  }
+}
+
+export class DuplicateResourceException extends BusinessException {
+  constructor(resourceType: string, field: string, value: any) {
+    super(
+      BusinessErrorCode.DUPLICATE_RESOURCE_DETAILED,
+      `${resourceType} with ${field} '${value}' already exists`,
+      {
+        resourceType,
+        field,
+        value,
+        action: 'use_different_value',
+      },
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
+export class InvalidInputException extends BusinessException {
+  constructor(parameter: string, reason: string, expected?: string) {
+    super(
+      BusinessErrorCode.INVALID_INPUT,
+      `Invalid ${parameter}: ${reason}`,
+      {
+        parameter,
+        reason,
+        expected,
+        action: 'correct_input',
+      },
+      HttpStatus.BAD_REQUEST,
+    );
+  }
+}
