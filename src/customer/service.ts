@@ -275,6 +275,7 @@ export class CustomerService {
   async findAll(
     userId: string,
     query: QueryCustomerDto,
+    ip?: string,
   ): Promise<ICustomerResponse> {
     const storeIds = await this.getUserStoreIds(userId);
 
@@ -337,6 +338,17 @@ export class CustomerService {
       this.customerModel.find(filter).sort(sort).skip(skip).limit(size),
       this.customerModel.countDocuments(filter),
     ]);
+
+    // Track search analytics if search query is provided
+    if (query.search) {
+      await this.searchAnalyticsService.saveSearchQuery(
+        query.search,
+        'customers',
+        total,
+        ip,
+        userId,
+      );
+    }
 
     // Calculate dynamic stats for all customers in bulk
     const customerIds = customers.map((c) => c._id);
