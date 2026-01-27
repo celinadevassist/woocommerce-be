@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Invoice {{invoiceNumber}}</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      color: #333;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+    }
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .email-wrapper {
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: #ffffff;
+      padding: 30px;
+      text-align: center;
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    .content {
+      padding: 30px;
+    }
+    .content p {
+      margin: 0 0 16px;
+      color: #555;
+    }
+    .invoice-header {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #f0f0f0;
+    }
+    .invoice-details {
+      font-size: 14px;
+    }
+    .invoice-details strong {
+      display: block;
+      color: #333;
+      margin-bottom: 5px;
+    }
+    .info-box {
+      background-color: #e8f4fd;
+      border: 1px solid #b8daff;
+      border-radius: 6px;
+      padding: 15px;
+      margin: 20px 0;
+      color: #004085;
+      font-size: 14px;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 20px 0;
+    }
+    .items-table th {
+      background-color: #f8f9fa;
+      padding: 12px;
+      text-align: left;
+      font-weight: 600;
+      color: #333;
+      border-bottom: 2px solid #dee2e6;
+    }
+    .items-table td {
+      padding: 12px;
+      border-bottom: 1px solid #dee2e6;
+      color: #555;
+    }
+    .items-table tr:last-child td {
+      border-bottom: none;
+    }
+    .text-right {
+      text-align: right;
+    }
+    .totals-section {
+      margin-top: 30px;
+      padding-top: 20px;
+      border-top: 2px solid #f0f0f0;
+    }
+    .totals-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      font-size: 15px;
+    }
+    .totals-row.total {
+      font-size: 18px;
+      font-weight: 600;
+      color: #333;
+      margin-top: 10px;
+      padding-top: 15px;
+      border-top: 2px solid #667eea;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+    .status-paid {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .status-pending {
+      background-color: #fff3cd;
+      color: #856404;
+    }
+    .status-overdue {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+    .footer {
+      background-color: #f8f9fa;
+      padding: 20px 30px;
+      text-align: center;
+      font-size: 13px;
+      color: #888;
+    }
+    .footer p {
+      margin: 5px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="email-wrapper">
+      <div class="header">
+        <h1>{{appName}}</h1>
+      </div>
+      <div class="content">
+        <p>Hello {{customerName}},</p>
+        <p>Thank you for your business. Please find your invoice details below:</p>
+
+        <div class="invoice-header">
+          <div>
+            <strong>Invoice Number:</strong>
+            <span>{{invoiceNumber}}</span>
+          </div>
+          <div class="invoice-details text-right">
+            <strong>Invoice Date:</strong>
+            <span>{{invoiceDate}}</span>
+            <br>
+            <strong>Due Date:</strong>
+            <span>{{dueDate}}</span>
+          </div>
+        </div>
+
+        <div class="info-box">
+          <strong>Status:</strong>
+          {{#if (eq status "paid")}}
+            <span class="status-badge status-paid">{{status}}</span>
+          {{else if (eq status "overdue")}}
+            <span class="status-badge status-overdue">{{status}}</span>
+          {{else}}
+            <span class="status-badge status-pending">{{status}}</span>
+          {{/if}}
+        </div>
+
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th>Description</th>
+              <th class="text-right">Quantity</th>
+              <th class="text-right">Unit Price</th>
+              <th class="text-right">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{#each items}}
+            <tr>
+              <td>{{this.description}}</td>
+              <td class="text-right">{{this.quantity}}</td>
+              <td class="text-right">{{../currency}}{{this.unitPrice}}</td>
+              <td class="text-right">{{../currency}}{{this.amount}}</td>
+            </tr>
+            {{/each}}
+          </tbody>
+        </table>
+
+        <div class="totals-section">
+          <div class="totals-row">
+            <span>Subtotal:</span>
+            <span>{{currency}}{{subtotal}}</span>
+          </div>
+          <div class="totals-row">
+            <span>Tax ({{taxRate}}%):</span>
+            <span>{{currency}}{{tax}}</span>
+          </div>
+          <div class="totals-row total">
+            <span>Total:</span>
+            <span>{{currency}}{{total}}</span>
+          </div>
+        </div>
+
+        <p style="margin-top: 30px;">If you have any questions about this invoice, please don't hesitate to contact our support team.</p>
+      </div>
+      <div class="footer">
+        <p>This email was sent by {{appName}}</p>
+        <p>If you have any questions, please contact our support team.</p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
