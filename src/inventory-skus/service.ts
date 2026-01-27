@@ -202,6 +202,111 @@ export class InventorySKUsService {
   }
 
   /**
+   * Export SKUs to CSV
+   */
+  async exportToCsv(userId: string, query: QuerySKUDto): Promise<string> {
+    if (!query.storeId) {
+      throw new BadRequestException('Store ID is required');
+    }
+
+    await this.getStoreWithAccess(query.storeId, userId);
+
+    const filter: any = {
+      storeId: new Types.ObjectId(query.storeId),
+      isDeleted: false,
+    };
+
+    // Apply filters
+    if (query.category) {
+      filter.category = query.category;
+    }
+    if (query.status) {
+      filter.status = query.status;
+    }
+    if (query.keyword) {
+      filter.$or = [
+        { title: { $regex: query.keyword, $options: 'i' } },
+        { sku: { $regex: query.keyword, $options: 'i' } },
+        { description: { $regex: query.keyword, $options: 'i' } },
+      ];
+    }
+
+    const skus = await this.skuModel
+      .find(filter)
+      .sort({ title: 1 })
+      .limit(10000); // Max 10k SKUs
+
+    // CSV Header
+    const headers = [
+      'SKU',
+      'Title',
+      'Description',
+      'Category',
+      'Status',
+      'Materials Count',
+      'Labor Cost',
+      'Overhead Cost',
+      'Fixed Cost',
+      'Calculated Cost',
+      'Selling Price',
+      'Profit Margin',
+      'Min Stock Level',
+      'Reorder Point',
+      'Reorder Quantity',
+      'Created Date',
+    ];
+
+    // CSV Rows
+    const rows = skus.map((sku) => {
+      const profitMargin =
+        sku.sellingPrice > 0
+          ? ((sku.sellingPrice - sku.calculatedCost) / sku.sellingPrice) * 100
+          : 0;
+
+      return [
+        sku.sku || '',
+        sku.title || '',
+        (sku.description || '').replace(/\n/g, ' ').substring(0, 200),
+        sku.category || '',
+        sku.status || '',
+        (sku.materials || []).length,
+        sku.laborCost || 0,
+        sku.overheadCost || 0,
+        sku.fixedCost ? 'Yes' : 'No',
+        sku.calculatedCost || 0,
+        sku.sellingPrice || 0,
+        profitMargin.toFixed(2),
+        sku.minStockLevel || 0,
+        sku.reorderPoint || 0,
+        sku.reorderQuantity || 0,
+        sku.createdAt
+          ? new Date(sku.createdAt).toISOString().split('T')[0]
+          : '',
+      ];
+    });
+
+    // Escape CSV values
+    const escapeValue = (val: any): string => {
+      const str = String(val ?? '');
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    // Build CSV with UTF-8 BOM for proper character encoding
+    const BOM = '\uFEFF';
+    const csvContent =
+      BOM +
+      [
+        headers.map(escapeValue).join(','),
+        ...rows.map((row) => row.map(escapeValue).join(',')),
+      ].join('\n');
+
+    return csvContent;
+  }
+
+  /**
    * Update a SKU
    */
   async update(
