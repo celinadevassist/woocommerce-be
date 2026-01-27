@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import * as Joi from 'joi';
 import { statusEnum, systemStatusEnum } from '../enums';
 import { EmailSchema } from './email.dto';
@@ -7,25 +7,27 @@ import { MongoIdSchema } from './mongo-id.dto';
 import { genderEnum } from 'src/enums/gender.enum';
 
 export class CreateUserDTO {
-  @ApiProperty({ description: 'first Name', type: String, required: true })
+  @ApiProperty({ example: 'Ahmed' })
   firstName: string;
 
-  @ApiProperty({ description: 'father Name', type: String, required: true })
+  @ApiProperty({ example: 'Hassan' })
   lastName: string;
 
-  @ApiProperty({ description: 'Email', type: String, required: false })
+  @ApiPropertyOptional({ example: 'ahmed.hassan@example.com' })
   email: string;
 
-  @ApiProperty({ description: 'Mobile number', type: String, required: false })
+  @ApiPropertyOptional({ example: '+201234567890' })
   mobile?: string;
 
-  @ApiProperty({ description: 'User skills', type: [String], required: false })
+  @ApiPropertyOptional({ example: ['JavaScript', 'React', 'Node.js'] })
   skills?: string[];
 
-  @ApiProperty({
-    description: 'Social media links',
-    type: Object,
-    required: false,
+  @ApiPropertyOptional({
+    example: {
+      linkedin: 'https://linkedin.com/in/ahmedhassan',
+      twitter: 'https://twitter.com/ahmedhassan',
+      github: 'https://github.com/ahmedhassan',
+    },
   })
   socialLinks?: {
     linkedin?: string;
@@ -38,25 +40,16 @@ export class CreateUserDTO {
     website?: string;
   };
 
-  @ApiProperty({ description: 'User location', type: String, required: false })
+  @ApiPropertyOptional({ example: 'Cairo, Egypt' })
   location?: string;
 
-  @ApiProperty({
-    description: 'Preferred language',
-    type: String,
-    required: false,
-  })
+  @ApiPropertyOptional({ example: 'en' })
   preferredLanguage?: string;
 
-  @ApiProperty({ description: 'User bio', type: String, required: false })
+  @ApiPropertyOptional({ example: 'Full-stack developer passionate about building scalable web applications' })
   bio?: string;
 
-  @ApiProperty({
-    description: 'Visible to community',
-    type: Boolean,
-    required: false,
-    default: false,
-  })
+  @ApiPropertyOptional({ example: true })
   visibleToCommunity?: boolean;
 }
 

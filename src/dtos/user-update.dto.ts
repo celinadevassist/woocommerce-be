@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import * as Joi from 'joi';
 import { statusEnum } from '../enums';
 import { EmailSchema } from './email.dto';
@@ -7,25 +7,28 @@ import { MongoIdSchema } from './mongo-id.dto';
 import { genderEnum } from 'src/enums/gender.enum';
 import { MembershipStatus } from '../enums/membership.enum';
 export class UpdateUserDTO {
-  @ApiProperty({ description: 'first Name', type: String, required: false })
+  @ApiPropertyOptional({ example: 'Ahmed' })
   firstName: string;
 
-  @ApiProperty({ description: 'father Name', type: String, required: false })
+  @ApiPropertyOptional({ example: 'Hassan' })
   lastName: string;
 
-  @ApiProperty({ description: 'image', type: String, required: false })
+  @ApiPropertyOptional({ example: 'https://example.com/images/profile.jpg' })
   image: string;
 
-  @ApiProperty({ description: 'mobile', type: String, required: false })
+  @ApiPropertyOptional({ example: '+201234567890' })
   mobile?: string;
 
-  @ApiProperty({ description: 'User skills', type: [String], required: false })
+  @ApiPropertyOptional({ example: ['JavaScript', 'TypeScript', 'React', 'NestJS'] })
   skills?: string[];
 
-  @ApiProperty({
-    description: 'Social media links',
-    type: Object,
-    required: false,
+  @ApiPropertyOptional({
+    example: {
+      linkedin: 'https://linkedin.com/in/ahmedhassan',
+      twitter: 'https://twitter.com/ahmedhassan',
+      github: 'https://github.com/ahmedhassan',
+      website: 'https://ahmedhassan.dev',
+    },
   })
   socialLinks?: {
     linkedin?: string;
@@ -38,53 +41,29 @@ export class UpdateUserDTO {
     website?: string;
   };
 
-  @ApiProperty({ description: 'User location', type: String, required: false })
+  @ApiPropertyOptional({ example: 'Cairo, Egypt' })
   location?: string;
 
-  @ApiProperty({
-    description: 'Last active timestamp',
-    type: Date,
-    required: false,
-  })
+  @ApiPropertyOptional({ example: '2024-01-15T10:30:00Z' })
   lastActive?: Date;
 
-  @ApiProperty({ description: 'bio', type: String, required: false })
+  @ApiPropertyOptional({ example: 'Senior full-stack developer with 5 years of experience' })
   bio?: string;
 
-  @ApiProperty({
-    description: 'visible To Community',
-    type: Boolean,
-    required: false,
-  })
+  @ApiPropertyOptional({ example: true })
   visibleToCommunity?: boolean;
 
   // Membership fields
-  @ApiProperty({
-    description: 'Membership status',
-    enum: MembershipStatus,
-    required: false,
-  })
+  @ApiPropertyOptional({ example: MembershipStatus.ACTIVE, enum: MembershipStatus })
   membershipStatus?: MembershipStatus;
 
-  @ApiProperty({
-    description: 'Membership end date',
-    type: Date,
-    required: false,
-  })
+  @ApiPropertyOptional({ example: '2024-12-31T23:59:59Z' })
   membershipEndDate?: Date;
 
-  @ApiProperty({
-    description: 'Membership price paid',
-    type: Number,
-    required: false,
-  })
+  @ApiPropertyOptional({ example: 99.99 })
   membershipPrice?: number;
 
-  @ApiProperty({
-    description: 'Number of specialist sessions attended',
-    type: Number,
-    required: false,
-  })
+  @ApiPropertyOptional({ example: 5 })
   specialistSessionsAttended?: number;
 }
 
