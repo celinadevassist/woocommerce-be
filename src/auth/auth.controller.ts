@@ -10,6 +10,7 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
 import { Scopes, User } from '../decorators';
 
@@ -32,6 +33,7 @@ import { UserDocument } from 'src/schema';
 export class AuthController {
   constructor(private authService: AuthService) {}
   @Post('signup')
+  @Throttle({ default: { ttl: 3600000, limit: 3 } })
   @UsePipes(
     new JoiValidationPipe({
       body: SignUpSchema,
@@ -48,6 +50,7 @@ export class AuthController {
   }
 
   @Post('signin')
+  @Throttle({ default: { ttl: 60000, limit: 5 } })
   @UsePipes(
     new JoiValidationPipe({
       body: SignInSchema,
@@ -64,6 +67,7 @@ export class AuthController {
   }
 
   @Get('forgot-password/:email')
+  @Throttle({ default: { ttl: 3600000, limit: 3 } })
   @UsePipes(
     new JoiValidationPipe({
       param: {
@@ -80,6 +84,7 @@ export class AuthController {
   }
 
   @Post('reset-password')
+  @Throttle({ default: { ttl: 3600000, limit: 5 } })
   @UsePipes(
     new JoiValidationPipe({
       param: {

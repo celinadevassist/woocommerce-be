@@ -34,6 +34,7 @@
     "@nestjs/schedule": "^5.0.0",
     "@nestjs/serve-static": "^5.0.0",
     "@nestjs/swagger": "^8.0.0",
+    "@nestjs/throttler": "^6.5.0",
     "@types/dotenv": "^8.2.0",
     "@types/handlebars": "^4.1.0",
     "@types/nodemailer": "^6.4.17",
@@ -117,6 +118,9 @@
       "**/*.(t|j)s"
     ],
     "coverageDirectory": "../coverage",
-    "testEnvironment": "node"
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^src/(.*)$": "<rootDir>/$1"
+    }
   }
 }

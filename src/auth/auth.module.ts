@@ -1,4 +1,5 @@
 import { forwardRef, Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { PassportModule } from '@nestjs/passport';
@@ -16,6 +17,8 @@ import { MailerService } from 'src/services/mailer.service';
 import { LoggerService } from 'src/logger/logger.service';
 import { MetadataModule } from 'src/common_metadata_module/module';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule } from '@nestjs/throttler';
+import { CustomThrottlerGuard } from '../guards/throttle.guard';
 
 @Module({
   imports: [
@@ -23,6 +26,12 @@ import { ConfigModule } from '@nestjs/config';
     RoleModule,
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
     PassportModule.register({ defaultStrategy: 'jwt' }),
+    ThrottlerModule.forRoot([
+      {
+        ttl: 60000, // 60 seconds
+        limit: 10, // 10 requests per ttl (default, can be overridden per endpoint)
+      },
+    ]),
     HttpModule,
     forwardRef(() => LoggerModule),
     forwardRef(() => ImageModule),
@@ -37,6 +46,10 @@ import { ConfigModule } from '@nestjs/config';
     MailrelayService,
     MailerService,
     LoggerService,
+    {
+      provide: APP_GUARD,
+      useClass: CustomThrottlerGuard,
+    },
   ],
   exports: [JwtStrategy, AuthService],
 })
