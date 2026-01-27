@@ -9,7 +9,12 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { AuthService } from './auth.service';
-import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiBearerAuth,
+  ApiOperation,
+  ApiResponse,
+} from '@nestjs/swagger';
 
 import { Scopes, User } from '../decorators';
 
@@ -32,6 +37,9 @@ import { UserDocument } from 'src/schema';
 export class AuthController {
   constructor(private authService: AuthService) {}
   @Post('signup')
+  @ApiOperation({ summary: 'Create a new user account' })
+  @ApiResponse({ status: 201, description: 'User registered successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid input or user already exists' })
   @UsePipes(
     new JoiValidationPipe({
       body: SignUpSchema,
@@ -48,6 +56,10 @@ export class AuthController {
   }
 
   @Post('signin')
+  @ApiOperation({ summary: 'Sign in to an existing account' })
+  @ApiResponse({ status: 200, description: 'User signed in successfully, returns JWT token' })
+  @ApiResponse({ status: 400, description: 'Invalid credentials' })
+  @ApiResponse({ status: 401, description: 'Authentication failed' })
   @UsePipes(
     new JoiValidationPipe({
       body: SignInSchema,
@@ -64,6 +76,9 @@ export class AuthController {
   }
 
   @Get('forgot-password/:email')
+  @ApiOperation({ summary: 'Request password reset email' })
+  @ApiResponse({ status: 200, description: 'Password reset email sent successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid email address' })
   @UsePipes(
     new JoiValidationPipe({
       param: {
@@ -80,6 +95,9 @@ export class AuthController {
   }
 
   @Post('reset-password')
+  @ApiOperation({ summary: 'Reset password using token from email' })
+  @ApiResponse({ status: 200, description: 'Password reset successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired token' })
   @UsePipes(
     new JoiValidationPipe({
       param: {
@@ -99,6 +117,9 @@ export class AuthController {
   }
 
   @Get('verify-email/:token')
+  @ApiOperation({ summary: 'Verify email address with token' })
+  @ApiResponse({ status: 200, description: 'Email verified successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired verification token' })
   @UsePipes(
     new JoiValidationPipe({
       param: {
@@ -114,6 +135,9 @@ export class AuthController {
   }
 
   @Post('resend-verification')
+  @ApiOperation({ summary: 'Resend email verification link' })
+  @ApiResponse({ status: 200, description: 'Verification email sent successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - authentication required' })
   @UsePipes(
     new JoiValidationPipe({
       param: {
@@ -133,6 +157,10 @@ export class AuthController {
   }
 
   @Post('change-password')
+  @ApiOperation({ summary: 'Change password for authenticated user' })
+  @ApiResponse({ status: 200, description: 'Password changed successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid password or validation failed' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - authentication required' })
   @UsePipes(
     new JoiValidationPipe({
       body: UpdatePasswordSchema,
@@ -151,6 +179,9 @@ export class AuthController {
   }
 
   @Post('logout')
+  @ApiOperation({ summary: 'Logout authenticated user' })
+  @ApiResponse({ status: 200, description: 'Logged out successfully' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - authentication required' })
   @UsePipes(
     new JoiValidationPipe({
       param: {
