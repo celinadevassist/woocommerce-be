@@ -1,59 +1,33 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 import * as Joi from 'joi';
 import { statusEnum } from '../enums';
 
 export class QueryUserDTO {
-  @ApiProperty({ description: 'first Name', type: String, required: false })
+  @ApiPropertyOptional({ example: 'Ahmed' })
   firstName: string;
 
-  @ApiProperty({ description: 'father Name', type: String, required: false })
+  @ApiPropertyOptional({ example: 'Hassan' })
   lastName: string;
 
-  @ApiProperty({
-    description: `user status${Object.keys(statusEnum).join()}`,
-    enum: statusEnum,
-    required: false,
-  })
+  @ApiPropertyOptional({ example: 'active', enum: statusEnum })
   status?: string;
 
-  @ApiProperty({ description: 'created date', type: Date, required: false })
+  @ApiPropertyOptional({ example: '2024-01-01T00:00:00Z' })
   createdAt?: Date;
 
-  @ApiProperty({
-    description: 'Page number (starting from 1)',
-    type: Number,
-    required: false,
-    default: 1,
-  })
+  @ApiPropertyOptional({ example: 1, default: 1 })
   page?: number;
 
-  @ApiProperty({
-    description: 'Number of items per page',
-    type: Number,
-    required: false,
-    default: 20,
-  })
+  @ApiPropertyOptional({ example: 20, default: 20 })
   limit?: number;
 
-  @ApiProperty({
-    description: 'Search term to filter users',
-    type: String,
-    required: false,
-  })
+  @ApiPropertyOptional({ example: 'developer' })
   search?: string;
 
-  @ApiProperty({
-    description: 'Filter users by skill',
-    type: String,
-    required: false,
-  })
+  @ApiPropertyOptional({ example: 'JavaScript' })
   skill?: string;
 
-  @ApiProperty({
-    description: 'Filter users by location',
-    type: String,
-    required: false,
-  })
+  @ApiPropertyOptional({ example: 'Cairo' })
   location?: string;
 }
 
