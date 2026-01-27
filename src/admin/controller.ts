@@ -89,7 +89,7 @@ export class AdminController {
       query: AdminQueryUsersSchema,
     }),
   )
-  async getUsers(@Query() query: AdminQueryUsersDTO) {
+  async getUsers(@Query() query: AdminQueryUsersDTO): Promise<any> {
     return await this.adminService.getUsers(query);
   }
 
@@ -104,7 +104,7 @@ export class AdminController {
       param: { lang: LanguageSchema, id: MongoIdSchema },
     }),
   )
-  async getUserById(@Param('id') id: string) {
+  async getUserById(@Param('id') id: string): Promise<any> {
     return await this.adminService.getUserById(id);
   }
 
@@ -151,7 +151,7 @@ export class AdminController {
       query: AdminQueryStoresSchema,
     }),
   )
-  async getStores(@Query() query: AdminQueryStoresDTO) {
+  async getStores(@Query() query: AdminQueryStoresDTO): Promise<any> {
     return await this.adminService.getStores(query);
   }
 
@@ -166,7 +166,7 @@ export class AdminController {
       param: { lang: LanguageSchema, id: MongoIdSchema },
     }),
   )
-  async getStoreById(@Param('id') id: string) {
+  async getStoreById(@Param('id') id: string): Promise<any> {
     return await this.adminService.getStoreById(id);
   }
 
@@ -225,7 +225,7 @@ export class AdminController {
       query: AdminQuerySubscriptionsSchema,
     }),
   )
-  async getSubscriptions(@Query() query: AdminQuerySubscriptionsDTO) {
+  async getSubscriptions(@Query() query: AdminQuerySubscriptionsDTO): Promise<any> {
     return await this.adminService.getSubscriptions(query);
   }
 
@@ -336,7 +336,7 @@ export class AdminController {
       query: AdminQueryInvoicesSchema,
     }),
   )
-  async getInvoices(@Query() query: AdminQueryInvoicesDTO) {
+  async getInvoices(@Query() query: AdminQueryInvoicesDTO): Promise<any> {
     return await this.adminService.getInvoices(query);
   }
 

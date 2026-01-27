@@ -169,7 +169,7 @@ export class AdminService {
 
   // ==================== USERS MANAGEMENT ====================
 
-  async getUsers(query: AdminQueryUsersDTO) {
+  async getUsers(query: AdminQueryUsersDTO): Promise<any> {
     const {
       page = 1,
       size = 20,
@@ -237,7 +237,7 @@ export class AdminService {
     };
   }
 
-  async getUserById(userId: string) {
+  async getUserById(userId: string): Promise<any> {
     const user = await this.userModel
       .findOne({ _id: new Types.ObjectId(userId), isDeleted: { $ne: true } })
       .select('-password -resetPasswordToken -resetPasswordExpires')
@@ -359,7 +359,7 @@ export class AdminService {
 
   // ==================== STORES MANAGEMENT ====================
 
-  async getStores(query: AdminQueryStoresDTO) {
+  async getStores(query: AdminQueryStoresDTO): Promise<any> {
     const {
       page = 1,
       size = 20,
@@ -438,7 +438,7 @@ export class AdminService {
     };
   }
 
-  async getStoreById(storeId: string) {
+  async getStoreById(storeId: string): Promise<any> {
     const store = await this.storeModel
       .findOne({ _id: new Types.ObjectId(storeId), isDeleted: false })
       .populate('ownerId', 'firstName lastName email')
@@ -547,7 +547,7 @@ export class AdminService {
 
   // ==================== SUBSCRIPTIONS MANAGEMENT ====================
 
-  async getSubscriptions(query: AdminQuerySubscriptionsDTO) {
+  async getSubscriptions(query: AdminQuerySubscriptionsDTO): Promise<any> {
     const {
       page = 1,
       size = 20,
@@ -703,7 +703,7 @@ export class AdminService {
 
   // ==================== INVOICES MANAGEMENT ====================
 
-  async getInvoices(query: AdminQueryInvoicesDTO) {
+  async getInvoices(query: AdminQueryInvoicesDTO): Promise<any> {
     const {
       page = 1,
       size = 20,
