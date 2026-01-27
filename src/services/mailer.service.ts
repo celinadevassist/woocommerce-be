@@ -51,7 +51,17 @@ export class MailerService {
       this.templatesPath = path.join(__dirname, '../templates/emails');
     }
 
+    // Register Handlebars helpers
+    this.registerHandlebarsHelpers();
+
     this.initializeTransporter();
+  }
+
+  private registerHandlebarsHelpers() {
+    // Register 'eq' helper for equality comparison
+    handlebars.registerHelper('eq', function (a, b) {
+      return a === b;
+    });
   }
 
   private initializeTransporter() {

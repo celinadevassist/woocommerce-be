@@ -165,4 +165,114 @@ export class EmailTestController {
       };
     }
   }
+
+  @Post('test-welcome')
+  @ApiOperation({ summary: 'Send test welcome email' })
+  @UseGuards(AuthGuard())
+  async sendTestWelcome(
+    @User() user: UserDocument,
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const success = await this.mailerService.sendWelcomeEmail(
+        user.email,
+        user.firstName || user.email,
+      );
+
+      return {
+        success,
+        message: success
+          ? 'Welcome email sent'
+          : 'Failed to send welcome email',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error: ${error.message}`,
+      };
+    }
+  }
+
+  @Post('test-subscription')
+  @ApiOperation({ summary: 'Send test subscription email' })
+  @UseGuards(AuthGuard())
+  async sendTestSubscription(
+    @User() user: UserDocument,
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const testSubscriptionData = {
+        subscriptionType: 'new',
+        userName: user.firstName || user.email,
+        planName: 'Premium Plan',
+        planDescription: 'All features included with priority support',
+        price: 29.99,
+        currency: 'USD',
+        billingCycle: 'monthly',
+        nextBillingDate: new Date(
+          Date.now() + 30 * 24 * 60 * 60 * 1000,
+        ).toLocaleDateString(),
+        status: 'active',
+        features: [
+          'Unlimited projects',
+          'Priority support',
+          'Advanced analytics',
+          'Custom integrations',
+        ],
+        dashboardUrl: 'https://app.example.com/dashboard',
+        manageSubscriptionUrl: 'https://app.example.com/settings/subscription',
+      };
+
+      const success = await this.mailerService.sendSubscriptionEmail(
+        user.email,
+        testSubscriptionData,
+      );
+
+      return {
+        success,
+        message: success
+          ? 'Subscription email sent'
+          : 'Failed to send subscription email',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error: ${error.message}`,
+      };
+    }
+  }
+
+  @Post('test-project-invitation')
+  @ApiOperation({ summary: 'Send test project invitation email' })
+  @UseGuards(AuthGuard())
+  async sendTestProjectInvitation(
+    @User() user: UserDocument,
+  ): Promise<{ success: boolean; message: string }> {
+    try {
+      const testInvitationData = {
+        userName: user.firstName || user.email,
+        inviterName: 'John Doe',
+        projectName: 'Q1 Marketing Campaign',
+        projectDescription:
+          'Help us plan and execute our Q1 marketing strategy for the new product launch.',
+        role: 'Team Member',
+        invitationUrl: 'https://app.example.com/invitations/accept/test-token-123',
+      };
+
+      const success = await this.mailerService.sendProjectInvitationEmail(
+        user.email,
+        testInvitationData,
+      );
+
+      return {
+        success,
+        message: success
+          ? 'Project invitation email sent'
+          : 'Failed to send project invitation email',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: `Error: ${error.message}`,
+      };
+    }
+  }
 }
