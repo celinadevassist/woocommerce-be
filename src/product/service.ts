@@ -116,6 +116,7 @@ export class ProductService {
   async findAll(
     userId: string,
     query: QueryProductDto,
+    ip?: string,
   ): Promise<IProductResponse> {
     // Get stores user has access to
     const storeIds = await this.getUserStoreIds(userId);
@@ -178,6 +179,17 @@ export class ProductService {
       this.productModel.find(filter).sort(sort).skip(skip).limit(size),
       this.productModel.countDocuments(filter),
     ]);
+
+    // Track search analytics if keyword is provided
+    if (query.keyword) {
+      await this.searchAnalyticsService.saveSearchQuery(
+        query.keyword,
+        'products',
+        total,
+        ip,
+        userId,
+      );
+    }
 
     return {
       products: products.map((p) => this.toProductInterface(p)),
