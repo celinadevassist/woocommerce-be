@@ -10,6 +10,7 @@ import { Category, CategorySchema } from '../category/schema';
 import { Tag, TagSchema } from '../tag/schema';
 import { WooCommerceModule } from '../integrations/woocommerce/woocommerce.module';
 import { S3UploadModule } from '../modules/s3-upload/s3-upload.module';
+import { SearchAnalyticsModule } from '../modules/search-analytics/search-analytics.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { S3UploadModule } from '../modules/s3-upload/s3-upload.module';
     ]),
     WooCommerceModule,
     S3UploadModule,
+    SearchAnalyticsModule,
   ],
   controllers: [ProductController],
   providers: [ProductService],
