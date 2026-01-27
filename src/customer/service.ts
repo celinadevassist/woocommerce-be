@@ -28,6 +28,7 @@ import { Order, OrderDocument } from '../order/schema';
 import { WooCustomer } from '../integrations/woocommerce/woocommerce.types';
 import { PhoneService } from '../phone/service';
 import { EmailService } from '../email/service';
+import { SearchAnalyticsService } from '../modules/search-analytics/search-analytics.service';
 
 @Injectable()
 export class CustomerService {
@@ -41,6 +42,7 @@ export class CustomerService {
     private readonly phoneService: PhoneService,
     @Inject(forwardRef(() => EmailService))
     private readonly emailService: EmailService,
+    private readonly searchAnalyticsService: SearchAnalyticsService,
   ) {}
 
   /**
