@@ -13,6 +13,7 @@ import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { config } from '../config.manager';
 import { sign, verify } from 'jsonwebtoken';
+import { nanoid } from 'nanoid';
 
 import { RoleService, SMSService, EmailService } from '../services';
 import { MailrelayService } from '../services/mailrelay.service';
@@ -83,7 +84,6 @@ export class AuthService {
     // console.log(user)
 
     // Generate email verification token
-    const { nanoid } = await eval('import("nanoid")');
     user.emailVerificationToken = nanoid(32);
     user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
     user.emailVerified = false;
@@ -244,7 +244,6 @@ export class AuthService {
     this.logger.log(`   User found: ${exist._id}`);
 
     // Generate password reset token
-    const { nanoid } = await eval('import("nanoid")');
     const resetToken = nanoid(32);
     const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
@@ -407,7 +406,6 @@ export class AuthService {
     }
 
     // Generate new verification token
-    const { nanoid } = await eval('import("nanoid")');
     const verificationToken = nanoid(32);
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
