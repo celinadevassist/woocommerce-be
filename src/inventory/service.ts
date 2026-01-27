@@ -149,6 +149,101 @@ export class InventoryService {
   }
 
   /**
+   * Export inventory logs to CSV
+   */
+  async exportToCsv(
+    userId: string,
+    options: {
+      productId?: string;
+      storeId?: string;
+      changeType?: InventoryChangeType;
+      startDate?: Date;
+      endDate?: Date;
+    } = {},
+  ): Promise<string> {
+    // Get user's accessible stores
+    const storeIds = await this.getUserStoreIds(userId);
+
+    const filter: any = {
+      storeId: { $in: storeIds },
+    };
+
+    if (options.productId) {
+      filter.productId = new Types.ObjectId(options.productId);
+    }
+    if (options.storeId) {
+      // Verify user has access to this specific store
+      await this.getStoreWithAccess(options.storeId, userId);
+      filter.storeId = new Types.ObjectId(options.storeId);
+    }
+    if (options.changeType) {
+      filter.changeType = options.changeType;
+    }
+    if (options.startDate || options.endDate) {
+      filter.createdAt = {};
+      if (options.startDate) filter.createdAt.$gte = options.startDate;
+      if (options.endDate) filter.createdAt.$lte = options.endDate;
+    }
+
+    const logs = await this.inventoryLogModel
+      .find(filter)
+      .sort({ createdAt: -1 })
+      .limit(10000); // Max 10k logs
+
+    // CSV Header
+    const headers = [
+      'Date',
+      'Product Name',
+      'SKU',
+      'Change Type',
+      'Previous Quantity',
+      'New Quantity',
+      'Quantity Change',
+      'Reason',
+      'Reference',
+      'Changed By',
+    ];
+
+    // CSV Rows
+    const rows = logs.map((log) => {
+      return [
+        log.createdAt
+          ? new Date(log.createdAt).toISOString().split('T')[0]
+          : '',
+        log.productName || '',
+        log.sku || '',
+        log.changeType || '',
+        log.previousQuantity || 0,
+        log.newQuantity || 0,
+        log.quantityChange || 0,
+        log.reason || '',
+        log.reference || '',
+        log.changedBy ? log.changedBy.toString() : '',
+      ];
+    });
+
+    // Escape CSV values
+    const escapeValue = (val: any): string => {
+      const str = String(val ?? '');
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    // Build CSV with UTF-8 BOM for Arabic text support
+    const BOM = '\uFEFF';
+    const csvContent =
+      BOM +
+      [
+        headers.map(escapeValue).join(','),
+        ...rows.map((row) => row.map(escapeValue).join(',')),
+      ].join('\n');
+
+    return csvContent;
+  }
+
+  /**
    * Get stock alerts
    */
   async getAlerts(
