@@ -8,11 +8,12 @@ import {
   Param,
   Query,
   Body,
+  Req,
   Res,
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
@@ -66,8 +67,18 @@ export class CustomerController {
       param: { lang: LanguageSchema },
     }),
   )
-  async findAll(@User('_id') userId: string, @Query() query: QueryCustomerDto) {
-    return this.customerService.findAll(userId, query);
+  async findAll(
+    @User('_id') userId: string,
+    @Query() query: QueryCustomerDto,
+    @Req() request: Request,
+  ) {
+    // Extract client IP (handle proxied requests)
+    const ip =
+      (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      request.ip ||
+      request.socket.remoteAddress;
+
+    return this.customerService.findAll(userId, query, ip);
   }
 
   @Get('stats')

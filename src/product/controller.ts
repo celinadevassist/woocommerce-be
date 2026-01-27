@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   Query,
+  Req,
   Res,
   UseGuards,
   UsePipes,
@@ -14,7 +15,7 @@ import {
   UploadedFile,
   BadRequestException,
 } from '@nestjs/common';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { Multer } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -73,8 +74,15 @@ export class ProductController {
     @Query() query: QueryProductDto,
     @User() user: UserDocument,
     @Param('lang') lang: string,
+    @Req() request: Request,
   ) {
-    return await this.productService.findAll(user._id.toString(), query);
+    // Extract client IP (handle proxied requests)
+    const ip =
+      (request.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() ||
+      request.ip ||
+      request.socket.remoteAddress;
+
+    return await this.productService.findAll(user._id.toString(), query, ip);
   }
 
   @Post()

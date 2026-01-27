@@ -9,6 +9,7 @@ import { CustomerController } from './controller';
 import { CustomerService } from './service';
 import { PhoneModule } from '../phone/module';
 import { EmailModule } from '../email/module';
+import { SearchAnalyticsModule } from '../modules/search-analytics/search-analytics.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { EmailModule } from '../email/module';
     ]),
     forwardRef(() => PhoneModule),
     forwardRef(() => EmailModule),
+    SearchAnalyticsModule,
   ],
   controllers: [CustomerController],
   providers: [CustomerService],

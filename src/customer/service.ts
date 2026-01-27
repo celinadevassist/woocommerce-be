@@ -28,6 +28,7 @@ import { Order, OrderDocument } from '../order/schema';
 import { WooCustomer } from '../integrations/woocommerce/woocommerce.types';
 import { PhoneService } from '../phone/service';
 import { EmailService } from '../email/service';
+import { SearchAnalyticsService } from '../modules/search-analytics/search-analytics.service';
 
 @Injectable()
 export class CustomerService {
@@ -41,6 +42,7 @@ export class CustomerService {
     private readonly phoneService: PhoneService,
     @Inject(forwardRef(() => EmailService))
     private readonly emailService: EmailService,
+    private readonly searchAnalyticsService: SearchAnalyticsService,
   ) {}
 
   /**
@@ -273,6 +275,7 @@ export class CustomerService {
   async findAll(
     userId: string,
     query: QueryCustomerDto,
+    ip?: string,
   ): Promise<ICustomerResponse> {
     const storeIds = await this.getUserStoreIds(userId);
 
@@ -335,6 +338,17 @@ export class CustomerService {
       this.customerModel.find(filter).sort(sort).skip(skip).limit(size),
       this.customerModel.countDocuments(filter),
     ]);
+
+    // Track search analytics if search query is provided
+    if (query.search) {
+      await this.searchAnalyticsService.saveSearchQuery(
+        query.search,
+        'customers',
+        total,
+        ip,
+        userId,
+      );
+    }
 
     // Calculate dynamic stats for all customers in bulk
     const customerIds = customers.map((c) => c._id);
