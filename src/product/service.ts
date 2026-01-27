@@ -1,10 +1,10 @@
+import { Injectable, Logger } from '@nestjs/common';
 import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  BadRequestException,
-  Logger,
-} from '@nestjs/common';
+  ResourceNotFoundException,
+  AccessDeniedException,
+  ValidationException,
+  InvalidInputException,
+} from '../shared/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Product, ProductDocument } from './schema';
@@ -82,14 +82,17 @@ export class ProductService {
     });
 
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', storeId);
     }
 
     const isOwner = store.ownerId.toString() === userId;
     const isMember = store.members.some((m) => m.userId.toString() === userId);
 
     if (!isOwner && !isMember) {
-      throw new ForbiddenException('You do not have access to this store');
+      throw new AccessDeniedException(
+        'store',
+        'user is not owner or member',
+      );
     }
 
     return store;
@@ -103,8 +106,10 @@ export class ProductService {
       const regular = parseFloat(regularPrice);
       const sale = parseFloat(salePrice);
       if (!isNaN(regular) && !isNaN(sale) && sale > regular) {
-        throw new BadRequestException(
-          'Sale price cannot be greater than regular price',
+        throw new ValidationException(
+          'salePrice',
+          'cannot be greater than regular price',
+          { regularPrice, salePrice },
         );
       }
     }
@@ -212,7 +217,7 @@ export class ProductService {
     });
 
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new ResourceNotFoundException('Product', id);
     }
 
     // Verify user has access to store
@@ -258,7 +263,8 @@ export class ProductService {
       sale_price: dto.salePrice || '',
       manage_stock: dto.manageStock ?? false,
       stock_quantity: dto.stockQuantity,
-      stock_status: dto.type === 'variable' ? 'instock' : (dto.stockStatus || 'instock'),
+      stock_status:
+        dto.type === 'variable' ? 'instock' : dto.stockStatus || 'instock',
       weight: dto.weight || '',
       categories: dto.categories?.map((id) => ({ id })) || [],
       tags: dto.tags?.map((id) => ({ id })) || [],
@@ -336,7 +342,7 @@ export class ProductService {
         .select('+credentials');
 
       if (!store) {
-        throw new NotFoundException('Store not found');
+        throw new ResourceNotFoundException('Store', dto.storeId);
       }
 
       const credentials = {
@@ -355,8 +361,10 @@ export class ProductService {
           `Failed to create product in WooCommerce: ${error.message}`,
           error.stack,
         );
-        throw new BadRequestException(
-          `Failed to create product in WooCommerce: ${error.message}`,
+        throw new InvalidInputException(
+          'WooCommerce product data',
+          `Failed to create in WooCommerce: ${error.message}`,
+          'Valid product data compatible with WooCommerce API',
         );
       }
     }
@@ -549,7 +557,7 @@ export class ProductService {
     });
 
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new ResourceNotFoundException('Product', id);
     }
 
     await this.verifyStoreAccess(product.storeId.toString(), userId);
@@ -738,7 +746,7 @@ export class ProductService {
     });
 
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new ResourceNotFoundException('Product', id);
     }
 
     await this.verifyStoreAccess(product.storeId.toString(), userId);
@@ -748,7 +756,11 @@ export class ProductService {
       const store = await this.storeModel
         .findById(product.storeId)
         .select('+credentials');
-      if (store?.url && store?.credentials?.consumerKey && store?.credentials?.consumerSecret) {
+      if (
+        store?.url &&
+        store?.credentials?.consumerKey &&
+        store?.credentials?.consumerSecret
+      ) {
         try {
           await this.wooCommerceService.deleteProduct(
             {
@@ -799,7 +811,7 @@ export class ProductService {
     });
 
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new ResourceNotFoundException('Product', id);
     }
 
     await this.verifyStoreAccess(product.storeId.toString(), userId);
@@ -953,9 +965,18 @@ export class ProductService {
     failed: number;
     results: { id: string; success: boolean; error?: string }[];
   }> {
-    this.logger.log(`[BulkUpdate] Starting bulk update for ${dto.variantIds?.length || 0} variants`);
+    this.logger.log(
+      `[BulkUpdate] Starting bulk update for ${
+        dto.variantIds?.length || 0
+      } variants`,
+    );
     this.logger.log(`[BulkUpdate] pushToWoo: ${pushToWoo}`);
-    this.logger.log(`[BulkUpdate] DTO: ${JSON.stringify({ ...dto, variantIds: dto.variantIds?.length + ' items' })}`);
+    this.logger.log(
+      `[BulkUpdate] DTO: ${JSON.stringify({
+        ...dto,
+        variantIds: dto.variantIds?.length + ' items',
+      })}`,
+    );
 
     const results: { id: string; success: boolean; error?: string }[] = [];
     let updated = 0;
@@ -1030,13 +1051,19 @@ export class ProductService {
         variant.pendingSync = !pushToWoo;
         await variant.save();
 
-        this.logger.log(`[BulkUpdate] Variant ${variantId} saved locally. regularPrice: ${variant.regularPrice}, salePrice: ${variant.salePrice}, pushToWoo: ${pushToWoo}, externalId: ${variant.externalId}`);
+        this.logger.log(
+          `[BulkUpdate] Variant ${variantId} saved locally. regularPrice: ${variant.regularPrice}, salePrice: ${variant.salePrice}, pushToWoo: ${pushToWoo}, externalId: ${variant.externalId}`,
+        );
 
         if (pushToWoo && variant.externalId) {
           try {
-            this.logger.log(`[BulkUpdate] Syncing variant ${variantId} to WooCommerce...`);
+            this.logger.log(
+              `[BulkUpdate] Syncing variant ${variantId} to WooCommerce...`,
+            );
             await this.syncVariantToWoo(variant);
-            this.logger.log(`[BulkUpdate] Variant ${variantId} synced successfully`);
+            this.logger.log(
+              `[BulkUpdate] Variant ${variantId} synced successfully`,
+            );
           } catch (syncError) {
             this.logger.error(
               `[BulkUpdate] Failed to sync variant ${variantId} to WooCommerce: ${syncError.message}`,
@@ -1045,7 +1072,9 @@ export class ProductService {
             // Still mark as success for local update, but log the sync failure
           }
         } else {
-          this.logger.log(`[BulkUpdate] Skipping WooCommerce sync for variant ${variantId} - pushToWoo: ${pushToWoo}, externalId: ${variant.externalId}`);
+          this.logger.log(
+            `[BulkUpdate] Skipping WooCommerce sync for variant ${variantId} - pushToWoo: ${pushToWoo}, externalId: ${variant.externalId}`,
+          );
         }
 
         results.push({ id: variantId, success: true });
@@ -1217,7 +1246,7 @@ export class ProductService {
     });
 
     if (!variant) {
-      throw new NotFoundException('Variant not found');
+      throw new ResourceNotFoundException('ProductVariant', variantId);
     }
 
     await this.verifyStoreAccess(variant.storeId.toString(), userId);
@@ -1299,7 +1328,7 @@ export class ProductService {
     });
 
     if (!variant) {
-      throw new NotFoundException('Variant not found');
+      throw new ResourceNotFoundException('ProductVariant', variantId);
     }
 
     await this.verifyStoreAccess(variant.storeId.toString(), userId);
@@ -1307,7 +1336,7 @@ export class ProductService {
     // Get the parent product for WooCommerce sync
     const product = await this.productModel.findById(variant.productId);
     if (!product) {
-      throw new NotFoundException('Parent product not found');
+      throw new ResourceNotFoundException('Product', variant.productId.toString());
     }
 
     // Delete from WooCommerce first
@@ -1315,7 +1344,11 @@ export class ProductService {
       const store = await this.storeModel
         .findById(variant.storeId)
         .select('+credentials');
-      if (store?.url && store?.credentials?.consumerKey && store?.credentials?.consumerSecret) {
+      if (
+        store?.url &&
+        store?.credentials?.consumerKey &&
+        store?.credentials?.consumerSecret
+      ) {
         try {
           await this.wooCommerceService.deleteVariation(
             {
@@ -1363,7 +1396,7 @@ export class ProductService {
     });
 
     if (!variant) {
-      throw new NotFoundException('Variant not found');
+      throw new ResourceNotFoundException('ProductVariant', variantId);
     }
 
     await this.verifyStoreAccess(variant.storeId.toString(), userId);
@@ -1377,19 +1410,31 @@ export class ProductService {
   async syncVariantToWoo(variant: ProductVariantDocument): Promise<void> {
     const product = await this.productModel.findById(variant.productId);
     if (!product) {
-      throw new NotFoundException('Parent product not found');
+      throw new ResourceNotFoundException('Product', variant.productId.toString());
     }
 
     // Check if product has externalId (is synced to WooCommerce)
     if (!product.externalId) {
-      this.logger.warn(`Cannot sync variant - parent product ${product._id} has no externalId`);
-      throw new BadRequestException('Parent product is not synced to WooCommerce');
+      this.logger.warn(
+        `Cannot sync variant - parent product ${product._id} has no externalId`,
+      );
+      throw new ValidationException(
+        'product.externalId',
+        'parent product must be synced to WooCommerce first',
+        { productId: product._id.toString() },
+      );
     }
 
     // Check if variant has externalId
     if (!variant.externalId) {
-      this.logger.warn(`Cannot sync variant ${variant._id} - has no externalId`);
-      throw new BadRequestException('Variant is not synced to WooCommerce');
+      this.logger.warn(
+        `Cannot sync variant ${variant._id} - has no externalId`,
+      );
+      throw new ValidationException(
+        'variant.externalId',
+        'variant must be synced to WooCommerce first',
+        { variantId: variant._id.toString() },
+      );
     }
 
     const store = await this.storeModel
@@ -1397,11 +1442,15 @@ export class ProductService {
       .select('+credentials');
 
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', variant.storeId.toString());
     }
 
     if (!store.credentials?.consumerKey || !store.credentials?.consumerSecret) {
-      throw new BadRequestException('Store credentials are not configured');
+      throw new ValidationException(
+        'store.credentials',
+        'WooCommerce credentials are not configured',
+        { storeId: store._id.toString() },
+      );
     }
 
     const credentials = {
@@ -1438,7 +1487,11 @@ export class ProductService {
       updateData.image = { src: variant.image.src };
     }
 
-    this.logger.log(`[Sync] Updating variation ${variant.externalId} with data: ${JSON.stringify(updateData)}`);
+    this.logger.log(
+      `[Sync] Updating variation ${
+        variant.externalId
+      } with data: ${JSON.stringify(updateData)}`,
+    );
 
     await this.wooCommerceService.updateVariation(
       credentials,
@@ -1447,7 +1500,9 @@ export class ProductService {
       updateData,
     );
 
-    this.logger.log(`[Sync] Successfully synced variation ${variant.externalId} to WooCommerce`);
+    this.logger.log(
+      `[Sync] Successfully synced variation ${variant.externalId} to WooCommerce`,
+    );
 
     variant.pendingSync = false;
     variant.lastSyncedAt = new Date();
@@ -1491,10 +1546,9 @@ export class ProductService {
         categoryFilter['categories.slug'] = categoryId;
       }
 
-      const productsInCategory = await this.productModel.find(
-        categoryFilter,
-        { _id: 1 },
-      );
+      const productsInCategory = await this.productModel.find(categoryFilter, {
+        _id: 1,
+      });
       productIdsInCategory = productsInCategory.map((p) => p._id);
 
       // If no products in category, return empty
@@ -1569,10 +1623,9 @@ export class ProductService {
         categoryFilter['categories.slug'] = categoryId;
       }
 
-      const productsInCategory = await this.productModel.find(
-        categoryFilter,
-        { _id: 1 },
-      );
+      const productsInCategory = await this.productModel.find(categoryFilter, {
+        _id: 1,
+      });
       const productIdsInCategory = productsInCategory.map((p) => p._id);
 
       if (productIdsInCategory.length === 0) {
@@ -1643,7 +1696,7 @@ export class ProductService {
       .select('+credentials');
 
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', product.storeId.toString());
     }
 
     const credentials = {
@@ -1775,8 +1828,10 @@ export class ProductService {
         `Failed to sync product to WooCommerce: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to sync product to WooCommerce: ${error.message}`,
+      throw new InvalidInputException(
+        'product sync',
+        `Failed to sync to WooCommerce: ${error.message}`,
+        'Valid product data compatible with WooCommerce API',
       );
     }
   }
@@ -1790,7 +1845,7 @@ export class ProductService {
       .select('+credentials');
 
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', product.storeId.toString());
     }
 
     const credentials = {
@@ -2455,17 +2510,21 @@ export class ProductService {
         categoryFilter['categories.slug'] = query.categoryId;
       }
 
-      const productsInCategory = await this.productModel.find(
-        categoryFilter,
-        { _id: 1 },
-      );
+      const productsInCategory = await this.productModel.find(categoryFilter, {
+        _id: 1,
+      });
       const productIdsInCategory = productsInCategory.map((p) => p._id);
 
       if (productIdsInCategory.length === 0) {
         // No products in this category, return empty result
         return {
           variants: [],
-          pagination: { total: 0, page: query.page || 1, size: query.size || 50, pages: 0 },
+          pagination: {
+            total: 0,
+            page: query.page || 1,
+            size: query.size || 50,
+            pages: 0,
+          },
         };
       }
 
@@ -2684,7 +2743,7 @@ export class ProductService {
     });
 
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new ResourceNotFoundException('Product', id);
     }
 
     await this.verifyStoreAccess(product.storeId.toString(), userId);
@@ -2810,13 +2869,17 @@ export class ProductService {
     });
 
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new ResourceNotFoundException('Product', id);
     }
 
     await this.verifyStoreAccess(product.storeId.toString(), userId);
 
     if (imageIndex < 0 || imageIndex >= product.images.length) {
-      throw new BadRequestException('Invalid image index');
+      throw new InvalidInputException(
+        'imageIndex',
+        `must be between 0 and ${product.images.length - 1}`,
+        `Valid index range: 0-${product.images.length - 1}`,
+      );
     }
 
     // Get the image to be deleted before removing it
@@ -2850,7 +2913,7 @@ export class ProductService {
       .select('+credentials');
 
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', product.storeId.toString());
     }
 
     const credentials = {
@@ -2964,7 +3027,7 @@ export class ProductService {
       .select('+credentials');
 
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', storeId);
     }
 
     await this.verifyStoreAccess(storeId, userId);
@@ -2980,7 +3043,11 @@ export class ProductService {
       .map((line) => line.trim())
       .filter((line) => line);
     if (lines.length < 2) {
-      throw new BadRequestException('CSV file is empty or has no data rows');
+      throw new ValidationException(
+        'csvContent',
+        'file is empty or has no data rows',
+        { lineCount: lines.length, expected: 'at least 2 lines (header + data)' },
+      );
     }
 
     const headers = this.parseCsvLine(lines[0]).map((h) =>
@@ -3194,7 +3261,12 @@ export class ProductService {
       regularPrice?: string;
       sku?: string;
     } = {},
-  ): Promise<{ created: number; skipped: number; variations: any[]; message?: string }> {
+  ): Promise<{
+    created: number;
+    skipped: number;
+    variations: any[];
+    message?: string;
+  }> {
     // Get the product
     const product = await this.productModel.findOne({
       _id: new Types.ObjectId(productId),
@@ -3202,7 +3274,7 @@ export class ProductService {
     });
 
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new ResourceNotFoundException('Product', productId);
     }
 
     // Verify user access
@@ -3210,8 +3282,10 @@ export class ProductService {
 
     // Check if product is variable type
     if (product.type !== 'variable') {
-      throw new BadRequestException(
-        'Only variable products can have variations',
+      throw new ValidationException(
+        'product.type',
+        'only variable products can have variations',
+        { currentType: product.type, expected: 'variable' },
       );
     }
 
@@ -3221,8 +3295,10 @@ export class ProductService {
     );
 
     if (variationAttributes.length === 0) {
-      throw new BadRequestException(
-        'Product has no attributes configured for variations',
+      throw new ValidationException(
+        'product.attributes',
+        'no attributes configured for variations',
+        { attributeCount: product.attributes.length },
       );
     }
 
@@ -3260,7 +3336,9 @@ export class ProductService {
     // Filter out combinations that already exist
     const combinations = allCombinations.filter((combo) => {
       const comboKey = variationAttributes
-        .map((attr, i) => `${attr.name.toLowerCase()}:${combo[i].toLowerCase()}`)
+        .map(
+          (attr, i) => `${attr.name.toLowerCase()}:${combo[i].toLowerCase()}`,
+        )
         .sort()
         .join('|');
       return !existingCombinationKeys.has(comboKey);
@@ -3281,7 +3359,7 @@ export class ProductService {
       .findById(product.storeId)
       .select('+credentials');
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', product.storeId.toString());
     }
 
     const credentials = {
@@ -3367,8 +3445,10 @@ export class ProductService {
         `Failed to generate variations: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
+      throw new InvalidInputException(
+        'variation generation',
         `Failed to generate variations: ${error.message}`,
+        'Valid product with proper attributes configured',
       );
     }
   }
