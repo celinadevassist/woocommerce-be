@@ -1,4 +1,13 @@
 /**
+ * @deprecated This enum is deprecated. Use BusinessErrorCode from 'src/shared/exceptions/business-error.codes' instead.
+ *
+ * The new error handling system provides:
+ * - Numeric error codes for better client-side handling
+ * - Specific exception classes (ResourceNotFoundException, ValidationException, etc.)
+ * - Actionable guidance in error responses
+ *
+ * See docs/ERROR_HANDLING.md for migration guide.
+ *
  * Error codes used throughout the application
  */
 export enum ErrorCodes {

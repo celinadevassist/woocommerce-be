@@ -13,8 +13,10 @@ import {
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { generateBussinessError } from '../handlers/error-creator';
-import { BusinessException } from 'src/exceptions/business.exception';
-import { ErrorCodes } from 'src/constants/error-codes';
+import {
+  SystemErrorException,
+  InvalidInputException,
+} from 'src/shared/exceptions/business.exception';
 
 import { IImage } from '../interfaces';
 
@@ -39,11 +41,8 @@ export class ImageService {
       ];
       return await this.imageModel.aggregate(pipeLine);
     } catch (error) {
-      if (error instanceof BusinessException) throw error;
-      throw new BusinessException(
-        ErrorCodes.INTERNAL_SERVER_ERROR,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      if (error instanceof SystemErrorException) throw error;
+      throw new SystemErrorException('image retrieval', error?.message);
     }
   }
 
@@ -51,11 +50,8 @@ export class ImageService {
     try {
       return await this.imageModel.findOne(data);
     } catch (error) {
-      if (error instanceof BusinessException) throw error;
-      throw new BusinessException(
-        ErrorCodes.INTERNAL_SERVER_ERROR,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      if (error instanceof SystemErrorException) throw error;
+      throw new SystemErrorException('image lookup', error?.message);
     }
   }
 
@@ -68,21 +64,15 @@ export class ImageService {
         { new: true, upsert: true },
       );
     } catch (error) {
-      if (error instanceof BusinessException) throw error;
-      throw new BusinessException(
-        ErrorCodes.INTERNAL_SERVER_ERROR,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      if (error instanceof SystemErrorException) throw error;
+      throw new SystemErrorException('image create/update', error?.message);
     }
   }
 
   async delete(id: string): Promise<{ message: string; deletedCount: number }> {
     try {
       if (!Types.ObjectId.isValid(id)) {
-        throw new BusinessException(
-          ErrorCodes.BAD_REQUEST,
-          HttpStatus.BAD_REQUEST,
-        );
+        throw new InvalidInputException('id', id, 'Valid MongoDB ObjectId');
       }
       const response = await this.imageModel.deleteOne({
         _id: new Types.ObjectId(id),
@@ -95,11 +85,8 @@ export class ImageService {
         deletedCount: response?.deletedCount || 0,
       };
     } catch (error) {
-      if (error instanceof BusinessException) throw error;
-      throw new BusinessException(
-        ErrorCodes.INTERNAL_SERVER_ERROR,
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      if (error instanceof InvalidInputException || error instanceof SystemErrorException) throw error;
+      throw new SystemErrorException('image deletion', error?.message);
     }
   }
 
