@@ -7,7 +7,10 @@ import { ProductImportService } from './service';
 import { ProductImport, ProductImportSchema } from './schema';
 import { Store, StoreSchema } from '../store/schema';
 import { Product, ProductSchema } from '../product/schema';
-import { ProductVariant, ProductVariantSchema } from '../product/variant.schema';
+import {
+  ProductVariant,
+  ProductVariantSchema,
+} from '../product/variant.schema';
 import { WooCommerceModule } from '../integrations/woocommerce/woocommerce.module';
 
 @Module({

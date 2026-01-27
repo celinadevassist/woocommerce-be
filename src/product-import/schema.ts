@@ -7,7 +7,12 @@ export type ProductImportDocument = ProductImport & Document;
 
 @Schema({ timestamps: true, versionKey: false, collection: 'product-imports' })
 export class ProductImport {
-  @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Store', required: true, index: true })
+  @Prop({
+    type: MongooseSchema.Types.ObjectId,
+    ref: 'Store',
+    required: true,
+    index: true,
+  })
   storeId: MongooseSchema.Types.ObjectId;
 
   @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true })
@@ -54,8 +59,14 @@ export class ProductImport {
       categories: [{ type: String }],
       tags: [{ type: String }],
       status: { type: String, enum: ['publish', 'draft', 'private'] },
-      catalogVisibility: { type: String, enum: ['visible', 'catalog', 'search', 'hidden'] },
-      stockStatus: { type: String, enum: ['instock', 'outofstock', 'onbackorder'] },
+      catalogVisibility: {
+        type: String,
+        enum: ['visible', 'catalog', 'search', 'hidden'],
+      },
+      stockStatus: {
+        type: String,
+        enum: ['instock', 'outofstock', 'onbackorder'],
+      },
       manageStock: { type: Boolean },
       stockQuantity: { type: Number },
       autoGenerateVariations: { type: Boolean },
@@ -63,13 +74,15 @@ export class ProductImport {
       variationMarkupType: { type: String, enum: ['percentage', 'fixed'] },
       variationMarkupValue: { type: Number },
       maxImages: { type: Number },
-      attributes: [{
-        id: { type: Number }, // WooCommerce attribute ID for global attributes
-        name: { type: String },
-        options: [{ type: String }],
-        visible: { type: Boolean },
-        variation: { type: Boolean },
-      }],
+      attributes: [
+        {
+          id: { type: Number }, // WooCommerce attribute ID for global attributes
+          name: { type: String },
+          options: [{ type: String }],
+          visible: { type: Boolean },
+          variation: { type: Boolean },
+        },
+      ],
     }),
   )
   settings: IImportSettings;

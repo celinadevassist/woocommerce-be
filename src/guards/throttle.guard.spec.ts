@@ -11,7 +11,9 @@ describe('CustomThrottlerGuard', () => {
       throttlers: [{ ttl: 60000, limit: 10 }],
     };
     const storageService = {
-      increment: jest.fn().mockResolvedValue({ totalHits: 1, timeToExpire: 60000 }),
+      increment: jest
+        .fn()
+        .mockResolvedValue({ totalHits: 1, timeToExpire: 60000 }),
     };
     const reflector = new Reflector();
 

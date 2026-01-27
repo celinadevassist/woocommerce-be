@@ -313,7 +313,10 @@ export class UserService {
     }
 
     if (user.role === 'admin') {
-      throw new AccessDeniedException('user deletion', 'Cannot delete admin users');
+      throw new AccessDeniedException(
+        'user deletion',
+        'Cannot delete admin users',
+      );
     }
     const response = await this.userModel.deleteOne({ _id: id });
     return {
@@ -483,7 +486,10 @@ export class UserService {
       if (error instanceof BusinessException) {
         throw error;
       }
-      throw new SystemErrorException('fetching community users', error?.message);
+      throw new SystemErrorException(
+        'fetching community users',
+        error?.message,
+      );
     }
   }
 }

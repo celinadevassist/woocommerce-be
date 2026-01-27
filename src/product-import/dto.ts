@@ -12,16 +12,24 @@ export class FetchProductsDto {
   @ApiProperty({ enum: ImportSource, description: 'Source platform' })
   source: ImportSource;
 
-  @ApiProperty({ description: 'Source store URL (e.g., https://example.myshopify.com)' })
+  @ApiProperty({
+    description: 'Source store URL (e.g., https://example.myshopify.com)',
+  })
   sourceUrl: string;
 
-  @ApiPropertyOptional({ description: 'Include product descriptions', default: true })
+  @ApiPropertyOptional({
+    description: 'Include product descriptions',
+    default: true,
+  })
   includeDescription?: boolean;
 
   @ApiPropertyOptional({ description: 'Include product images', default: true })
   includeImages?: boolean;
 
-  @ApiPropertyOptional({ description: 'Include product variants', default: true })
+  @ApiPropertyOptional({
+    description: 'Include product variants',
+    default: true,
+  })
   includeVariants?: boolean;
 
   @ApiPropertyOptional({ description: 'Products per page', default: 50 })
@@ -91,13 +99,19 @@ export class ImportSettingsDto {
     fixedPrice?: number;
   };
 
-  @ApiPropertyOptional({ description: 'Category IDs to assign', type: [String] })
+  @ApiPropertyOptional({
+    description: 'Category IDs to assign',
+    type: [String],
+  })
   categories?: string[];
 
   @ApiPropertyOptional({ description: 'Tags to assign', type: [String] })
   tags?: string[];
 
-  @ApiProperty({ enum: ['publish', 'draft', 'private'], description: 'Product status' })
+  @ApiProperty({
+    enum: ['publish', 'draft', 'private'],
+    description: 'Product status',
+  })
   status: 'publish' | 'draft' | 'private';
 
   @ApiPropertyOptional({
@@ -106,7 +120,10 @@ export class ImportSettingsDto {
   })
   catalogVisibility?: 'visible' | 'catalog' | 'search' | 'hidden';
 
-  @ApiPropertyOptional({ enum: ['instock', 'outofstock', 'onbackorder'], description: 'Stock status' })
+  @ApiPropertyOptional({
+    enum: ['instock', 'outofstock', 'onbackorder'],
+    description: 'Stock status',
+  })
   stockStatus?: 'instock' | 'outofstock' | 'onbackorder';
 
   @ApiPropertyOptional({ description: 'Enable stock management' })
@@ -115,22 +132,35 @@ export class ImportSettingsDto {
   @ApiPropertyOptional({ description: 'Stock quantity' })
   stockQuantity?: number;
 
-  @ApiPropertyOptional({ description: 'Auto-generate variations for variable products', default: true })
+  @ApiPropertyOptional({
+    description: 'Auto-generate variations for variable products',
+    default: true,
+  })
   autoGenerateVariations?: boolean;
 
-  @ApiPropertyOptional({ enum: ['original', 'markup'], description: 'Variation price mode' })
+  @ApiPropertyOptional({
+    enum: ['original', 'markup'],
+    description: 'Variation price mode',
+  })
   variationPriceMode?: 'original' | 'markup';
 
-  @ApiPropertyOptional({ enum: ['percentage', 'fixed'], description: 'Variation markup type' })
+  @ApiPropertyOptional({
+    enum: ['percentage', 'fixed'],
+    description: 'Variation markup type',
+  })
   variationMarkupType?: 'percentage' | 'fixed';
 
   @ApiPropertyOptional({ description: 'Variation markup value' })
   variationMarkupValue?: number;
 
-  @ApiPropertyOptional({ description: 'Max images per product (0 = no images, undefined = all)' })
+  @ApiPropertyOptional({
+    description: 'Max images per product (0 = no images, undefined = all)',
+  })
   maxImages?: number;
 
-  @ApiPropertyOptional({ description: 'Selected attributes for variable products' })
+  @ApiPropertyOptional({
+    description: 'Selected attributes for variable products',
+  })
   attributes?: {
     id?: number; // WooCommerce attribute ID for global attributes
     name: string;
@@ -152,7 +182,10 @@ export class ExecuteImportDto {
   @ApiProperty({ description: 'Source store URL' })
   sourceUrl: string;
 
-  @ApiProperty({ description: 'Products to import', type: [SelectedProductDto] })
+  @ApiProperty({
+    description: 'Products to import',
+    type: [SelectedProductDto],
+  })
   products: SelectedProductDto[];
 
   @ApiProperty({ description: 'Import settings', type: ImportSettingsDto })
@@ -234,32 +267,42 @@ const ImportSettingsSchema = Joi.object().keys({
   categories: Joi.array().items(Joi.string()).default([]),
   tags: Joi.array().items(Joi.string()).default([]),
   status: Joi.string().valid('publish', 'draft', 'private').required(),
-  catalogVisibility: Joi.string().valid('visible', 'catalog', 'search', 'hidden').default('visible'),
-  stockStatus: Joi.string().valid('instock', 'outofstock', 'onbackorder').default('instock'),
+  catalogVisibility: Joi.string()
+    .valid('visible', 'catalog', 'search', 'hidden')
+    .default('visible'),
+  stockStatus: Joi.string()
+    .valid('instock', 'outofstock', 'onbackorder')
+    .default('instock'),
   manageStock: Joi.boolean().default(false),
   stockQuantity: Joi.number().integer().min(0).optional(),
   autoGenerateVariations: Joi.boolean().default(true),
-  variationPriceMode: Joi.string().valid('original', 'markup').default('original'),
-  variationMarkupType: Joi.string().valid('percentage', 'fixed').when('variationPriceMode', {
-    is: 'markup',
-    then: Joi.required(),
-    otherwise: Joi.optional(),
-  }),
+  variationPriceMode: Joi.string()
+    .valid('original', 'markup')
+    .default('original'),
+  variationMarkupType: Joi.string()
+    .valid('percentage', 'fixed')
+    .when('variationPriceMode', {
+      is: 'markup',
+      then: Joi.required(),
+      otherwise: Joi.optional(),
+    }),
   variationMarkupValue: Joi.number().when('variationPriceMode', {
     is: 'markup',
     then: Joi.required(),
     otherwise: Joi.optional(),
   }),
   maxImages: Joi.number().integer().min(0).optional(),
-  attributes: Joi.array().items(
-    Joi.object({
-      id: Joi.number().optional(), // WooCommerce attribute ID for global attributes
-      name: Joi.string().required(),
-      options: Joi.array().items(Joi.string()).default([]),
-      visible: Joi.boolean().default(true),
-      variation: Joi.boolean().default(true),
-    }),
-  ).optional(),
+  attributes: Joi.array()
+    .items(
+      Joi.object({
+        id: Joi.number().optional(), // WooCommerce attribute ID for global attributes
+        name: Joi.string().required(),
+        options: Joi.array().items(Joi.string()).default([]),
+        visible: Joi.boolean().default(true),
+        variation: Joi.boolean().default(true),
+      }),
+    )
+    .optional(),
 });
 
 export const ExecuteImportSchema = Joi.object().keys({
@@ -271,9 +314,13 @@ export const ExecuteImportSchema = Joi.object().keys({
     .valid(...Object.values(ImportSource))
     .required(),
   sourceUrl: Joi.string().uri().required(),
-  products: Joi.array().items(SelectedProductSchema).min(1).required().messages({
-    'array.min': 'At least one product must be selected for import',
-  }),
+  products: Joi.array()
+    .items(SelectedProductSchema)
+    .min(1)
+    .required()
+    .messages({
+      'array.min': 'At least one product must be selected for import',
+    }),
   settings: ImportSettingsSchema.required(),
 });
 

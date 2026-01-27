@@ -83,7 +83,10 @@ export class CustomerController {
 
   @Get('stats')
   @ApiOperation({ summary: 'Get customer statistics' })
-  @ApiResponse({ status: 200, description: 'Statistics retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Statistics retrieved successfully',
+  })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiQuery({ name: 'storeId', required: false })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))

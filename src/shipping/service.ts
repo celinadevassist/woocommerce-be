@@ -1,10 +1,11 @@
+import { Injectable, Logger } from '@nestjs/common';
 import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  BadRequestException,
-  Logger,
-} from '@nestjs/common';
+  ResourceNotFoundException,
+  AccessDeniedException,
+  SystemErrorException,
+  InvalidInputException,
+  DuplicateResourceException,
+} from '../shared/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Store, StoreDocument } from '../store/schema';
@@ -45,14 +46,14 @@ export class ShippingService {
       .select('+credentials');
 
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', storeId);
     }
 
     const isOwner = store.ownerId.toString() === userId;
     const isMember = store.members.some((m) => m.userId.toString() === userId);
 
     if (!isOwner && !isMember) {
-      throw new ForbiddenException('You do not have access to this store');
+      throw new AccessDeniedException('store', 'user is not owner or member');
     }
 
     return {
@@ -147,9 +148,7 @@ export class ShippingService {
         `Failed to fetch shipping zones: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to fetch shipping zones: ${error.message}`,
-      );
+      throw new SystemErrorException('fetch shipping zones', error.message);
     }
   }
 
@@ -182,9 +181,7 @@ export class ShippingService {
         `Failed to fetch shipping zone: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to fetch shipping zone: ${error.message}`,
-      );
+      throw new SystemErrorException('fetch shipping zone', error.message);
     }
   }
 
@@ -219,9 +216,7 @@ export class ShippingService {
         `Failed to create shipping zone: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to create shipping zone: ${error.message}`,
-      );
+      throw new SystemErrorException('create shipping zone', error.message);
     }
   }
 
@@ -264,9 +259,7 @@ export class ShippingService {
         `Failed to update shipping zone: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to update shipping zone: ${error.message}`,
-      );
+      throw new SystemErrorException('update shipping zone', error.message);
     }
   }
 
@@ -291,9 +284,7 @@ export class ShippingService {
         `Failed to delete shipping zone: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to delete shipping zone: ${error.message}`,
-      );
+      throw new SystemErrorException('delete shipping zone', error.message);
     }
   }
 
@@ -320,9 +311,7 @@ export class ShippingService {
         `Failed to fetch zone locations: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to fetch zone locations: ${error.message}`,
-      );
+      throw new SystemErrorException('fetch zone locations', error.message);
     }
   }
 
@@ -350,9 +339,7 @@ export class ShippingService {
         `Failed to update zone locations: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to update zone locations: ${error.message}`,
-      );
+      throw new SystemErrorException('update zone locations', error.message);
     }
   }
 
@@ -379,9 +366,7 @@ export class ShippingService {
         `Failed to fetch zone methods: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to fetch zone methods: ${error.message}`,
-      );
+      throw new SystemErrorException('fetch zone methods', error.message);
     }
   }
 
@@ -413,9 +398,7 @@ export class ShippingService {
         `Failed to add zone method: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to add zone method: ${error.message}`,
-      );
+      throw new SystemErrorException('add zone method', error.message);
     }
   }
 
@@ -448,9 +431,7 @@ export class ShippingService {
         `Failed to update zone method: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to update zone method: ${error.message}`,
-      );
+      throw new SystemErrorException('update zone method', error.message);
     }
   }
 
@@ -477,9 +458,7 @@ export class ShippingService {
         `Failed to delete zone method: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to delete zone method: ${error.message}`,
-      );
+      throw new SystemErrorException('delete zone method', error.message);
     }
   }
 
@@ -508,9 +487,7 @@ export class ShippingService {
         `Failed to fetch shipping methods: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to fetch shipping methods: ${error.message}`,
-      );
+      throw new SystemErrorException('fetch shipping methods', error.message);
     }
   }
 
@@ -534,9 +511,7 @@ export class ShippingService {
         `Failed to fetch countries: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to fetch countries: ${error.message}`,
-      );
+      throw new SystemErrorException('fetch countries', error.message);
     }
   }
 
@@ -565,9 +540,7 @@ export class ShippingService {
         `Failed to fetch country states: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to fetch country states: ${error.message}`,
-      );
+      throw new SystemErrorException('fetch country states', error.message);
     }
   }
 
@@ -594,9 +567,7 @@ export class ShippingService {
         `Failed to fetch custom states: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to fetch custom states: ${error.message}`,
-      );
+      throw new SystemErrorException('fetch custom states', error.message);
     }
   }
 
@@ -621,22 +592,19 @@ export class ShippingService {
       );
     } catch (error) {
       if (error.response?.status === 404) {
-        throw new BadRequestException(
-          'CartFlow Locations plugin is not installed on the store',
+        throw new InvalidInputException(
+          'CartFlow Locations plugin',
+          'plugin is not installed on the store',
         );
       }
       if (error.response?.status === 409) {
-        throw new BadRequestException(
-          'State already exists. Use update to modify it.',
-        );
+        throw new DuplicateResourceException('State', 'code', stateCode);
       }
       this.logger.error(
         `Failed to add custom state: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to add custom state: ${error.message}`,
-      );
+      throw new SystemErrorException('add custom state', error.message);
     }
   }
 
@@ -661,17 +629,16 @@ export class ShippingService {
       );
     } catch (error) {
       if (error.response?.status === 404) {
-        throw new NotFoundException(
-          'State not found or CartFlow Locations plugin is not installed',
+        throw new ResourceNotFoundException(
+          'State or CartFlow plugin',
+          `${countryCode}:${stateCode}`,
         );
       }
       this.logger.error(
         `Failed to update custom state: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to update custom state: ${error.message}`,
-      );
+      throw new SystemErrorException('update custom state', error.message);
     }
   }
 
@@ -694,17 +661,16 @@ export class ShippingService {
       );
     } catch (error) {
       if (error.response?.status === 404) {
-        throw new NotFoundException(
-          'State not found or CartFlow Locations plugin is not installed',
+        throw new ResourceNotFoundException(
+          'State or CartFlow plugin',
+          `${countryCode}:${stateCode}`,
         );
       }
       this.logger.error(
         `Failed to delete custom state: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to delete custom state: ${error.message}`,
-      );
+      throw new SystemErrorException('delete custom state', error.message);
     }
   }
 
@@ -734,17 +700,16 @@ export class ShippingService {
       );
     } catch (error) {
       if (error.response?.status === 404) {
-        throw new BadRequestException(
-          'CartFlow Locations plugin is not installed on the store',
+        throw new InvalidInputException(
+          'CartFlow Locations plugin',
+          'plugin is not installed on the store',
         );
       }
       this.logger.error(
         `Failed to bulk update states: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to bulk update states: ${error.message}`,
-      );
+      throw new SystemErrorException('bulk update states', error.message);
     }
   }
 
@@ -773,9 +738,7 @@ export class ShippingService {
         `Failed to fetch countries with custom states: ${error.message}`,
         error.stack,
       );
-      throw new BadRequestException(
-        `Failed to fetch countries: ${error.message}`,
-      );
+      throw new SystemErrorException('fetch countries', error.message);
     }
   }
 }

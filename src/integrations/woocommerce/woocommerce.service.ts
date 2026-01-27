@@ -233,7 +233,7 @@ export class WooCommerceService implements IPlatformAdapter {
   async deleteProduct(
     credentials: WooCommerceCredentials,
     productId: number,
-    force: boolean = true,
+    force = true,
   ): Promise<WooProduct> {
     return this.request<WooProduct>(
       credentials,

@@ -91,7 +91,11 @@ export class ResourceNotFoundException extends BusinessException {
 }
 
 export class ValidationException extends BusinessException {
-  constructor(field: string, reason: string, constraints?: Record<string, any>) {
+  constructor(
+    field: string,
+    reason: string,
+    constraints?: Record<string, any>,
+  ) {
     super(
       BusinessErrorCode.VALIDATION_FAILED,
       `Validation failed for ${field}: ${reason}`,
@@ -155,7 +159,7 @@ export class InvalidInputException extends BusinessException {
 
 // Authentication specific exceptions
 export class AuthenticationFailedException extends BusinessException {
-  constructor(reason: string = 'Invalid credentials') {
+  constructor(reason = 'Invalid credentials') {
     super(
       BusinessErrorCode.AUTHENTICATION_FAILED,
       'Authentication failed',
@@ -169,7 +173,7 @@ export class AuthenticationFailedException extends BusinessException {
 }
 
 export class TokenExpiredException extends BusinessException {
-  constructor(tokenType: string = 'token') {
+  constructor(tokenType = 'token') {
     super(
       BusinessErrorCode.TOKEN_EXPIRED,
       `${tokenType} has expired`,

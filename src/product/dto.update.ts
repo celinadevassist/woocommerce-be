@@ -138,7 +138,9 @@ export class UpdateProductDto {
   @ApiPropertyOptional({ description: 'Sale price' })
   salePrice?: string;
 
-  @ApiPropertyOptional({ description: 'Current price (computed from regular/sale)' })
+  @ApiPropertyOptional({
+    description: 'Current price (computed from regular/sale)',
+  })
   price?: string;
 
   @ApiPropertyOptional({ description: 'Is product on sale' })

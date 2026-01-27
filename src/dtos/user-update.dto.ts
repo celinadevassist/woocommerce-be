@@ -19,7 +19,9 @@ export class UpdateUserDTO {
   @ApiPropertyOptional({ example: '+201234567890' })
   mobile?: string;
 
-  @ApiPropertyOptional({ example: ['JavaScript', 'TypeScript', 'React', 'NestJS'] })
+  @ApiPropertyOptional({
+    example: ['JavaScript', 'TypeScript', 'React', 'NestJS'],
+  })
   skills?: string[];
 
   @ApiPropertyOptional({
@@ -47,14 +49,19 @@ export class UpdateUserDTO {
   @ApiPropertyOptional({ example: '2024-01-15T10:30:00Z' })
   lastActive?: Date;
 
-  @ApiPropertyOptional({ example: 'Senior full-stack developer with 5 years of experience' })
+  @ApiPropertyOptional({
+    example: 'Senior full-stack developer with 5 years of experience',
+  })
   bio?: string;
 
   @ApiPropertyOptional({ example: true })
   visibleToCommunity?: boolean;
 
   // Membership fields
-  @ApiPropertyOptional({ example: MembershipStatus.ACTIVE, enum: MembershipStatus })
+  @ApiPropertyOptional({
+    example: MembershipStatus.ACTIVE,
+    enum: MembershipStatus,
+  })
   membershipStatus?: MembershipStatus;
 
   @ApiPropertyOptional({ example: '2024-12-31T23:59:59Z' })

@@ -6,7 +6,16 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(mkdir:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(cd:*)",
+      "Bash(npm view:*)",
+      "Bash(npm install)",
+      "Bash(xargs git branch -d)",
+      "Bash(git worktree:*)",
+      "Bash(while read branch)",
+      "Bash(do git branch -D \"$branch\")",
+      "Bash(done)",
+      "Bash(cd /mnt/g/Woocommerce\\\\ Management\\\\ System/back-end && git branch:*)"
     ]
   }
 }

@@ -1,9 +1,4 @@
-import {
-  Injectable,
-  Inject,
-  forwardRef,
-  Logger,
-} from '@nestjs/common';
+import { Injectable, Inject, forwardRef, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 
@@ -311,7 +306,10 @@ export class AuthService {
         error,
       );
       this.logger.error(`   Error details: ${JSON.stringify(error)}`);
-      throw new SystemErrorException('sending password reset email', error?.message || 'Email service unavailable');
+      throw new SystemErrorException(
+        'sending password reset email',
+        error?.message || 'Email service unavailable',
+      );
     }
   }
 
@@ -446,7 +444,10 @@ export class AuthService {
         `Failed to resend verification email to ${exist.email}:`,
         error,
       );
-      throw new SystemErrorException('sending verification email', error?.message || 'Email service unavailable');
+      throw new SystemErrorException(
+        'sending verification email',
+        error?.message || 'Email service unavailable',
+      );
     }
   }
 

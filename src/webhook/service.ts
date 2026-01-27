@@ -1,9 +1,8 @@
+import { Injectable, Logger } from '@nestjs/common';
 import {
-  Injectable,
-  Logger,
-  UnauthorizedException,
-  NotFoundException,
-} from '@nestjs/common';
+  ResourceNotFoundException,
+  AuthenticationFailedException,
+} from '../shared/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as crypto from 'crypto';
@@ -48,7 +47,7 @@ export class WebhookService {
   ): Promise<StoreDocument> {
     const store = await this.storeModel.findById(storeId);
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', storeId);
     }
 
     if (!store.webhookSecret) {
@@ -65,7 +64,9 @@ export class WebhookService {
 
     if (signature !== expectedSignature) {
       this.logger.error(`Invalid webhook signature for store ${storeId}`);
-      throw new UnauthorizedException('Invalid webhook signature');
+      throw new AuthenticationFailedException(
+        'Webhook signature verification failed. Ensure the webhook secret in your WooCommerce store matches the secret configured in this system.',
+      );
     }
 
     return store;

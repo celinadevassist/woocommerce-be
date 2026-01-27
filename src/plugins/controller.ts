@@ -21,7 +21,8 @@ export class PluginsController {
       path.join(__dirname, '..', '..', '..', 'plugins-assets'), // Alternative compiled structure
     ];
 
-    this.pluginsDir = possiblePaths.find((p) => fs.existsSync(p)) || possiblePaths[0];
+    this.pluginsDir =
+      possiblePaths.find((p) => fs.existsSync(p)) || possiblePaths[0];
     this.logger.log(`Plugins directory resolved to: ${this.pluginsDir}`);
   }
 

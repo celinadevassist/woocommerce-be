@@ -7,7 +7,7 @@ export class SignInDTO {
     description: 'email',
     type: String,
     required: false,
-    example: 'user@example.com'
+    example: 'user@example.com',
   })
   email: string;
 
@@ -15,7 +15,7 @@ export class SignInDTO {
     description: 'Password',
     type: String,
     required: true,
-    example: 'Password123!'
+    example: 'Password123!',
   })
   password?: string;
 }

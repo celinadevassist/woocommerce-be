@@ -12,7 +12,10 @@ import axios from 'axios';
 import { ProductImport, ProductImportDocument } from './schema';
 import { Store, StoreDocument } from '../store/schema';
 import { Product, ProductDocument } from '../product/schema';
-import { ProductVariant, ProductVariantDocument } from '../product/variant.schema';
+import {
+  ProductVariant,
+  ProductVariantDocument,
+} from '../product/variant.schema';
 import { ImportStatus, ImportSource, PricingMode, MarkupType } from './enum';
 import {
   IExternalProduct,
@@ -32,10 +35,12 @@ export class ProductImportService {
   private readonly logger = new Logger(ProductImportService.name);
 
   constructor(
-    @InjectModel(ProductImport.name) private importModel: Model<ProductImportDocument>,
+    @InjectModel(ProductImport.name)
+    private importModel: Model<ProductImportDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
-    @InjectModel(ProductVariant.name) private variantModel: Model<ProductVariantDocument>,
+    @InjectModel(ProductVariant.name)
+    private variantModel: Model<ProductVariantDocument>,
     private readonly wooCommerceService: WooCommerceService,
   ) {}
 
@@ -79,7 +84,10 @@ export class ProductImportService {
   async fetchProducts(
     dto: FetchProductsDto,
     userId: string,
-  ): Promise<{ products: IExternalProduct[]; pagination: { page: number; hasMore: boolean } }> {
+  ): Promise<{
+    products: IExternalProduct[];
+    pagination: { page: number; hasMore: boolean };
+  }> {
     // Verify store access
     await this.verifyStoreAccess(dto.storeId, userId);
 
@@ -93,9 +101,10 @@ export class ProductImportService {
   /**
    * Fetch products from Shopify public API
    */
-  private async fetchShopifyProducts(
-    dto: FetchProductsDto,
-  ): Promise<{ products: IExternalProduct[]; pagination: { page: number; hasMore: boolean } }> {
+  private async fetchShopifyProducts(dto: FetchProductsDto): Promise<{
+    products: IExternalProduct[];
+    pagination: { page: number; hasMore: boolean };
+  }> {
     const { sourceUrl, limit = 50, page = 1 } = dto;
 
     // Normalize URL - remove trailing slash
@@ -140,11 +149,15 @@ export class ProductImportService {
           );
         }
         if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
-          throw new BadRequestException('Could not connect to the store. Please check the URL.');
+          throw new BadRequestException(
+            'Could not connect to the store. Please check the URL.',
+          );
         }
       }
 
-      throw new BadRequestException(`Failed to fetch products: ${error.message}`);
+      throw new BadRequestException(
+        `Failed to fetch products: ${error.message}`,
+      );
     }
   }
 
@@ -158,7 +171,8 @@ export class ProductImportService {
     return shopifyProducts.map((product) => {
       // Determine product type
       const isSimple =
-        product.variants.length === 1 && product.variants[0].title === 'Default Title';
+        product.variants.length === 1 &&
+        product.variants[0].title === 'Default Title';
       const type = isSimple ? 'simple' : 'variable';
 
       // Calculate price range
@@ -183,17 +197,28 @@ export class ProductImportService {
             // Extract options from variant
             const variantOptions: { name: string; value: string }[] = [];
             if (v.option1 && product.options[0]) {
-              variantOptions.push({ name: product.options[0].name, value: v.option1 });
+              variantOptions.push({
+                name: product.options[0].name,
+                value: v.option1,
+              });
             }
             if (v.option2 && product.options[1]) {
-              variantOptions.push({ name: product.options[1].name, value: v.option2 });
+              variantOptions.push({
+                name: product.options[1].name,
+                value: v.option2,
+              });
             }
             if (v.option3 && product.options[2]) {
-              variantOptions.push({ name: product.options[2].name, value: v.option3 });
+              variantOptions.push({
+                name: product.options[2].name,
+                value: v.option3,
+              });
             }
 
             // Find variant-specific image (Shopify images have variant_ids array)
-            const variantImage = product.images.find((img) => img.variant_ids?.includes(v.id));
+            const variantImage = product.images.find((img) =>
+              img.variant_ids?.includes(v.id),
+            );
 
             return {
               externalId: String(v.id),
@@ -205,14 +230,26 @@ export class ProductImportService {
               available: v.available,
               weight: v.grams,
               weightUnit: 'g',
-              image: variantImage ? { src: variantImage.src, alt: variantImage.alt || product.title } : undefined,
+              image: variantImage
+                ? {
+                    src: variantImage.src,
+                    alt: variantImage.alt || product.title,
+                  }
+                : undefined,
             };
           })
         : [];
 
       // Map options (attributes)
       const productOptions = product.options
-        .filter((opt) => !(opt.name === 'Title' && opt.values.length === 1 && opt.values[0] === 'Default Title'))
+        .filter(
+          (opt) =>
+            !(
+              opt.name === 'Title' &&
+              opt.values.length === 1 &&
+              opt.values[0] === 'Default Title'
+            ),
+        )
         .map((opt) => ({
           name: opt.name,
           position: opt.position,
@@ -239,7 +276,10 @@ export class ProductImportService {
   /**
    * Execute product import
    */
-  async executeImport(dto: ExecuteImportDto, userId: string): Promise<{ jobId: string }> {
+  async executeImport(
+    dto: ExecuteImportDto,
+    userId: string,
+  ): Promise<{ jobId: string }> {
     // Verify store access and get credentials for WooCommerce API
     const store = await this.verifyStoreAccess(dto.storeId, userId, true);
 
@@ -262,7 +302,12 @@ export class ProductImportService {
     await importJob.save();
 
     // Start background import process
-    this.processImport(importJob._id.toString(), store, dto.products, dto.settings);
+    this.processImport(
+      importJob._id.toString(),
+      store,
+      dto.products,
+      dto.settings,
+    );
 
     return { jobId: importJob._id.toString() };
   }
@@ -276,7 +321,9 @@ export class ProductImportService {
     products: ISelectedProduct[],
     settings: IImportSettings,
   ): Promise<void> {
-    this.logger.log(`Starting import job ${jobId} with ${products.length} products`);
+    this.logger.log(
+      `Starting import job ${jobId} with ${products.length} products`,
+    );
 
     try {
       // Update job status to running
@@ -297,7 +344,11 @@ export class ProductImportService {
         });
 
         try {
-          const result = await this.importSingleProduct(store, product, settings);
+          const result = await this.importSingleProduct(
+            store,
+            product,
+            settings,
+          );
           results.push({
             ...result,
             duration: Date.now() - startTime,
@@ -318,7 +369,9 @@ export class ProductImportService {
 
           await this.importModel.findByIdAndUpdate(jobId, update);
         } catch (error) {
-          this.logger.error(`Failed to import product ${product.title}: ${error.message}`);
+          this.logger.error(
+            `Failed to import product ${product.title}: ${error.message}`,
+          );
 
           const failedResult: IImportResult = {
             externalId: product.externalId,
@@ -364,7 +417,11 @@ export class ProductImportService {
     product: ISelectedProduct,
     settings: IImportSettings,
   ): Promise<IImportResult> {
-    this.logger.log(`[Import] Starting product: ${product.title} (${product.images?.length || 0} images)`);
+    this.logger.log(
+      `[Import] Starting product: ${product.title} (${
+        product.images?.length || 0
+      } images)`,
+    );
 
     // Prepare WooCommerce product data
     const wooProduct = this.prepareWooCommerceProduct(product, settings);
@@ -377,10 +434,19 @@ export class ProductImportService {
     };
 
     // Create product in WooCommerce (images can take a long time to download)
-    this.logger.log(`[Import] Creating product in WooCommerce: ${product.title}`);
+    this.logger.log(
+      `[Import] Creating product in WooCommerce: ${product.title}`,
+    );
     const startTime = Date.now();
-    const createdProduct = await this.wooCommerceService.createProduct(credentials, wooProduct);
-    this.logger.log(`[Import] Product created in WooCommerce in ${Date.now() - startTime}ms: ${product.title} (ID: ${createdProduct.id})`);
+    const createdProduct = await this.wooCommerceService.createProduct(
+      credentials,
+      wooProduct,
+    );
+    this.logger.log(
+      `[Import] Product created in WooCommerce in ${
+        Date.now() - startTime
+      }ms: ${product.title} (ID: ${createdProduct.id})`,
+    );
 
     // Save to local database
     const localProduct = new this.productModel({
@@ -405,7 +471,8 @@ export class ProductImportService {
       stockStatus: settings.stockStatus,
       manageStock: settings.manageStock,
       stockQuantity: settings.manageStock ? settings.stockQuantity || 0 : null,
-      categories: settings.categories?.map((catId) => ({ externalId: catId })) || [],
+      categories:
+        settings.categories?.map((catId) => ({ externalId: catId })) || [],
       tags: settings.tags?.map((tag) => ({ name: tag })) || [],
       images:
         product.images?.map((img, idx) => ({
@@ -428,7 +495,11 @@ export class ProductImportService {
 
     // Generate variations if variable product and autoGenerateVariations is enabled
     let variationsGenerated = 0;
-    if (product.type === 'variable' && settings.autoGenerateVariations && product.options?.length > 0) {
+    if (
+      product.type === 'variable' &&
+      settings.autoGenerateVariations &&
+      product.options?.length > 0
+    ) {
       try {
         variationsGenerated = await this.generateVariations(
           store,
@@ -438,7 +509,9 @@ export class ProductImportService {
           settings,
         );
       } catch (error) {
-        this.logger.warn(`Failed to generate variations for ${product.title}: ${error.message}`);
+        this.logger.warn(
+          `Failed to generate variations for ${product.title}: ${error.message}`,
+        );
       }
     }
 
@@ -455,13 +528,20 @@ export class ProductImportService {
   /**
    * Prepare product data for WooCommerce API
    */
-  private prepareWooCommerceProduct(product: ISelectedProduct, settings: IImportSettings): any {
+  private prepareWooCommerceProduct(
+    product: ISelectedProduct,
+    settings: IImportSettings,
+  ): any {
     const basePrice = product.variants[0]?.price || '0';
     const calculatedPrice = this.calculatePrice(basePrice, settings);
     const compareAtPrice = product.variants[0]?.compareAtPrice;
 
     // Debug: Log received attributes
-    this.logger.log(`[Import] Received attributes from settings: ${JSON.stringify(settings.attributes)}`);
+    this.logger.log(
+      `[Import] Received attributes from settings: ${JSON.stringify(
+        settings.attributes,
+      )}`,
+    );
 
     const wooProduct: any = {
       name: product.title,
@@ -474,7 +554,9 @@ export class ProductImportService {
       sku: '',
       stock_status: settings.stockStatus,
       manage_stock: settings.manageStock,
-      categories: settings.categories?.map((catId) => ({ id: parseInt(catId, 10) })) || [],
+      categories:
+        settings.categories?.map((catId) => ({ id: parseInt(catId, 10) })) ||
+        [],
       tags: settings.tags?.map((tag) => ({ name: tag })) || [],
     };
 
@@ -498,7 +580,11 @@ export class ProductImportService {
     }
 
     // Add sale price if compare_at_price exists and prices are not empty
-    if (calculatedPrice !== undefined && compareAtPrice && parseFloat(compareAtPrice) > parseFloat(basePrice)) {
+    if (
+      calculatedPrice !== undefined &&
+      compareAtPrice &&
+      parseFloat(compareAtPrice) > parseFloat(basePrice)
+    ) {
       wooProduct.regular_price = this.calculatePrice(compareAtPrice, settings);
       wooProduct.sale_price = calculatedPrice;
     }
@@ -536,11 +622,21 @@ export class ProductImportService {
 
         if (builtAttributes.length > 0) {
           wooProduct.attributes = builtAttributes;
-          this.logger.log(`[Import] WooCommerce product attributes: ${builtAttributes.map(a => `${a.name || 'ID:' + a.id}(${a.options.length} terms)`).join(', ')}`);
+          this.logger.log(
+            `[Import] WooCommerce product attributes: ${builtAttributes
+              .map(
+                (a) => `${a.name || 'ID:' + a.id}(${a.options.length} terms)`,
+              )
+              .join(', ')}`,
+          );
         }
       }
 
-      this.logger.log(`[Import] Final WooCommerce attributes: ${JSON.stringify(wooProduct.attributes)}`);
+      this.logger.log(
+        `[Import] Final WooCommerce attributes: ${JSON.stringify(
+          wooProduct.attributes,
+        )}`,
+      );
     }
 
     return wooProduct;
@@ -549,7 +645,10 @@ export class ProductImportService {
   /**
    * Calculate price based on settings (for simple products)
    */
-  private calculatePrice(originalPrice: string, settings: IImportSettings): string | undefined {
+  private calculatePrice(
+    originalPrice: string,
+    settings: IImportSettings,
+  ): string | undefined {
     // Empty mode - don't set any price
     if (settings.pricing.mode === PricingMode.EMPTY) {
       return undefined;
@@ -585,8 +684,20 @@ export class ProductImportService {
   private buildLocalProductAttributes(
     product: ISelectedProduct,
     settings: IImportSettings,
-  ): { name: string; position: number; visible: boolean; variation: boolean; options: string[] }[] {
-    const result: { name: string; position: number; visible: boolean; variation: boolean; options: string[] }[] = [];
+  ): {
+    name: string;
+    position: number;
+    visible: boolean;
+    variation: boolean;
+    options: string[];
+  }[] {
+    const result: {
+      name: string;
+      position: number;
+      visible: boolean;
+      variation: boolean;
+      options: string[];
+    }[] = [];
 
     // Use only user's selected WooCommerce attributes
     if (settings.attributes && settings.attributes.length > 0) {
@@ -611,7 +722,10 @@ export class ProductImportService {
    * If main pricing mode is 'empty', variations are also empty (user will set prices manually)
    * Otherwise, uses variationPriceMode settings
    */
-  private calculateVariationPrice(originalPrice: string, settings: IImportSettings): string | undefined {
+  private calculateVariationPrice(
+    originalPrice: string,
+    settings: IImportSettings,
+  ): string | undefined {
     // If main pricing mode is EMPTY, variations should also be empty
     // User wants to set all prices manually
     if (settings.pricing.mode === PricingMode.EMPTY) {
@@ -621,7 +735,10 @@ export class ProductImportService {
     const price = parseFloat(originalPrice) || 0;
 
     // If variationPriceMode is 'original' (default), keep the original price from source
-    if (settings.variationPriceMode === 'original' || !settings.variationPriceMode) {
+    if (
+      settings.variationPriceMode === 'original' ||
+      !settings.variationPriceMode
+    ) {
       if (price === 0) {
         return undefined;
       }
@@ -665,7 +782,12 @@ export class ProductImportService {
 
     // Use user's selected WooCommerce attributes for ALL products
     // Ignore Shopify's attribute structure - use only what user selected
-    let attributesToUse: { id?: number; name: string; position: number; values: string[] }[] = [];
+    const attributesToUse: {
+      id?: number;
+      name: string;
+      position: number;
+      values: string[];
+    }[] = [];
 
     if (settings.attributes && settings.attributes.length > 0) {
       // Use all user-selected attributes that have terms
@@ -677,40 +799,69 @@ export class ProductImportService {
             position: attributesToUse.length,
             values: userAttr.options,
           });
-          this.logger.log(`[Import] Using attribute "${userAttr.name}" with terms: ${userAttr.options.join(', ')}`);
+          this.logger.log(
+            `[Import] Using attribute "${
+              userAttr.name
+            }" with terms: ${userAttr.options.join(', ')}`,
+          );
         }
       }
     }
 
     // If no user attributes selected, don't generate variations
     if (attributesToUse.length === 0) {
-      this.logger.log(`[Import] No attributes selected by user, skipping variation generation`);
+      this.logger.log(
+        `[Import] No attributes selected by user, skipping variation generation`,
+      );
       return 0;
     }
 
-    this.logger.log(`[Import] Attributes for variation generation: ${JSON.stringify(attributesToUse)}`);
+    this.logger.log(
+      `[Import] Attributes for variation generation: ${JSON.stringify(
+        attributesToUse,
+      )}`,
+    );
 
     // Log each attribute with its values
     for (const attr of attributesToUse) {
-      this.logger.log(`[Import] Attribute "${attr.name}" (ID: ${attr.id}) has ${attr.values.length} values: ${attr.values.join(', ')}`);
+      this.logger.log(
+        `[Import] Attribute "${attr.name}" (ID: ${attr.id}) has ${
+          attr.values.length
+        } values: ${attr.values.join(', ')}`,
+      );
     }
 
     // Generate all combinations of options
     const combinations = this.generateAttributeCombinations(attributesToUse);
-    this.logger.log(`[Import] Generated ${combinations.length} variation combinations (expected: ${attributesToUse.reduce((acc, attr) => acc * attr.values.length, 1)})`);
+    this.logger.log(
+      `[Import] Generated ${
+        combinations.length
+      } variation combinations (expected: ${attributesToUse.reduce(
+        (acc, attr) => acc * attr.values.length,
+        1,
+      )})`,
+    );
 
     // Log first few combinations for debugging
     if (combinations.length > 0) {
       const samplesToLog = Math.min(3, combinations.length);
       for (let i = 0; i < samplesToLog; i++) {
-        this.logger.log(`[Import] Combination ${i + 1}: ${JSON.stringify(combinations[i])}`);
+        this.logger.log(
+          `[Import] Combination ${i + 1}: ${JSON.stringify(combinations[i])}`,
+        );
       }
       if (combinations.length > samplesToLog) {
-        this.logger.log(`[Import] ... and ${combinations.length - samplesToLog} more combinations`);
+        this.logger.log(
+          `[Import] ... and ${
+            combinations.length - samplesToLog
+          } more combinations`,
+        );
       }
     }
 
-    this.logger.debug(`Generating ${combinations.length} variations for product ${product.title}`);
+    this.logger.debug(
+      `Generating ${combinations.length} variations for product ${product.title}`,
+    );
 
     let created = 0;
 
@@ -724,8 +875,12 @@ export class ProductImportService {
           ),
         );
 
-        const variantPrice = matchingVariant?.price || product.variants[0]?.price || '0';
-        const calculatedPrice = this.calculateVariationPrice(variantPrice, settings);
+        const variantPrice =
+          matchingVariant?.price || product.variants[0]?.price || '0';
+        const calculatedPrice = this.calculateVariationPrice(
+          variantPrice,
+          settings,
+        );
 
         // Map attributes for variation - use ID for global attributes
         const mappedAttributes = combination.map((attr) => {
@@ -744,7 +899,9 @@ export class ProductImportService {
           sku: '',
           stock_status: settings.stockStatus,
           manage_stock: settings.manageStock,
-          stock_quantity: settings.manageStock ? settings.stockQuantity || 0 : undefined,
+          stock_quantity: settings.manageStock
+            ? settings.stockQuantity || 0
+            : undefined,
           attributes: mappedAttributes,
         };
 
@@ -763,18 +920,23 @@ export class ProductImportService {
           const comparePrice = parseFloat(matchingVariant.compareAtPrice);
           const regularPrice = parseFloat(variantPrice);
           if (comparePrice > regularPrice) {
-            variationData.regular_price = this.calculateVariationPrice(matchingVariant.compareAtPrice, settings);
+            variationData.regular_price = this.calculateVariationPrice(
+              matchingVariant.compareAtPrice,
+              settings,
+            );
             (variationData as any).sale_price = calculatedPrice;
           }
         }
 
         // Log variation data for debugging
-        this.logger.log(`[Import] Creating variation with data: ${JSON.stringify({
-          attributes: variationData.attributes,
-          regular_price: variationData.regular_price,
-          stock_status: variationData.stock_status,
-          manage_stock: variationData.manage_stock,
-        })}`);
+        this.logger.log(
+          `[Import] Creating variation with data: ${JSON.stringify({
+            attributes: variationData.attributes,
+            regular_price: variationData.regular_price,
+            stock_status: variationData.stock_status,
+            manage_stock: variationData.manage_stock,
+          })}`,
+        );
 
         const createdVariation = await this.wooCommerceService.createVariation(
           credentials,
@@ -783,7 +945,9 @@ export class ProductImportService {
         );
 
         // Get variation title from WooCommerce response attributes (e.g., "Gold / Large")
-        const variationTitle = createdVariation.attributes?.map((attr) => attr.option).join(' / ') || 'Variant';
+        const variationTitle =
+          createdVariation.attributes?.map((attr) => attr.option).join(' / ') ||
+          'Variant';
 
         // Save variation to local database using WooCommerce response data
         const localVariant = new this.variantModel({
@@ -807,22 +971,33 @@ export class ProductImportService {
           stockStatus: createdVariation.stock_status || 'instock',
           weight: createdVariation.weight,
           dimensions: createdVariation.dimensions,
-          image: createdVariation.image?.src ? { src: createdVariation.image.src, alt: createdVariation.image.alt || variationTitle } : undefined,
+          image: createdVariation.image?.src
+            ? {
+                src: createdVariation.image.src,
+                alt: createdVariation.image.alt || variationTitle,
+              }
+            : undefined,
           // Use attributes from WooCommerce response
           attributes: (createdVariation.attributes || []).map((attr) => ({
             externalId: attr.id,
             name: attr.name,
             option: attr.option,
           })),
-          dateCreatedWoo: createdVariation.date_created ? new Date(createdVariation.date_created) : undefined,
-          dateModifiedWoo: createdVariation.date_modified ? new Date(createdVariation.date_modified) : undefined,
+          dateCreatedWoo: createdVariation.date_created
+            ? new Date(createdVariation.date_created)
+            : undefined,
+          dateModifiedWoo: createdVariation.date_modified
+            ? new Date(createdVariation.date_modified)
+            : undefined,
           lastSyncedAt: new Date(),
           pendingSync: false,
           isDeleted: false,
         });
 
         await localVariant.save();
-        this.logger.log(`[Import] Saved local variation: ${variationTitle} (ID: ${createdVariation.id})`);
+        this.logger.log(
+          `[Import] Saved local variation: ${variationTitle} (ID: ${createdVariation.id})`,
+        );
 
         created++;
       } catch (error) {
@@ -845,7 +1020,10 @@ export class ProductImportService {
 
     const result: { id?: number; name: string; value: string }[][] = [];
 
-    const generate = (index: number, current: { id?: number; name: string; value: string }[]) => {
+    const generate = (
+      index: number,
+      current: { id?: number; name: string; value: string }[],
+    ) => {
       if (index === options.length) {
         result.push([...current]);
         return;
@@ -889,7 +1067,8 @@ export class ProductImportService {
     }
 
     const total = job.totalProducts;
-    const completed = job.completedProducts + job.failedProducts + job.skippedProducts;
+    const completed =
+      job.completedProducts + job.failedProducts + job.skippedProducts;
 
     return {
       jobId: job._id.toString(),
@@ -913,8 +1092,8 @@ export class ProductImportService {
   async getImportHistory(
     storeId: string,
     userId: string,
-    page: number = 1,
-    limit: number = 10,
+    page = 1,
+    limit = 10,
   ): Promise<{
     imports: ProductImportDocument[];
     total: number;
@@ -959,7 +1138,9 @@ export class ProductImportService {
     };
 
     try {
-      const attributes = await this.wooCommerceService.getAttributes(credentials);
+      const attributes = await this.wooCommerceService.getAttributes(
+        credentials,
+      );
       return { attributes };
     } catch (error) {
       this.logger.error(`Failed to get store attributes: ${error.message}`);
@@ -970,7 +1151,10 @@ export class ProductImportService {
   /**
    * Cancel a running import job
    */
-  async cancelImport(jobId: string, userId: string): Promise<{ success: boolean }> {
+  async cancelImport(
+    jobId: string,
+    userId: string,
+  ): Promise<{ success: boolean }> {
     const job = await this.importModel.findById(jobId);
 
     if (!job) {
@@ -981,8 +1165,13 @@ export class ProductImportService {
       await this.verifyStoreAccess(job.storeId.toString(), userId);
     }
 
-    if (job.status !== ImportStatus.RUNNING && job.status !== ImportStatus.PENDING) {
-      throw new BadRequestException('Can only cancel pending or running imports');
+    if (
+      job.status !== ImportStatus.RUNNING &&
+      job.status !== ImportStatus.PENDING
+    ) {
+      throw new BadRequestException(
+        'Can only cancel pending or running imports',
+      );
     }
 
     await this.importModel.findByIdAndUpdate(jobId, {

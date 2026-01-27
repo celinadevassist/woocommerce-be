@@ -41,7 +41,8 @@ export class ProductImportController {
   @Post('fetch')
   @ApiOperation({
     summary: 'Fetch products from external source',
-    description: 'Fetches products from an external store (Shopify) for preview before import',
+    description:
+      'Fetches products from an external store (Shopify) for preview before import',
   })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'], description: 'Language' })
   @ApiResponse({ status: 200, description: 'Products fetched successfully' })
@@ -54,14 +55,21 @@ export class ProductImportController {
       param: { lang: LanguageSchema },
     }),
   )
-  async fetchProducts(@Body() dto: FetchProductsDto, @User() user: UserDocument) {
-    return await this.productImportService.fetchProducts(dto, user._id.toString());
+  async fetchProducts(
+    @Body() dto: FetchProductsDto,
+    @User() user: UserDocument,
+  ) {
+    return await this.productImportService.fetchProducts(
+      dto,
+      user._id.toString(),
+    );
   }
 
   @Post('execute')
   @ApiOperation({
     summary: 'Execute product import',
-    description: 'Starts importing selected products to WooCommerce with specified settings',
+    description:
+      'Starts importing selected products to WooCommerce with specified settings',
   })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'], description: 'Language' })
   @ApiResponse({ status: 200, description: 'Import started successfully' })
@@ -74,8 +82,14 @@ export class ProductImportController {
       param: { lang: LanguageSchema },
     }),
   )
-  async executeImport(@Body() dto: ExecuteImportDto, @User() user: UserDocument) {
-    return await this.productImportService.executeImport(dto, user._id.toString());
+  async executeImport(
+    @Body() dto: ExecuteImportDto,
+    @User() user: UserDocument,
+  ) {
+    return await this.productImportService.executeImport(
+      dto,
+      user._id.toString(),
+    );
   }
 
   @Get('status/:jobId')
@@ -97,8 +111,14 @@ export class ProductImportController {
       },
     }),
   )
-  async getImportStatus(@Param('jobId') jobId: string, @User() user: UserDocument) {
-    return await this.productImportService.getImportStatus(jobId, user._id.toString());
+  async getImportStatus(
+    @Param('jobId') jobId: string,
+    @User() user: UserDocument,
+  ) {
+    return await this.productImportService.getImportStatus(
+      jobId,
+      user._id.toString(),
+    );
   }
 
   @Get('history/:storeId')
@@ -108,8 +128,18 @@ export class ProductImportController {
   })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'], description: 'Language' })
   @ApiParam({ name: 'storeId', description: 'Store ID' })
-  @ApiQuery({ name: 'page', required: false, type: Number, description: 'Page number' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: 'Items per page' })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    type: Number,
+    description: 'Page number',
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    type: Number,
+    description: 'Items per page',
+  })
   @ApiResponse({ status: 200, description: 'History retrieved successfully' })
   @ApiResponse({ status: 403, description: 'No access to store' })
   @UsePipes(
@@ -128,8 +158,8 @@ export class ProductImportController {
   )
   async getImportHistory(
     @Param('storeId') storeId: string,
-    @Query('page') page: number = 1,
-    @Query('limit') limit: number = 10,
+    @Query('page') page = 1,
+    @Query('limit') limit = 10,
     @User() user: UserDocument,
   ) {
     return await this.productImportService.getImportHistory(
@@ -143,11 +173,15 @@ export class ProductImportController {
   @Get('attributes/:storeId')
   @ApiOperation({
     summary: 'Get WooCommerce attributes for a store',
-    description: 'Returns all product attributes from the WooCommerce store for mapping',
+    description:
+      'Returns all product attributes from the WooCommerce store for mapping',
   })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'], description: 'Language' })
   @ApiParam({ name: 'storeId', description: 'Store ID' })
-  @ApiResponse({ status: 200, description: 'Attributes retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Attributes retrieved successfully',
+  })
   @ApiResponse({ status: 403, description: 'No access to store' })
   @UsePipes(
     new JoiValidationPipe({
@@ -159,8 +193,14 @@ export class ProductImportController {
       },
     }),
   )
-  async getStoreAttributes(@Param('storeId') storeId: string, @User() user: UserDocument) {
-    return await this.productImportService.getStoreAttributes(storeId, user._id.toString());
+  async getStoreAttributes(
+    @Param('storeId') storeId: string,
+    @User() user: UserDocument,
+  ) {
+    return await this.productImportService.getStoreAttributes(
+      storeId,
+      user._id.toString(),
+    );
   }
 
   @Post('cancel/:jobId')
@@ -171,7 +211,10 @@ export class ProductImportController {
   @ApiParam({ name: 'lang', enum: ['en', 'ar'], description: 'Language' })
   @ApiParam({ name: 'jobId', description: 'Import job ID' })
   @ApiResponse({ status: 200, description: 'Import cancelled successfully' })
-  @ApiResponse({ status: 400, description: 'Cannot cancel completed/failed job' })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot cancel completed/failed job',
+  })
   @ApiResponse({ status: 404, description: 'Job not found' })
   @UsePipes(
     new JoiValidationPipe({
@@ -183,7 +226,13 @@ export class ProductImportController {
       },
     }),
   )
-  async cancelImport(@Param('jobId') jobId: string, @User() user: UserDocument) {
-    return await this.productImportService.cancelImport(jobId, user._id.toString());
+  async cancelImport(
+    @Param('jobId') jobId: string,
+    @User() user: UserDocument,
+  ) {
+    return await this.productImportService.cancelImport(
+      jobId,
+      user._id.toString(),
+    );
   }
 }

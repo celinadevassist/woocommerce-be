@@ -287,7 +287,11 @@ export class ProductController {
     description: 'Attributes retrieved successfully',
   })
   @ApiQuery({ name: 'storeId', required: false })
-  @ApiQuery({ name: 'categoryId', required: false, description: 'Filter attributes by category' })
+  @ApiQuery({
+    name: 'categoryId',
+    required: false,
+    description: 'Filter attributes by category',
+  })
   @UsePipes(
     new JoiValidationPipe({
       param: { lang: LanguageSchema },
@@ -435,7 +439,12 @@ export class ProductController {
   @ApiOperation({ summary: 'Delete a product and all its variants' })
   @ApiResponse({ status: 200, description: 'Product deleted successfully' })
   @ApiResponse({ status: 404, description: 'Product not found' })
-  @ApiQuery({ name: 'deleteFromWoo', required: false, type: Boolean, description: 'Delete from WooCommerce (default: true)' })
+  @ApiQuery({
+    name: 'deleteFromWoo',
+    required: false,
+    type: Boolean,
+    description: 'Delete from WooCommerce (default: true)',
+  })
   @UsePipes(
     new JoiValidationPipe({
       param: { lang: LanguageSchema },
@@ -448,7 +457,11 @@ export class ProductController {
     @Param('lang') lang: string,
   ) {
     const shouldDelete = deleteFromWoo !== 'false';
-    return await this.productService.delete(id, user._id.toString(), shouldDelete);
+    return await this.productService.delete(
+      id,
+      user._id.toString(),
+      shouldDelete,
+    );
   }
 
   @Patch(':id/stock')

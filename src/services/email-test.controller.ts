@@ -254,7 +254,8 @@ export class EmailTestController {
         projectDescription:
           'Help us plan and execute our Q1 marketing strategy for the new product launch.',
         role: 'Team Member',
-        invitationUrl: 'https://app.example.com/invitations/accept/test-token-123',
+        invitationUrl:
+          'https://app.example.com/invitations/accept/test-token-123',
       };
 
       const success = await this.mailerService.sendProjectInvitationEmail(

@@ -1,10 +1,9 @@
+import { Injectable, Logger } from '@nestjs/common';
 import {
-  Injectable,
-  NotFoundException,
-  ForbiddenException,
-  BadRequestException,
-  Logger,
-} from '@nestjs/common';
+  ResourceNotFoundException,
+  AccessDeniedException,
+  ValidationException,
+} from '../shared/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Review, ReviewDocument } from './schema';
@@ -84,14 +83,14 @@ export class ReviewService {
     });
 
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', storeId);
     }
 
     const isOwner = store.ownerId.toString() === userId;
     const isMember = store.members?.some((m) => m.userId.toString() === userId);
 
     if (!isOwner && !isMember) {
-      throw new ForbiddenException('You do not have access to this store');
+      throw new AccessDeniedException('store', 'user is not owner or member');
     }
 
     return store;
@@ -229,7 +228,7 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found');
+      throw new ResourceNotFoundException('Review', id);
     }
 
     await this.verifyStoreAccess(review.storeId.toString(), userId);
@@ -256,7 +255,7 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found');
+      throw new ResourceNotFoundException('Review', id);
     }
 
     await this.verifyStoreAccess(review.storeId.toString(), userId);
@@ -335,7 +334,7 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found');
+      throw new ResourceNotFoundException('Review', id);
     }
 
     await this.verifyStoreAccess(review.storeId.toString(), userId);
@@ -1011,7 +1010,7 @@ export class ReviewService {
     });
 
     if (!template) {
-      throw new NotFoundException('Template not found');
+      throw new ResourceNotFoundException('ResponseTemplate', id);
     }
 
     await this.verifyStoreAccess(template.storeId.toString(), userId);
@@ -1034,7 +1033,7 @@ export class ReviewService {
     });
 
     if (!template) {
-      throw new NotFoundException('Template not found');
+      throw new ResourceNotFoundException('ResponseTemplate', id);
     }
 
     await this.verifyStoreAccess(template.storeId.toString(), userId);
@@ -1063,7 +1062,7 @@ export class ReviewService {
   ): Promise<{ averageRating: number; ratingCount: number }> {
     const product = await this.productModel.findById(productId);
     if (!product) {
-      throw new NotFoundException('Product not found');
+      throw new ResourceNotFoundException('Product', productId);
     }
 
     // Calculate rating stats from approved reviews only
@@ -1255,7 +1254,7 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found');
+      throw new ResourceNotFoundException('Review', reviewId);
     }
 
     await this.verifyStoreAccess(review.storeId.toString(), userId);
@@ -1299,7 +1298,7 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found');
+      throw new ResourceNotFoundException('Review', reviewId);
     }
 
     await this.verifyStoreAccess(review.storeId.toString(), userId);
@@ -1309,7 +1308,7 @@ export class ReviewService {
     );
 
     if (photoIndex === undefined || photoIndex === -1) {
-      throw new NotFoundException('Photo not found');
+      throw new ResourceNotFoundException('ReviewPhoto', photoId);
     }
 
     const photo = review.photos[photoIndex];
@@ -1351,7 +1350,7 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found');
+      throw new ResourceNotFoundException('Review', reviewId);
     }
 
     await this.verifyStoreAccess(review.storeId.toString(), userId);
@@ -1386,7 +1385,7 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found');
+      throw new ResourceNotFoundException('Review', reviewId);
     }
 
     await this.verifyStoreAccess(review.storeId.toString(), userId);
@@ -1417,7 +1416,7 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found');
+      throw new ResourceNotFoundException('Review', reviewId);
     }
 
     await this.verifyStoreAccess(review.storeId.toString(), userId);
@@ -1451,7 +1450,7 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found');
+      throw new ResourceNotFoundException('Review', reviewId);
     }
 
     await this.verifyStoreAccess(review.storeId.toString(), userId);
@@ -1545,14 +1544,19 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found');
+      throw new ResourceNotFoundException('Review', reviewId);
     }
 
     await this.verifyStoreAccess(review.storeId.toString(), userId);
 
     if (review.moderationStatus !== ModerationStatus.APPROVED) {
-      throw new BadRequestException(
+      throw new ValidationException(
+        'moderationStatus',
         'Review must be approved before publishing',
+        {
+          currentStatus: review.moderationStatus,
+          requiredStatus: ModerationStatus.APPROVED,
+        },
       );
     }
 
@@ -1576,7 +1580,7 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found');
+      throw new ResourceNotFoundException('Review', reviewId);
     }
 
     await this.verifyStoreAccess(review.storeId.toString(), userId);
@@ -1635,7 +1639,7 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found');
+      throw new ResourceNotFoundException('Review', reviewId);
     }
 
     await this.verifyStoreAccess(review.storeId.toString(), userId);
@@ -1660,7 +1664,7 @@ export class ReviewService {
     });
 
     if (!review) {
-      throw new NotFoundException('Review not found');
+      throw new ResourceNotFoundException('Review', reviewId);
     }
 
     await this.verifyStoreAccess(review.storeId.toString(), userId);

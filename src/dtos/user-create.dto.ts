@@ -46,7 +46,10 @@ export class CreateUserDTO {
   @ApiPropertyOptional({ example: 'en' })
   preferredLanguage?: string;
 
-  @ApiPropertyOptional({ example: 'Full-stack developer passionate about building scalable web applications' })
+  @ApiPropertyOptional({
+    example:
+      'Full-stack developer passionate about building scalable web applications',
+  })
   bio?: string;
 
   @ApiPropertyOptional({ example: true })

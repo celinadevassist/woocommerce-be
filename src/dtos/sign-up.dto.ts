@@ -9,7 +9,7 @@ export class SignUpDTO {
     description: 'first Name',
     type: String,
     required: true,
-    example: 'John'
+    example: 'John',
   })
   firstName: string;
 
@@ -17,7 +17,7 @@ export class SignUpDTO {
     description: 'father Name',
     type: String,
     required: true,
-    example: 'Doe'
+    example: 'Doe',
   })
   lastName: string;
 
@@ -25,14 +25,14 @@ export class SignUpDTO {
     description: 'Email',
     type: String,
     required: true,
-    example: 'john.doe@example.com'
+    example: 'john.doe@example.com',
   })
   email: string;
 
   @ApiProperty({
     description: 'Password',
     required: true,
-    example: 'SecurePass123!'
+    example: 'SecurePass123!',
   })
   password?: string;
 }

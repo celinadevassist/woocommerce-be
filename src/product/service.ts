@@ -89,10 +89,7 @@ export class ProductService {
     const isMember = store.members.some((m) => m.userId.toString() === userId);
 
     if (!isOwner && !isMember) {
-      throw new AccessDeniedException(
-        'store',
-        'user is not owner or member',
-      );
+      throw new AccessDeniedException('store', 'user is not owner or member');
     }
 
     return store;
@@ -1336,7 +1333,10 @@ export class ProductService {
     // Get the parent product for WooCommerce sync
     const product = await this.productModel.findById(variant.productId);
     if (!product) {
-      throw new ResourceNotFoundException('Product', variant.productId.toString());
+      throw new ResourceNotFoundException(
+        'Product',
+        variant.productId.toString(),
+      );
     }
 
     // Delete from WooCommerce first
@@ -1410,7 +1410,10 @@ export class ProductService {
   async syncVariantToWoo(variant: ProductVariantDocument): Promise<void> {
     const product = await this.productModel.findById(variant.productId);
     if (!product) {
-      throw new ResourceNotFoundException('Product', variant.productId.toString());
+      throw new ResourceNotFoundException(
+        'Product',
+        variant.productId.toString(),
+      );
     }
 
     // Check if product has externalId (is synced to WooCommerce)
@@ -3046,7 +3049,10 @@ export class ProductService {
       throw new ValidationException(
         'csvContent',
         'file is empty or has no data rows',
-        { lineCount: lines.length, expected: 'at least 2 lines (header + data)' },
+        {
+          lineCount: lines.length,
+          expected: 'at least 2 lines (header + data)',
+        },
       );
     }
 

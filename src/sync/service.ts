@@ -1,11 +1,8 @@
+import { Injectable, Logger, Inject, forwardRef } from '@nestjs/common';
 import {
-  Injectable,
-  Logger,
-  NotFoundException,
-  BadRequestException,
-  Inject,
-  forwardRef,
-} from '@nestjs/common';
+  ResourceNotFoundException,
+  ValidationException,
+} from '../shared/exceptions';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { SyncJob, SyncJobDocument } from './schema';
@@ -64,7 +61,7 @@ export class SyncService {
   ): Promise<ISyncResult> {
     const store = await this.storeService.getStoreWithCredentials(storeId);
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', storeId);
     }
 
     // Check if there's already a running sync for this entity type
@@ -75,8 +72,13 @@ export class SyncService {
     });
 
     if (existingJob) {
-      throw new BadRequestException(
+      throw new ValidationException(
+        'sync',
         'A product sync is already in progress for this store',
+        {
+          status: 'in_progress',
+          constraint: 'Only one product sync job allowed at a time',
+        },
       );
     }
 
@@ -151,11 +153,15 @@ export class SyncService {
   async pauseSync(jobId: string): Promise<ISyncResult> {
     const job = await this.syncJobModel.findById(jobId);
     if (!job) {
-      throw new NotFoundException('Sync job not found');
+      throw new ResourceNotFoundException('SyncJob', jobId);
     }
 
     if (job.status !== SyncJobStatus.RUNNING) {
-      throw new BadRequestException('Only running sync jobs can be paused');
+      throw new ValidationException(
+        'status',
+        'Only running sync jobs can be paused',
+        { currentStatus: job.status, requiredStatus: SyncJobStatus.RUNNING },
+      );
     }
 
     job.status = SyncJobStatus.PAUSED;
@@ -175,18 +181,22 @@ export class SyncService {
   async resumeSync(jobId: string): Promise<ISyncResult> {
     const job = await this.syncJobModel.findById(jobId);
     if (!job) {
-      throw new NotFoundException('Sync job not found');
+      throw new ResourceNotFoundException('SyncJob', jobId);
     }
 
     if (job.status !== SyncJobStatus.PAUSED) {
-      throw new BadRequestException('Only paused sync jobs can be resumed');
+      throw new ValidationException(
+        'status',
+        'Only paused sync jobs can be resumed',
+        { currentStatus: job.status, requiredStatus: SyncJobStatus.PAUSED },
+      );
     }
 
     const store = await this.storeService.getStoreWithCredentials(
       job.storeId.toString(),
     );
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', job.storeId.toString());
     }
 
     job.status = SyncJobStatus.RUNNING;
@@ -213,7 +223,7 @@ export class SyncService {
   async cancelSync(jobId: string): Promise<ISyncResult> {
     const job = await this.syncJobModel.findById(jobId);
     if (!job) {
-      throw new NotFoundException('Sync job not found');
+      throw new ResourceNotFoundException('SyncJob', jobId);
     }
 
     if (
@@ -223,7 +233,18 @@ export class SyncService {
         SyncJobStatus.PAUSED,
       ].includes(job.status)
     ) {
-      throw new BadRequestException('This sync job cannot be cancelled');
+      throw new ValidationException(
+        'status',
+        'This sync job cannot be cancelled',
+        {
+          currentStatus: job.status,
+          cancellableStatuses: [
+            SyncJobStatus.PENDING,
+            SyncJobStatus.RUNNING,
+            SyncJobStatus.PAUSED,
+          ],
+        },
+      );
     }
 
     job.status = SyncJobStatus.CANCELLED;
@@ -323,7 +344,7 @@ export class SyncService {
   async getSyncJob(jobId: string): Promise<ISyncJob> {
     const job = await this.syncJobModel.findById(jobId);
     if (!job) {
-      throw new NotFoundException('Sync job not found');
+      throw new ResourceNotFoundException('SyncJob', jobId);
     }
     return this.toInterface(job);
   }
@@ -529,7 +550,7 @@ export class SyncService {
   ): Promise<ISyncResult> {
     const store = await this.storeService.getStoreWithCredentials(storeId);
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', storeId);
     }
 
     const existingJob = await this.syncJobModel.findOne({
@@ -539,8 +560,13 @@ export class SyncService {
     });
 
     if (existingJob) {
-      throw new BadRequestException(
+      throw new ValidationException(
+        'sync',
         'An order sync is already in progress for this store',
+        {
+          status: 'in_progress',
+          constraint: 'Only one order sync job allowed at a time',
+        },
       );
     }
 
@@ -737,7 +763,7 @@ export class SyncService {
   ): Promise<ISyncResult> {
     const store = await this.storeService.getStoreWithCredentials(storeId);
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', storeId);
     }
 
     const existingJob = await this.syncJobModel.findOne({
@@ -747,8 +773,13 @@ export class SyncService {
     });
 
     if (existingJob) {
-      throw new BadRequestException(
+      throw new ValidationException(
+        'sync',
         'A customer sync is already in progress for this store',
+        {
+          status: 'in_progress',
+          constraint: 'Only one customer sync job allowed at a time',
+        },
       );
     }
 
@@ -891,7 +922,7 @@ export class SyncService {
   ): Promise<ISyncResult> {
     const store = await this.storeService.getStoreWithCredentials(storeId);
     if (!store) {
-      throw new NotFoundException('Store not found');
+      throw new ResourceNotFoundException('Store', storeId);
     }
 
     const existingJob = await this.syncJobModel.findOne({
@@ -901,8 +932,13 @@ export class SyncService {
     });
 
     if (existingJob) {
-      throw new BadRequestException(
+      throw new ValidationException(
+        'sync',
         'A review sync is already in progress for this store',
+        {
+          status: 'in_progress',
+          constraint: 'Only one review sync job allowed at a time',
+        },
       );
     }
 

@@ -148,16 +148,13 @@ export class InventoryController {
     @Param('lang') lang: string,
     @Res() res: Response,
   ): Promise<void> {
-    const csv = await this.inventoryService.exportToCsv(
-      user._id.toString(),
-      {
-        productId,
-        storeId,
-        changeType,
-        startDate: startDate ? new Date(startDate) : undefined,
-        endDate: endDate ? new Date(endDate) : undefined,
-      },
-    );
+    const csv = await this.inventoryService.exportToCsv(user._id.toString(), {
+      productId,
+      storeId,
+      changeType,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+    });
     const filename = `inventory-logs-export-${
       new Date().toISOString().split('T')[0]
     }.csv`;

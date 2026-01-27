@@ -225,7 +225,9 @@ export class AdminController {
       query: AdminQuerySubscriptionsSchema,
     }),
   )
-  async getSubscriptions(@Query() query: AdminQuerySubscriptionsDTO): Promise<any> {
+  async getSubscriptions(
+    @Query() query: AdminQuerySubscriptionsDTO,
+  ): Promise<any> {
     return await this.adminService.getSubscriptions(query);
   }
 
