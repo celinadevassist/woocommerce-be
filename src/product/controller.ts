@@ -18,6 +18,7 @@ import {
 import { Request, Response } from 'express';
 import { Multer } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
+import { SkipThrottle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
@@ -307,6 +308,32 @@ export class ProductController {
       user._id.toString(),
       storeId,
       categoryId,
+    );
+  }
+
+  @Post('variants/backfill-attributes')
+  @SkipThrottle()
+  @ApiOperation({
+    summary: 'Backfill variant attributes from WooCommerce',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Attributes backfilled successfully',
+  })
+  @ApiQuery({ name: 'storeId', required: true })
+  @UsePipes(
+    new JoiValidationPipe({
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async backfillVariantAttributes(
+    @Query('storeId') storeId: string,
+    @User() user: UserDocument,
+    @Param('lang') lang: string,
+  ) {
+    return await this.productService.backfillVariantAttributes(
+      user._id.toString(),
+      storeId,
     );
   }
 

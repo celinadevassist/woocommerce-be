@@ -28,6 +28,7 @@ import { StockStatus } from './enum';
 import { Store, StoreDocument } from '../store/schema';
 import { Category, CategoryDocument } from '../category/schema';
 import { Tag, TagDocument } from '../tag/schema';
+import { Attribute, AttributeDocument } from '../attribute/schema';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 import {
   WooProduct,
@@ -47,6 +48,8 @@ export class ProductService {
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
     @InjectModel(Category.name) private categoryModel: Model<CategoryDocument>,
     @InjectModel(Tag.name) private tagModel: Model<TagDocument>,
+    @InjectModel(Attribute.name)
+    private attributeModel: Model<AttributeDocument>,
     private readonly wooCommerceService: WooCommerceService,
     private readonly s3UploadService: S3UploadService,
     private readonly searchAnalyticsService: SearchAnalyticsService,
@@ -907,6 +910,41 @@ export class ProductService {
         if (dto.salePrice !== undefined) {
           product.salePrice = dto.salePrice;
         }
+        if (dto.attributes !== undefined) {
+          // Look up store attributes to get externalIds
+          const storeAttributes = await this.attributeModel.find({
+            storeId: product.storeId,
+            isDeleted: false,
+          });
+          const attrNameToExternalId = new Map(
+            storeAttributes.map((attr) => [
+              attr.name.toLowerCase(),
+              attr.wooId,
+            ]),
+          );
+
+          product.attributes = dto.attributes.map((a, idx) => ({
+            // Use provided id, or look up by name, or default to 0
+            externalId:
+              a.id ?? attrNameToExternalId.get(a.name.toLowerCase()) ?? 0,
+            name: a.name,
+            position: a.position ?? idx,
+            visible: a.visible ?? true,
+            variation: a.variation ?? false,
+            options: a.options || [],
+          }));
+
+          this.logger.log(
+            `[bulkUpdate] Setting attributes for product ${productId}: ` +
+              `${product.attributes.length} attributes - ${JSON.stringify(
+                product.attributes.map((a) => ({
+                  externalId: a.externalId,
+                  name: a.name,
+                  options: a.options,
+                })),
+              )}`,
+          );
+        }
 
         if (dto.priceAdjustment) {
           const currentPrice = parseFloat(product.regularPrice || '0');
@@ -951,7 +989,7 @@ export class ProductService {
   }
 
   /**
-   * Bulk update multiple variants
+   * Bulk update multiple variants (optimized with batch WooCommerce API)
    */
   async bulkUpdateVariants(
     userId: string,
@@ -979,106 +1017,219 @@ export class ProductService {
     let updated = 0;
     let failed = 0;
 
+    // Validate prices if being set directly
+    if (dto.regularPrice !== undefined && dto.salePrice !== undefined) {
+      this.validatePrices(dto.regularPrice, dto.salePrice);
+    }
+
+    // Phase 1: Fetch all variants in one query and validate
+    const variantObjectIds = dto.variantIds.map((id) => new Types.ObjectId(id));
+    const variants = await this.variantModel.find({
+      _id: { $in: variantObjectIds },
+      isDeleted: false,
+    });
+
+    // Build a map for quick lookup
+    const variantMap = new Map(variants.map((v) => [v._id.toString(), v]));
+
+    // Check which IDs were not found
+    const foundIds = new Set(variants.map((v) => v._id.toString()));
     for (const variantId of dto.variantIds) {
-      try {
-        const variant = await this.variantModel.findOne({
-          _id: new Types.ObjectId(variantId),
-          isDeleted: false,
+      if (!foundIds.has(variantId)) {
+        results.push({
+          id: variantId,
+          success: false,
+          error: 'Variant not found',
         });
+        failed++;
+      }
+    }
 
-        if (!variant) {
-          results.push({
-            id: variantId,
-            success: false,
-            error: 'Variant not found',
+    if (variants.length === 0) {
+      return { updated, failed, results };
+    }
+
+    // Verify store access (only need to check once per store)
+    const storeIds = [...new Set(variants.map((v) => v.storeId.toString()))];
+    for (const storeId of storeIds) {
+      await this.verifyStoreAccess(storeId, userId);
+    }
+
+    // Phase 2: Build MongoDB update and apply in bulk
+    const updateFields: any = { pendingSync: !pushToWoo };
+    if (dto.status !== undefined) updateFields.status = dto.status;
+    if (dto.manageStock !== undefined)
+      updateFields.manageStock = dto.manageStock;
+    if (dto.stockQuantity !== undefined) {
+      updateFields.stockQuantity = dto.stockQuantity;
+      updateFields.stockStatus =
+        dto.stockQuantity === 0
+          ? StockStatus.OUT_OF_STOCK
+          : StockStatus.IN_STOCK;
+    }
+    if (dto.stockStatus !== undefined)
+      updateFields.stockStatus = dto.stockStatus;
+    if (dto.regularPrice !== undefined)
+      updateFields.regularPrice = dto.regularPrice;
+    if (dto.salePrice !== undefined) updateFields.salePrice = dto.salePrice;
+
+    // Handle price adjustment (requires per-variant calculation)
+    if (dto.priceAdjustment) {
+      // Price adjustment needs individual calculation, use bulkWrite
+      const bulkOps = variants.map((variant) => {
+        const currentPrice = parseFloat(variant.regularPrice || '0');
+        let adjustment = dto.priceAdjustment.value;
+        if (dto.priceAdjustment.method === 'percentage') {
+          adjustment = currentPrice * (dto.priceAdjustment.value / 100);
+        }
+        const newPrice =
+          dto.priceAdjustment.type === 'increase'
+            ? (currentPrice + adjustment).toFixed(2)
+            : Math.max(0, currentPrice - adjustment).toFixed(2);
+
+        return {
+          updateOne: {
+            filter: { _id: variant._id },
+            update: { $set: { ...updateFields, regularPrice: newPrice } },
+          },
+        };
+      });
+
+      await this.variantModel.bulkWrite(bulkOps);
+      this.logger.log(
+        `[BulkUpdate] Bulk updated ${variants.length} variants locally (with price adjustment)`,
+      );
+    } else {
+      // Simple updateMany for all variants at once
+      await this.variantModel.updateMany(
+        { _id: { $in: variantObjectIds } },
+        { $set: updateFields },
+      );
+      this.logger.log(
+        `[BulkUpdate] Bulk updated ${variants.length} variants locally via updateMany`,
+      );
+    }
+
+    // Mark all found variants as successful
+    for (const variant of variants) {
+      results.push({ id: variant._id.toString(), success: true });
+      updated++;
+    }
+
+    // Phase 3: Batch sync to WooCommerce (grouped by product)
+    if (pushToWoo) {
+      // Group variants by parent product
+      const variantsByProduct = new Map<
+        string,
+        {
+          variant: ProductVariantDocument;
+          parentExternalId: number;
+          storeId: string;
+        }[]
+      >();
+
+      for (const variant of variants) {
+        if (variant.externalId && variant.parentExternalId) {
+          const productKey = variant.productId.toString();
+          if (!variantsByProduct.has(productKey)) {
+            variantsByProduct.set(productKey, []);
+          }
+          variantsByProduct.get(productKey).push({
+            variant,
+            parentExternalId: variant.parentExternalId,
+            storeId: variant.storeId.toString(),
           });
-          failed++;
-          continue;
         }
+      }
 
-        await this.verifyStoreAccess(variant.storeId.toString(), userId);
-
-        // Validate prices if being updated
-        const regularPrice = dto.regularPrice ?? variant.regularPrice;
-        const salePrice = dto.salePrice ?? variant.salePrice;
-        this.validatePrices(regularPrice, salePrice);
-
-        if (dto.status !== undefined) {
-          variant.status = dto.status;
-        }
-        if (dto.manageStock !== undefined) {
-          variant.manageStock = dto.manageStock;
-        }
-        if (dto.stockQuantity !== undefined) {
-          variant.stockQuantity = dto.stockQuantity;
-          if (dto.stockQuantity === 0) {
-            variant.stockStatus = StockStatus.OUT_OF_STOCK;
-          } else {
-            variant.stockStatus = StockStatus.IN_STOCK;
-          }
-        }
-        if (dto.stockStatus !== undefined) {
-          variant.stockStatus = dto.stockStatus;
-        }
-        if (dto.regularPrice !== undefined) {
-          variant.regularPrice = dto.regularPrice;
-        }
-        if (dto.salePrice !== undefined) {
-          variant.salePrice = dto.salePrice;
-        }
-
-        if (dto.priceAdjustment) {
-          const currentPrice = parseFloat(variant.regularPrice || '0');
-          let adjustment = dto.priceAdjustment.value;
-
-          if (dto.priceAdjustment.method === 'percentage') {
-            adjustment = currentPrice * (dto.priceAdjustment.value / 100);
-          }
-
-          if (dto.priceAdjustment.type === 'increase') {
-            variant.regularPrice = (currentPrice + adjustment).toFixed(2);
-          } else {
-            variant.regularPrice = Math.max(
-              0,
-              currentPrice - adjustment,
-            ).toFixed(2);
-          }
-        }
-
-        variant.pendingSync = !pushToWoo;
-        await variant.save();
-
+      if (variantsByProduct.size > 0) {
         this.logger.log(
-          `[BulkUpdate] Variant ${variantId} saved locally. regularPrice: ${variant.regularPrice}, salePrice: ${variant.salePrice}, pushToWoo: ${pushToWoo}, externalId: ${variant.externalId}`,
+          `[BulkUpdate] Starting batch WooCommerce sync for ${variantsByProduct.size} product(s)`,
         );
 
-        if (pushToWoo && variant.externalId) {
+        // Re-fetch updated variants to get the latest values after updateMany
+        const updatedVariants = await this.variantModel.find({
+          _id: { $in: variantObjectIds },
+          isDeleted: false,
+        });
+        const updatedMap = new Map(
+          updatedVariants.map((v) => [v._id.toString(), v]),
+        );
+
+        for (const [productId, productVariants] of variantsByProduct) {
           try {
+            const { parentExternalId, storeId } = productVariants[0];
+
+            const store = await this.storeModel
+              .findById(storeId)
+              .select('+credentials');
+
+            if (
+              !store?.credentials?.consumerKey ||
+              !store?.credentials?.consumerSecret
+            ) {
+              this.logger.warn(
+                `[BulkUpdate] Skipping WooCommerce sync for product ${productId} - missing credentials`,
+              );
+              continue;
+            }
+
+            const credentials = {
+              url: store.url,
+              consumerKey: store.credentials.consumerKey,
+              consumerSecret: store.credentials.consumerSecret,
+            };
+
+            // Build batch update payload from refreshed data
+            const updatePayload = productVariants.map(({ variant }) => {
+              const fresh = updatedMap.get(variant._id.toString()) || variant;
+              const updateData: any = {
+                id: fresh.externalId,
+              };
+
+              if (
+                fresh.regularPrice !== undefined &&
+                fresh.regularPrice !== null
+              ) {
+                updateData.regular_price = String(fresh.regularPrice);
+              }
+              if (fresh.salePrice !== undefined && fresh.salePrice !== null) {
+                updateData.sale_price = String(fresh.salePrice);
+              } else {
+                updateData.sale_price = '';
+              }
+
+              if (dto.status !== undefined) updateData.status = fresh.status;
+              if (dto.manageStock !== undefined)
+                updateData.manage_stock = fresh.manageStock;
+              if (dto.stockQuantity !== undefined)
+                updateData.stock_quantity = fresh.stockQuantity;
+              if (dto.stockStatus !== undefined)
+                updateData.stock_status = fresh.stockStatus;
+
+              return updateData;
+            });
+
             this.logger.log(
-              `[BulkUpdate] Syncing variant ${variantId} to WooCommerce...`,
+              `[BulkUpdate] Batch updating ${updatePayload.length} variants for product ${parentExternalId}`,
             );
-            await this.syncVariantToWoo(variant);
+
+            await this.wooCommerceService.batchVariations(
+              credentials,
+              parentExternalId,
+              { update: updatePayload },
+            );
+
             this.logger.log(
-              `[BulkUpdate] Variant ${variantId} synced successfully`,
+              `[BulkUpdate] Successfully batch synced ${updatePayload.length} variants for product ${parentExternalId}`,
             );
           } catch (syncError) {
             this.logger.error(
-              `[BulkUpdate] Failed to sync variant ${variantId} to WooCommerce: ${syncError.message}`,
+              `[BulkUpdate] Failed to batch sync variants for product ${productId}: ${syncError.message}`,
               syncError.stack,
             );
-            // Still mark as success for local update, but log the sync failure
           }
-        } else {
-          this.logger.log(
-            `[BulkUpdate] Skipping WooCommerce sync for variant ${variantId} - pushToWoo: ${pushToWoo}, externalId: ${variant.externalId}`,
-          );
         }
-
-        results.push({ id: variantId, success: true });
-        updated++;
-      } catch (error) {
-        results.push({ id: variantId, success: false, error: error.message });
-        failed++;
       }
     }
 
@@ -1097,6 +1248,9 @@ export class ProductService {
     failed: number;
     results: { id: string; success: boolean; error?: string }[];
   }> {
+    this.logger.log(
+      `[BulkDelete] Starting bulk delete for ${variantIds.length} variants, pushToWoo: ${pushToWoo}`,
+    );
     const results: { id: string; success: boolean; error?: string }[] = [];
     let deleted = 0;
     let failed = 0;
@@ -1142,6 +1296,10 @@ export class ProductService {
       }
     }
 
+    this.logger.log(
+      `[BulkDelete] Grouped variants into ${variantsByProduct.size} product(s)`,
+    );
+
     // Process each product group
     for (const [productId, variants] of variantsByProduct) {
       try {
@@ -1164,47 +1322,89 @@ export class ProductService {
         }
 
         // Delete from WooCommerce using batch API if pushing to WooCommerce
-        if (pushToWoo && variants[0].parentExternalId) {
-          const credentials = {
-            url: store.url,
-            consumerKey: store.credentials.consumerKey,
-            consumerSecret: store.credentials.consumerSecret,
-          };
+        if (pushToWoo) {
+          // Get parentExternalId - try from variant first, then from parent product
+          let parentExternalId = variants[0].parentExternalId;
 
-          const deleteIds = variants
-            .filter((v) => v.variant.externalId)
-            .map((v) => v.variant.externalId);
-
-          if (deleteIds.length > 0) {
-            try {
-              await this.wooCommerceService.batchVariations(
-                credentials,
-                variants[0].parentExternalId,
-                { delete: deleteIds },
-              );
-            } catch (wooError) {
+          if (!parentExternalId) {
+            // Fallback: get from parent product
+            const parentProduct = await this.productModel.findById(productId);
+            parentExternalId = parentProduct?.externalId;
+            if (!parentExternalId) {
               this.logger.warn(
-                `Failed to batch delete variants from WooCommerce: ${wooError.message}`,
+                `[BulkDelete] Skipping WooCommerce delete for product ${productId} - no parent externalId found`,
+              );
+            }
+          }
+
+          if (parentExternalId) {
+            const credentials = {
+              url: store.url,
+              consumerKey: store.credentials.consumerKey,
+              consumerSecret: store.credentials.consumerSecret,
+            };
+
+            const deleteIds = variants
+              .filter((v) => v.variant.externalId)
+              .map((v) => v.variant.externalId);
+
+            if (deleteIds.length > 0) {
+              try {
+                this.logger.log(
+                  `[BulkDelete] Batch deleting ${deleteIds.length} variants from WooCommerce (product ${parentExternalId})`,
+                );
+                await this.wooCommerceService.batchVariations(
+                  credentials,
+                  parentExternalId,
+                  { delete: deleteIds },
+                );
+                this.logger.log(
+                  `[BulkDelete] Successfully batch deleted ${deleteIds.length} variants from WooCommerce`,
+                );
+              } catch (wooError) {
+                this.logger.warn(
+                  `[BulkDelete] Failed to batch delete variants from WooCommerce: ${wooError.message}`,
+                );
+              }
+            } else {
+              this.logger.warn(
+                `[BulkDelete] No variants with externalId found for WooCommerce delete`,
               );
             }
           }
         }
 
-        // Soft delete in local database
-        for (const v of variants) {
-          try {
-            v.variant.isDeleted = true;
-            await v.variant.save();
+        // Soft delete in local database (batch operation)
+        this.logger.log(
+          `[BulkDelete] Batch soft-deleting ${variants.length} variants locally for product ${productId}`,
+        );
+        const variantIdsToDelete = variants.map(
+          (v) => new Types.ObjectId(v.variant._id),
+        );
+        const externalIdsToRemove = variants
+          .filter((v) => v.variant.externalId)
+          .map((v) => v.variant.externalId);
 
-            // Update parent product's variation count
-            await this.productModel.findByIdAndUpdate(productId, {
-              $inc: { variationCount: -1 },
-              $pull: { variationIds: v.variant.externalId },
-            });
+        try {
+          // Batch soft-delete all variants
+          await this.variantModel.updateMany(
+            { _id: { $in: variantIdsToDelete } },
+            { isDeleted: true },
+          );
 
+          // Update parent product once with all changes
+          await this.productModel.findByIdAndUpdate(productId, {
+            $inc: { variationCount: -variants.length },
+            $pull: { variationIds: { $in: externalIdsToRemove } },
+          });
+
+          // Mark all as successful
+          for (const v of variants) {
             results.push({ id: v.variant._id.toString(), success: true });
             deleted++;
-          } catch (err) {
+          }
+        } catch (err) {
+          for (const v of variants) {
             results.push({
               id: v.variant._id.toString(),
               success: false,
@@ -1582,6 +1782,10 @@ export class ProductService {
       { $sort: { _id: 1 } },
     ]);
 
+    this.logger.log(
+      `[getVariantAttributes] Aggregation result count: ${result.length}`,
+    );
+
     const attributes: { [key: string]: string[] } = {};
     result.forEach((item: { _id: string; options: string[] }) => {
       attributes[item._id] = item.options.sort();
@@ -1600,6 +1804,10 @@ export class ProductService {
     attributeFilters: { name: string; values: string[] }[],
     categoryId?: string,
   ): Promise<{ variants: IProductVariant[]; total: number }> {
+    this.logger.log(
+      `[searchVariantsByAttributes] Searching with filters: ${JSON.stringify(attributeFilters)}, storeId: ${storeId}, categoryId: ${categoryId}`,
+    );
+
     const storeIds = await this.getUserStoreIds(userId);
 
     const filter: any = {
@@ -1649,10 +1857,18 @@ export class ProductService {
       }));
     }
 
+    this.logger.log(
+      `[searchVariantsByAttributes] Final filter: ${JSON.stringify(filter)}`,
+    );
+
     const variants = await this.variantModel
       .find(filter)
       .populate('productId', 'name')
       .limit(500);
+
+    this.logger.log(
+      `[searchVariantsByAttributes] Found ${variants.length} variants`,
+    );
 
     return {
       variants: variants.map((v) => this.toVariantInterface(v)),
@@ -1786,16 +2002,76 @@ export class ProductService {
           alt: img.alt,
         }));
       }
-      if (product.attributes?.length) {
-        wooUpdateData.attributes = product.attributes.map((a) => ({
-          id: a.externalId,
+      // Look up store attributes to get correct externalIds if missing
+      const storeAttributes = await this.attributeModel.find({
+        storeId: product.storeId,
+        isDeleted: false,
+      });
+      const attrNameToExternalId = new Map(
+        storeAttributes.map((attr) => [attr.name.toLowerCase(), attr.wooId]),
+      );
+
+      // Always send attributes to WooCommerce, even if empty (to clear them)
+      // Also fix any missing externalIds in the product's attributes
+      // Filter out orphan attributes (those not in store's attribute list)
+      let attributesNeedUpdate = false;
+      const validAttributes: any[] = [];
+      const orphanAttributes: string[] = [];
+
+      (product.attributes || []).forEach((a, idx) => {
+        const resolvedId =
+          a.externalId || attrNameToExternalId.get(a.name.toLowerCase()) || 0;
+
+        // Skip orphan attributes (not in store's attribute list)
+        if (!resolvedId) {
+          orphanAttributes.push(a.name);
+          return;
+        }
+
+        // Update the product's attribute with the resolved externalId if it was missing
+        if (!a.externalId && resolvedId) {
+          product.attributes[idx].externalId = resolvedId;
+          attributesNeedUpdate = true;
+        }
+
+        validAttributes.push({
+          id: resolvedId,
           name: a.name,
           position: a.position,
           visible: a.visible,
           variation: a.variation,
           options: a.options,
-        }));
+        });
+      });
+
+      wooUpdateData.attributes = validAttributes;
+
+      if (orphanAttributes.length > 0) {
+        this.logger.warn(
+          `[syncProductToWoo] Filtered out ${orphanAttributes.length} orphan attributes ` +
+            `(not in store's attribute list): ${orphanAttributes.join(', ')}`,
+        );
       }
+
+      // Save the fixed externalIds to the database
+      if (attributesNeedUpdate) {
+        this.logger.log(
+          `[syncProductToWoo] Fixed missing externalIds for product ${product._id}`,
+        );
+      }
+
+      this.logger.log(
+        `[syncProductToWoo] Product ${product._id} (externalId: ${product.externalId}) - ` +
+          `Sending ${
+            wooUpdateData.attributes.length
+          } attributes to WooCommerce: ${JSON.stringify(
+            wooUpdateData.attributes.map((a) => ({
+              id: a.id,
+              name: a.name,
+              options: a.options,
+            })),
+          )}`,
+      );
       if (product.defaultAttributes?.length) {
         wooUpdateData.default_attributes = product.defaultAttributes.map(
           (a) => ({
@@ -1817,10 +2093,20 @@ export class ProductService {
         }));
       }
 
-      await this.wooCommerceService.updateProduct(
+      const wooResult = await this.wooCommerceService.updateProduct(
         credentials,
         product.externalId,
         wooUpdateData,
+      );
+
+      this.logger.log(
+        `[syncProductToWoo] WooCommerce response for product ${product._id}: ` +
+          `attributes returned = ${
+            wooResult?.attributes?.length ?? 'undefined'
+          }, ` +
+          `attribute names: ${JSON.stringify(
+            wooResult?.attributes?.map((a: any) => a.name) || [],
+          )}`,
       );
 
       product.pendingSync = false;
@@ -2059,7 +2345,11 @@ export class ProductService {
             position: 0,
           }
         : undefined,
-      attributes: wooVariant.attributes,
+      attributes: (wooVariant.attributes || []).map((attr) => ({
+        externalId: attr.id,
+        name: attr.name,
+        option: attr.option,
+      })),
       dateCreatedWoo: new Date(wooVariant.date_created),
       dateModifiedWoo: new Date(wooVariant.date_modified),
       lastSyncedAt: new Date(),
@@ -2074,6 +2364,110 @@ export class ProductService {
     }
 
     return await this.variantModel.create(variantData);
+  }
+
+  /**
+   * Backfill variant attributes from WooCommerce for variants that have empty attributes
+   */
+  async backfillVariantAttributes(
+    userId: string,
+    storeId: string,
+  ): Promise<{ updated: number; failed: number; total: number }> {
+    const store = await this.verifyStoreAccess(storeId, userId);
+
+    const storeDoc = await this.storeModel
+      .findById(store._id)
+      .select('+credentials');
+    if (!storeDoc?.credentials) {
+      throw new ValidationException(
+        'store',
+        'Store does not have WooCommerce credentials',
+      );
+    }
+
+    const credentials = {
+      url: storeDoc.url,
+      consumerKey: storeDoc.credentials.consumerKey,
+      consumerSecret: storeDoc.credentials.consumerSecret,
+    };
+
+    // Find variants with empty attributes
+    const emptyVariants = await this.variantModel.find({
+      storeId: new Types.ObjectId(storeId),
+      isDeleted: false,
+      $or: [
+        { attributes: { $exists: false } },
+        { attributes: { $size: 0 } },
+      ],
+    });
+
+    this.logger.log(
+      `[backfillVariantAttributes] Found ${emptyVariants.length} variants with empty attributes for store ${storeId}`,
+    );
+
+    if (emptyVariants.length === 0) {
+      return { updated: 0, failed: 0, total: 0 };
+    }
+
+    // Group variants by parentExternalId to batch fetch
+    const variantsByParent = new Map<number, ProductVariantDocument[]>();
+    for (const variant of emptyVariants) {
+      const parentId = variant.parentExternalId;
+      if (!variantsByParent.has(parentId)) {
+        variantsByParent.set(parentId, []);
+      }
+      variantsByParent.get(parentId).push(variant);
+    }
+
+    let updated = 0;
+    let failed = 0;
+
+    for (const [parentExternalId, variants] of variantsByParent) {
+      try {
+        // Fetch all variations for this product from WooCommerce
+        const wooVariations =
+          await this.wooCommerceService.getProductVariations(
+            credentials,
+            parentExternalId,
+            1,
+            100,
+          );
+
+        // Map WooCommerce variations by ID for quick lookup
+        const wooMap = new Map(
+          wooVariations.data.map((v) => [v.id, v]),
+        );
+
+        for (const variant of variants) {
+          const wooVariant = wooMap.get(variant.externalId);
+          if (wooVariant?.attributes?.length > 0) {
+            variant.attributes = wooVariant.attributes.map((attr) => ({
+              externalId: attr.id,
+              name: attr.name,
+              option: attr.option,
+            })) as any;
+            await variant.save();
+            updated++;
+          } else {
+            failed++;
+            this.logger.warn(
+              `[backfillVariantAttributes] No attributes found in WooCommerce for variant ${variant.externalId} (parent: ${parentExternalId})`,
+            );
+          }
+        }
+      } catch (error) {
+        this.logger.error(
+          `[backfillVariantAttributes] Failed to fetch variations for product ${parentExternalId}: ${error.message}`,
+        );
+        failed += variants.length;
+      }
+    }
+
+    this.logger.log(
+      `[backfillVariantAttributes] Done. Updated: ${updated}, Failed: ${failed}, Total: ${emptyVariants.length}`,
+    );
+
+    return { updated, failed, total: emptyVariants.length };
   }
 
   /**
@@ -3272,6 +3666,12 @@ export class ProductService {
     skipped: number;
     variations: any[];
     message?: string;
+    attributeBreakdown?: {
+      attributes: { name: string; optionCount: number; options: string[] }[];
+      filteredOrphanAttributes: string[];
+      formula: string;
+      totalCombinations: number;
+    };
   }> {
     // Get the product
     const product = await this.productModel.findOne({
@@ -3295,10 +3695,38 @@ export class ProductService {
       );
     }
 
-    // Get attributes that are used for variations
-    const variationAttributes = product.attributes.filter(
+    // Get store attributes to filter out orphan attributes
+    const storeAttributes = await this.attributeModel.find({
+      storeId: product.storeId,
+      isDeleted: false,
+    });
+    const storeAttributeNames = new Set(
+      storeAttributes.map((attr) => attr.name.toLowerCase()),
+    );
+
+    // Get attributes that are used for variations (filter out orphan attributes)
+    const allVariationAttributes = product.attributes.filter(
       (attr) => attr.variation && attr.options?.length > 0,
     );
+
+    // Filter to only include attributes that exist in store attributes
+    const variationAttributes = allVariationAttributes.filter((attr) =>
+      storeAttributeNames.has(attr.name.toLowerCase()),
+    );
+
+    // Log orphan attributes if any were filtered
+    const orphanAttributes = allVariationAttributes.filter(
+      (attr) => !storeAttributeNames.has(attr.name.toLowerCase()),
+    );
+    if (orphanAttributes.length > 0) {
+      this.logger.warn(
+        `Filtered out ${
+          orphanAttributes.length
+        } orphan attributes not found in store: ${orphanAttributes
+          .map((a) => a.name)
+          .join(', ')}`,
+      );
+    }
 
     if (variationAttributes.length === 0) {
       throw new ValidationException(
@@ -3307,6 +3735,28 @@ export class ProductService {
         { attributeCount: product.attributes.length },
       );
     }
+
+    // Log attribute breakdown for debugging
+    const attributeBreakdown = variationAttributes.map((attr) => ({
+      name: attr.name,
+      optionCount: attr.options.length,
+      options: attr.options,
+    }));
+    const totalCombinations = variationAttributes.reduce(
+      (total, attr) => total * attr.options.length,
+      1,
+    );
+    this.logger.log(
+      `Generating variations for product ${productId}: ${JSON.stringify({
+        productName: product.name,
+        attributeCount: variationAttributes.length,
+        attributes: attributeBreakdown,
+        expectedCombinations: totalCombinations,
+        formula: variationAttributes
+          .map((attr) => `${attr.name}(${attr.options.length})`)
+          .join(' × '),
+      })}`,
+    );
 
     // Generate all combinations (cartesian product)
     const generateCombinations = (arrays: string[][]): string[][] => {
@@ -3357,6 +3807,14 @@ export class ProductService {
         skipped: allCombinations.length,
         variations: [],
         message: 'All variation combinations already exist',
+        attributeBreakdown: {
+          attributes: attributeBreakdown,
+          filteredOrphanAttributes: orphanAttributes.map((a) => a.name),
+          formula: variationAttributes
+            .map((attr) => `${attr.name}(${attr.options.length})`)
+            .join(' × '),
+          totalCombinations,
+        },
       };
     }
 
@@ -3445,6 +3903,14 @@ export class ProductService {
         created: createdVariations.length,
         skipped: skippedCount,
         variations: createdVariations,
+        attributeBreakdown: {
+          attributes: attributeBreakdown,
+          filteredOrphanAttributes: orphanAttributes.map((a) => a.name),
+          formula: variationAttributes
+            .map((attr) => `${attr.name}(${attr.options.length})`)
+            .join(' × '),
+          totalCombinations,
+        },
       };
     } catch (error) {
       this.logger.error(
