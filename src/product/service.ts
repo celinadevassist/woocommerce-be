@@ -2497,7 +2497,7 @@ export class ProductService {
         }
 
         this.logger.log(
-          `[backfillVariantAttributes] [${productIndex}/${totalProducts}] Assigned ${assignCount} combinations for "${product.name}"`,
+          `[backfillVariantAttributes] [${productIndex}/${totalProducts}] Assigned ${bulkOps.length} combinations for "${product.name}"`,
         );
       } catch (error) {
         this.logger.error(
