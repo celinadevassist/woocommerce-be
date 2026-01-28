@@ -2367,29 +2367,15 @@ export class ProductService {
   }
 
   /**
-   * Backfill variant attributes from WooCommerce for variants that have empty attributes
+   * Backfill variant attributes by deriving them from parent product attribute definitions.
+   * Used when WooCommerce variations have empty attributes (e.g., after import).
+   * Matches variants to attribute combinations by creation order (externalId).
    */
   async backfillVariantAttributes(
     userId: string,
     storeId: string,
-  ): Promise<{ updated: number; failed: number; total: number }> {
-    const store = await this.verifyStoreAccess(storeId, userId);
-
-    const storeDoc = await this.storeModel
-      .findById(store._id)
-      .select('+credentials');
-    if (!storeDoc?.credentials) {
-      throw new ValidationException(
-        'store',
-        'Store does not have WooCommerce credentials',
-      );
-    }
-
-    const credentials = {
-      url: storeDoc.url,
-      consumerKey: storeDoc.credentials.consumerKey,
-      consumerSecret: storeDoc.credentials.consumerSecret,
-    };
+  ): Promise<{ updated: number; failed: number; skipped: number; total: number }> {
+    await this.verifyStoreAccess(storeId, userId);
 
     // Find variants with empty attributes
     const emptyVariants = await this.variantModel.find({
@@ -2406,68 +2392,126 @@ export class ProductService {
     );
 
     if (emptyVariants.length === 0) {
-      return { updated: 0, failed: 0, total: 0 };
+      return { updated: 0, failed: 0, skipped: 0, total: 0 };
     }
 
-    // Group variants by parentExternalId to batch fetch
-    const variantsByParent = new Map<number, ProductVariantDocument[]>();
+    // Group variants by productId
+    const variantsByProduct = new Map<string, ProductVariantDocument[]>();
     for (const variant of emptyVariants) {
-      const parentId = variant.parentExternalId;
-      if (!variantsByParent.has(parentId)) {
-        variantsByParent.set(parentId, []);
+      const productId = variant.productId.toString();
+      if (!variantsByProduct.has(productId)) {
+        variantsByProduct.set(productId, []);
       }
-      variantsByParent.get(parentId).push(variant);
+      variantsByProduct.get(productId).push(variant);
     }
 
     let updated = 0;
     let failed = 0;
+    let skipped = 0;
+    let productIndex = 0;
+    const totalProducts = variantsByProduct.size;
 
-    for (const [parentExternalId, variants] of variantsByParent) {
+    this.logger.log(
+      `[backfillVariantAttributes] Processing ${totalProducts} parent products`,
+    );
+
+    // Cartesian product helper
+    const generateCombinations = (arrays: string[][]): string[][] => {
+      if (arrays.length === 0) return [[]];
+      const [first, ...rest] = arrays;
+      const restCombinations = generateCombinations(rest);
+      return first.flatMap((item) =>
+        restCombinations.map((combo) => [item, ...combo]),
+      );
+    };
+
+    for (const [productId, variants] of variantsByProduct) {
+      productIndex++;
       try {
-        // Fetch all variations for this product from WooCommerce
-        const wooVariations =
-          await this.wooCommerceService.getProductVariations(
-            credentials,
-            parentExternalId,
-            1,
-            100,
+        // Get parent product from local DB
+        const product = await this.productModel.findById(productId);
+        if (!product) {
+          this.logger.warn(
+            `[backfillVariantAttributes] [${productIndex}/${totalProducts}] Parent product ${productId} not found, skipping ${variants.length} variants`,
           );
+          skipped += variants.length;
+          continue;
+        }
 
-        // Map WooCommerce variations by ID for quick lookup
-        const wooMap = new Map(
-          wooVariations.data.map((v) => [v.id, v]),
+        // Get variation attributes (variation: true with options)
+        const variationAttributes = product.attributes.filter(
+          (attr) => attr.variation && attr.options?.length > 0,
         );
 
-        for (const variant of variants) {
-          const wooVariant = wooMap.get(variant.externalId);
-          if (wooVariant?.attributes?.length > 0) {
-            variant.attributes = wooVariant.attributes.map((attr) => ({
-              externalId: attr.id,
+        if (variationAttributes.length === 0) {
+          this.logger.warn(
+            `[backfillVariantAttributes] [${productIndex}/${totalProducts}] Product "${product.name}" has no variation attributes, skipping ${variants.length} variants`,
+          );
+          skipped += variants.length;
+          continue;
+        }
+
+        // Generate all attribute combinations
+        const optionArrays = variationAttributes.map((attr) => attr.options);
+        const allCombinations = generateCombinations(optionArrays);
+
+        // Sort variants by externalId (creation order)
+        const sortedVariants = [...variants].sort(
+          (a, b) => a.externalId - b.externalId,
+        );
+
+        this.logger.log(
+          `[backfillVariantAttributes] [${productIndex}/${totalProducts}] Product "${product.name}": ${variationAttributes.length} attributes, ${allCombinations.length} combinations, ${sortedVariants.length} variants`,
+        );
+
+        if (allCombinations.length !== sortedVariants.length) {
+          this.logger.warn(
+            `[backfillVariantAttributes] Mismatch: ${allCombinations.length} combinations vs ${sortedVariants.length} variants for "${product.name}". Assigning what we can.`,
+          );
+        }
+
+        // Build bulk operations
+        const bulkOps = [];
+        for (let i = 0; i < sortedVariants.length; i++) {
+          if (i < allCombinations.length) {
+            const combo = allCombinations[i];
+            const attrs = variationAttributes.map((attr, attrIndex) => ({
+              externalId: attr.externalId,
               name: attr.name,
-              option: attr.option,
-            })) as any;
-            await variant.save();
+              option: combo[attrIndex],
+            }));
+            bulkOps.push({
+              updateOne: {
+                filter: { _id: sortedVariants[i]._id },
+                update: { $set: { attributes: attrs } },
+              },
+            });
             updated++;
           } else {
             failed++;
-            this.logger.warn(
-              `[backfillVariantAttributes] No attributes found in WooCommerce for variant ${variant.externalId} (parent: ${parentExternalId})`,
-            );
           }
         }
+
+        if (bulkOps.length > 0) {
+          await this.variantModel.bulkWrite(bulkOps);
+        }
+
+        this.logger.log(
+          `[backfillVariantAttributes] [${productIndex}/${totalProducts}] Assigned ${assignCount} combinations for "${product.name}"`,
+        );
       } catch (error) {
         this.logger.error(
-          `[backfillVariantAttributes] Failed to fetch variations for product ${parentExternalId}: ${error.message}`,
+          `[backfillVariantAttributes] Failed for product ${productId}: ${error.message}`,
         );
         failed += variants.length;
       }
     }
 
     this.logger.log(
-      `[backfillVariantAttributes] Done. Updated: ${updated}, Failed: ${failed}, Total: ${emptyVariants.length}`,
+      `[backfillVariantAttributes] Done. Updated: ${updated}, Failed: ${failed}, Skipped: ${skipped}, Total: ${emptyVariants.length}`,
     );
 
-    return { updated, failed, total: emptyVariants.length };
+    return { updated, failed, skipped, total: emptyVariants.length };
   }
 
   /**
