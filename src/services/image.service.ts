@@ -85,7 +85,11 @@ export class ImageService {
         deletedCount: response?.deletedCount || 0,
       };
     } catch (error) {
-      if (error instanceof InvalidInputException || error instanceof SystemErrorException) throw error;
+      if (
+        error instanceof InvalidInputException ||
+        error instanceof SystemErrorException
+      )
+        throw error;
       throw new SystemErrorException('image deletion', error?.message);
     }
   }

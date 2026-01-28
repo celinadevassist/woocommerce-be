@@ -403,6 +403,14 @@ export class BulkUpdateProductDto {
   salePrice?: string;
   manageStock?: boolean;
   lowStockAmount?: number;
+  attributes?: {
+    id?: number;
+    name: string;
+    position?: number;
+    visible?: boolean;
+    variation?: boolean;
+    options: string[];
+  }[];
   priceAdjustment?: {
     type: 'increase' | 'decrease';
     method: 'percentage' | 'fixed';
@@ -423,6 +431,18 @@ export const BulkUpdateProductSchema = Joi.object().keys({
   salePrice: Joi.string().allow('', null).optional(),
   manageStock: Joi.boolean().optional(),
   lowStockAmount: Joi.number().min(0).allow(null).optional(),
+  attributes: Joi.array()
+    .items(
+      Joi.object({
+        id: Joi.number().optional(),
+        name: Joi.string().required(),
+        position: Joi.number().optional(),
+        visible: Joi.boolean().optional(),
+        variation: Joi.boolean().optional(),
+        options: Joi.array().items(Joi.string()).required(),
+      }),
+    )
+    .optional(),
   priceAdjustment: Joi.object({
     type: Joi.string().valid('increase', 'decrease').required(),
     method: Joi.string().valid('percentage', 'fixed').required(),

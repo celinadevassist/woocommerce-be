@@ -8,6 +8,7 @@ import { ProductVariant, ProductVariantSchema } from './variant.schema';
 import { Store, StoreSchema } from '../store/schema';
 import { Category, CategorySchema } from '../category/schema';
 import { Tag, TagSchema } from '../tag/schema';
+import { Attribute, AttributeSchema } from '../attribute/schema';
 import { WooCommerceModule } from '../integrations/woocommerce/woocommerce.module';
 import { S3UploadModule } from '../modules/s3-upload/s3-upload.module';
 import { SearchAnalyticsModule } from '../modules/search-analytics/search-analytics.module';
@@ -21,6 +22,7 @@ import { SearchAnalyticsModule } from '../modules/search-analytics/search-analyt
       { name: Store.name, schema: StoreSchema },
       { name: Category.name, schema: CategorySchema },
       { name: Tag.name, schema: TagSchema },
+      { name: Attribute.name, schema: AttributeSchema },
     ]),
     WooCommerceModule,
     S3UploadModule,

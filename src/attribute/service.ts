@@ -288,13 +288,25 @@ export class AttributeService {
     const credentials = this.getCredentials(store);
 
     // Create in WooCommerce first
-    const wooAttr = await this.wooCommerceService.createAttribute(credentials, {
-      name: data.name,
-      slug: data.slug,
-      type: data.type || 'select',
-      order_by: data.orderBy || 'menu_order',
-      has_archives: data.hasArchives || false,
-    });
+    let wooAttr;
+    try {
+      wooAttr = await this.wooCommerceService.createAttribute(credentials, {
+        name: data.name,
+        slug: data.slug || undefined,
+        type: data.type || 'select',
+        order_by: data.orderBy || 'menu_order',
+        has_archives: data.hasArchives || false,
+      });
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to create attribute in WooCommerce';
+      this.logger.error(
+        `Failed to create attribute in WooCommerce: ${errorMessage}`,
+      );
+      throw new BadRequestException(errorMessage);
+    }
 
     // Create in MongoDB
     const attribute = await this.attributeModel.create({
@@ -349,17 +361,29 @@ export class AttributeService {
     }
 
     // Update in WooCommerce first
-    const wooAttr = await this.wooCommerceService.updateAttribute(
-      credentials,
-      attribute.wooId,
-      {
-        name: data.name,
-        slug: data.slug,
-        type: data.type,
-        order_by: data.orderBy,
-        has_archives: data.hasArchives,
-      },
-    );
+    let wooAttr;
+    try {
+      wooAttr = await this.wooCommerceService.updateAttribute(
+        credentials,
+        attribute.wooId,
+        {
+          name: data.name,
+          slug: data.slug || undefined,
+          type: data.type,
+          order_by: data.orderBy,
+          has_archives: data.hasArchives,
+        },
+      );
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to update attribute in WooCommerce';
+      this.logger.error(
+        `Failed to update attribute in WooCommerce: ${errorMessage}`,
+      );
+      throw new BadRequestException(errorMessage);
+    }
 
     // Update in MongoDB
     attribute.name = wooAttr.name;
@@ -420,11 +444,22 @@ export class AttributeService {
     }
 
     // Delete from WooCommerce first
-    await this.wooCommerceService.deleteAttribute(
-      credentials,
-      attribute.wooId,
-      true,
-    );
+    try {
+      await this.wooCommerceService.deleteAttribute(
+        credentials,
+        attribute.wooId,
+        true,
+      );
+    } catch (error) {
+      const errorMessage =
+        error.response?.data?.message ||
+        error.message ||
+        'Failed to delete attribute in WooCommerce';
+      this.logger.error(
+        `Failed to delete attribute in WooCommerce: ${errorMessage}`,
+      );
+      throw new BadRequestException(errorMessage);
+    }
 
     // Soft delete in MongoDB
     attribute.isDeleted = true;
