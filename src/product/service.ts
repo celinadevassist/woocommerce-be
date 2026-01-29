@@ -1741,11 +1741,11 @@ export class ProductService {
         type: 'variable', // Only variable products have variants
       };
 
-      // Check if categoryId is a slug or ObjectId
-      if (Types.ObjectId.isValid(categoryId)) {
-        categoryFilter['categories.externalId'] = parseInt(categoryId);
+      // Check if categoryId is numeric (WooCommerce ID) or a slug
+      const numericId = parseInt(categoryId, 10);
+      if (!isNaN(numericId) && String(numericId) === categoryId) {
+        categoryFilter['categories.externalId'] = numericId;
       } else {
-        // It's a slug
         categoryFilter['categories.slug'] = categoryId;
       }
 
