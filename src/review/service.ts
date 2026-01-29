@@ -1802,6 +1802,235 @@ export class ReviewService {
     );
   }
 
+  // ==================== CSV Import ====================
+
+  /**
+   * Import reviews from CSV content
+   */
+  async importFromCsv(
+    userId: string,
+    storeId: string,
+    csvContent: string,
+  ): Promise<{
+    total: number;
+    created: number;
+    failed: number;
+    errors: { row: number; error: string }[];
+  }> {
+    await this.verifyStoreAccess(storeId, userId);
+
+    // Strip UTF-8 BOM if present
+    const content = csvContent.replace(/^\uFEFF/, '');
+
+    const lines = content
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line);
+
+    if (lines.length < 2) {
+      throw new ValidationException(
+        'csvContent',
+        'file is empty or has no data rows',
+        {
+          lineCount: lines.length,
+          expected: 'at least 2 lines (header + data)',
+        },
+      );
+    }
+
+    const headers = this.parseCsvLine(lines[0]).map((h) =>
+      h.toLowerCase().trim(),
+    );
+    const dataRows = lines.slice(1);
+
+    // Pre-load store products for matching
+    const storeProducts = await this.productModel.find({
+      storeId: new Types.ObjectId(storeId),
+      isDeleted: false,
+    });
+    const productsByName = new Map(
+      storeProducts.map((p) => [p.name?.toLowerCase(), p]),
+    );
+    const productsBySku = new Map(
+      storeProducts.filter((p) => p.sku).map((p) => [p.sku?.toLowerCase(), p]),
+    );
+
+    const results = {
+      total: dataRows.length,
+      created: 0,
+      failed: 0,
+      errors: [] as { row: number; error: string }[],
+    };
+
+    const getColumn = (row: string[], headerName: string): string => {
+      const index = headers.indexOf(headerName.toLowerCase());
+      return index >= 0 ? (row[index] || '').trim() : '';
+    };
+
+    for (let i = 0; i < dataRows.length; i++) {
+      const rowNumber = i + 2;
+      try {
+        const row = this.parseCsvLine(dataRows[i]);
+
+        const reviewer = getColumn(row, 'reviewer');
+        const review = getColumn(row, 'review');
+        const ratingStr = getColumn(row, 'rating');
+
+        if (!reviewer) {
+          results.errors.push({
+            row: rowNumber,
+            error: 'Reviewer is required',
+          });
+          results.failed++;
+          continue;
+        }
+
+        if (!review) {
+          results.errors.push({
+            row: rowNumber,
+            error: 'Review is required',
+          });
+          results.failed++;
+          continue;
+        }
+
+        const rating = parseInt(ratingStr, 10);
+        if (isNaN(rating) || rating < 1 || rating > 5) {
+          results.errors.push({
+            row: rowNumber,
+            error: 'Rating must be between 1 and 5',
+          });
+          results.failed++;
+          continue;
+        }
+
+        const email = getColumn(row, 'email');
+        const productName = getColumn(row, 'product');
+        const verified = ['yes', 'true', '1'].includes(
+          getColumn(row, 'verified').toLowerCase(),
+        );
+        const tagsStr = getColumn(row, 'tags');
+        const tags = tagsStr
+          ? tagsStr.split(';').map((t) => t.trim()).filter(Boolean)
+          : [];
+        const dateStr = getColumn(row, 'date');
+        const autoApprove = ['yes', 'true', '1'].includes(
+          getColumn(row, 'auto approve').toLowerCase(),
+        );
+        const autoPublish = ['yes', 'true', '1'].includes(
+          getColumn(row, 'auto publish').toLowerCase(),
+        );
+
+        // Match product by name or SKU
+        let localProduct: ProductDocument | null = null;
+        if (productName) {
+          localProduct =
+            productsByName.get(productName.toLowerCase()) ||
+            productsBySku.get(productName.toLowerCase()) ||
+            null;
+        }
+
+        const reviewData: any = {
+          storeId: new Types.ObjectId(storeId),
+          reviewer,
+          reviewerEmail:
+            email?.toLowerCase() ||
+            `import-${Date.now()}-${i}@no-email.local`,
+          review,
+          rating,
+          verified,
+          status: ReviewStatus.APPROVED,
+          source: ReviewSource.IMPORT,
+          reviewType: ReviewType.PRODUCT,
+          moderationStatus: autoApprove
+            ? ModerationStatus.APPROVED
+            : ModerationStatus.PENDING,
+          isPublished: autoApprove && autoPublish ? true : false,
+          publishedAt:
+            autoApprove && autoPublish ? new Date() : undefined,
+          tags,
+          photos: [],
+          isDeleted: false,
+        };
+
+        if (dateStr) {
+          const parsedDate = new Date(dateStr);
+          if (!isNaN(parsedDate.getTime())) {
+            reviewData.wooCreatedAt = parsedDate;
+          }
+        }
+
+        if (localProduct) {
+          reviewData.localProductId = localProduct._id;
+          reviewData.productExternalId = localProduct.externalId;
+        }
+
+        if (autoApprove) {
+          reviewData.moderatedBy = new Types.ObjectId(userId);
+          reviewData.moderatedAt = new Date();
+        }
+
+        await this.reviewModel.create(reviewData);
+        results.created++;
+
+        // Sync product rating if auto-approved and product matched
+        if (
+          localProduct &&
+          reviewData.moderationStatus === ModerationStatus.APPROVED
+        ) {
+          await this.syncProductRating(localProduct._id.toString()).catch(
+            (err) => {
+              this.logger.error(
+                `Failed to sync product rating after import: ${err.message}`,
+              );
+            },
+          );
+        }
+      } catch (error) {
+        this.logger.error(`Import error row ${rowNumber}: ${error.message}`);
+        results.errors.push({ row: rowNumber, error: error.message });
+        results.failed++;
+      }
+    }
+
+    this.logger.log(
+      `Review CSV import complete: ${results.created} created, ${results.failed} failed out of ${results.total}`,
+    );
+
+    return results;
+  }
+
+  /**
+   * Parse a CSV line handling quoted fields
+   */
+  private parseCsvLine(line: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current);
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current);
+
+    return result;
+  }
+
   // ==================== Public API Methods ====================
 
   /**

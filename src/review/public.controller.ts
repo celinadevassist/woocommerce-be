@@ -4,14 +4,21 @@ import {
   Post,
   Param,
   Query,
+  Body,
   BadRequestException,
   NotFoundException,
   Logger,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import {
+  ApiOperation,
+  ApiTags,
+  ApiQuery,
+  ApiResponse,
+  ApiBody,
+} from '@nestjs/swagger';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { SkipThrottle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
 import { PublicReviewService } from './public.service';
 import { Store, StoreDocument } from '../store/schema';
 import { ReviewType } from './enum';
@@ -156,6 +163,79 @@ export class PublicReviewController {
       size: limit ? parseInt(limit, 10) : 5,
       sortBy: 'createdAt',
       sortOrder: 'desc',
+    });
+  }
+
+  @Post()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiOperation({ summary: 'Submit a public review (rate limited)' })
+  @ApiQuery({
+    name: 'api_key',
+    required: true,
+    description: 'Store public API key',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      required: ['reviewer', 'review', 'rating'],
+      properties: {
+        reviewer: { type: 'string', description: 'Reviewer name' },
+        review: { type: 'string', description: 'Review content' },
+        rating: {
+          type: 'number',
+          minimum: 1,
+          maximum: 5,
+          description: 'Rating 1-5',
+        },
+        email: { type: 'string', description: 'Reviewer email (optional)' },
+        productId: {
+          type: 'string',
+          description: 'Local product ID (optional)',
+        },
+        productExternalId: {
+          type: 'number',
+          description: 'WooCommerce product ID (optional)',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Review submitted and pending moderation',
+  })
+  @ApiResponse({ status: 429, description: 'Rate limit exceeded' })
+  async submitReview(
+    @Query('api_key') apiKey: string,
+    @Body()
+    body: {
+      reviewer: string;
+      review: string;
+      rating: number;
+      email?: string;
+      productId?: string;
+      productExternalId?: number;
+    },
+  ) {
+    const storeId = await this.validateApiKey(apiKey);
+
+    // Validate required fields
+    if (!body.reviewer || !body.reviewer.trim()) {
+      throw new BadRequestException('Reviewer name is required');
+    }
+    if (!body.review || !body.review.trim()) {
+      throw new BadRequestException('Review content is required');
+    }
+    if (!body.rating || body.rating < 1 || body.rating > 5) {
+      throw new BadRequestException('Rating must be between 1 and 5');
+    }
+
+    return this.publicReviewService.createPublicReview(storeId, {
+      reviewer: body.reviewer.trim(),
+      review: body.review.trim(),
+      rating: body.rating,
+      email: body.email,
+      productId: body.productId,
+      productExternalId: body.productExternalId,
     });
   }
 

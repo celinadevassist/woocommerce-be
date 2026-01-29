@@ -3,7 +3,12 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Review, ReviewDocument } from './schema';
 import { Product, ProductDocument } from '../product/schema';
-import { ModerationStatus, ReviewStatus, ReviewType } from './enum';
+import {
+  ModerationStatus,
+  ReviewSource,
+  ReviewStatus,
+  ReviewType,
+} from './enum';
 
 interface PublicReviewsOptions {
   productId?: string;
@@ -214,5 +219,71 @@ export class PublicReviewService {
       { _id: reviewId },
       { $inc: { viewCount: 1 } },
     );
+  }
+
+  /**
+   * Create a public review submission (from public API / widget)
+   */
+  async createPublicReview(
+    storeId: string,
+    dto: {
+      reviewer: string;
+      review: string;
+      rating: number;
+      email?: string;
+      productId?: string;
+      productExternalId?: number;
+    },
+  ): Promise<{ _id: string; status: string }> {
+    // Match product by local ID or WooCommerce external ID
+    let localProduct: ProductDocument | null = null;
+    if (dto.productId) {
+      localProduct = await this.productModel.findOne({
+        _id: dto.productId,
+        storeId: new Types.ObjectId(storeId),
+        isDeleted: false,
+      });
+    } else if (dto.productExternalId) {
+      localProduct = await this.productModel.findOne({
+        externalId: dto.productExternalId,
+        storeId: new Types.ObjectId(storeId),
+        isDeleted: false,
+      });
+    }
+
+    const reviewData: any = {
+      storeId: new Types.ObjectId(storeId),
+      reviewer: dto.reviewer,
+      reviewerEmail:
+        dto.email?.toLowerCase() ||
+        `public-${Date.now()}@no-email.local`,
+      review: dto.review,
+      rating: dto.rating,
+      verified: false,
+      status: ReviewStatus.HOLD,
+      source: ReviewSource.PUBLIC_API,
+      reviewType: ReviewType.PRODUCT,
+      moderationStatus: ModerationStatus.PENDING,
+      isPublished: false,
+      tags: [],
+      photos: [],
+      isDeleted: false,
+    };
+
+    if (localProduct) {
+      reviewData.localProductId = localProduct._id;
+      reviewData.productExternalId = localProduct.externalId;
+    }
+
+    const review = await this.reviewModel.create(reviewData);
+
+    this.logger.log(
+      `Public review created for store ${storeId} by ${dto.reviewer}`,
+    );
+
+    return {
+      _id: review._id.toString(),
+      status: 'pending_moderation',
+    };
   }
 }

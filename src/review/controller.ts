@@ -13,6 +13,7 @@ import {
   UsePipes,
   UseInterceptors,
   UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
@@ -163,6 +164,84 @@ export class ReviewController {
       `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(
         filename,
       )}`,
+    );
+    res.send(csv);
+  }
+
+  // ==================== CSV Import ====================
+
+  @Post('import')
+  @ApiOperation({ summary: 'Import reviews from CSV' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiResponse({ status: 201, description: 'Reviews imported successfully' })
+  @ApiConsumes('multipart/form-data')
+  @ApiQuery({ name: 'storeId', required: true })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  async importFromCsv(
+    @UploadedFile() file: Multer.File,
+    @Query('storeId') storeId: string,
+    @User('_id') userId: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+    if (!storeId) {
+      throw new BadRequestException('Store ID is required');
+    }
+
+    return await this.reviewService.importFromCsv(
+      userId,
+      storeId,
+      file.buffer.toString('utf-8'),
+    );
+  }
+
+  @Get('import/template')
+  @ApiOperation({ summary: 'Download CSV import template for reviews' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiResponse({ status: 200, description: 'Returns CSV template file' })
+  async getImportTemplate(@Res() res: Response) {
+    const headers = [
+      'Reviewer',
+      'Email',
+      'Product',
+      'Rating',
+      'Review',
+      'Verified',
+      'Tags',
+      'Date',
+      'Auto Approve',
+      'Auto Publish',
+    ];
+
+    const exampleRow = [
+      'John Doe',
+      'john@example.com',
+      'Product Name or SKU',
+      '5',
+      'Great product! Highly recommended.',
+      'yes',
+      'quality; fast-shipping',
+      '2025-01-15',
+      'yes',
+      'no',
+    ];
+
+    const BOM = '\uFEFF';
+    const csv = BOM + [headers.join(','), exampleRow.join(',')].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="reviews-import-template.csv"',
     );
     res.send(csv);
   }

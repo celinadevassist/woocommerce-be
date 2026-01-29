@@ -10,6 +10,7 @@ export enum ReviewSource {
   MANUAL = 'manual',
   REVIEW_REQUEST = 'review_request',
   IMPORT = 'import',
+  PUBLIC_API = 'public_api',
 }
 
 export enum ReviewType {
