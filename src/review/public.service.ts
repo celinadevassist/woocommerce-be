@@ -3,7 +3,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Review, ReviewDocument } from './schema';
 import { Product, ProductDocument } from '../product/schema';
-import { ModerationStatus, ReviewType } from './enum';
+import { ModerationStatus, ReviewStatus, ReviewType } from './enum';
 
 interface PublicReviewsOptions {
   productId?: string;
@@ -46,6 +46,7 @@ export class PublicReviewService {
       storeId: storeObjectId,
       isPublished: true,
       moderationStatus: ModerationStatus.APPROVED,
+      status: ReviewStatus.APPROVED,
       isDeleted: false,
     };
 
@@ -151,6 +152,7 @@ export class PublicReviewService {
       storeId: storeObjectId,
       isPublished: true,
       moderationStatus: ModerationStatus.APPROVED,
+      status: ReviewStatus.APPROVED,
       isDeleted: false,
     };
 

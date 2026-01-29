@@ -11,11 +11,13 @@ import {
 import { ApiOperation, ApiTags, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
+import { SkipThrottle } from '@nestjs/throttler';
 import { PublicReviewService } from './public.service';
 import { Store, StoreDocument } from '../store/schema';
 import { ReviewType } from './enum';
 
 @ApiTags('Public Reviews API')
+@SkipThrottle()
 @Controller('widget/store-reviews')
 export class PublicReviewController {
   private readonly logger = new Logger(PublicReviewController.name);

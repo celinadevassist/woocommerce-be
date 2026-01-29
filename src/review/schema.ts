@@ -175,7 +175,10 @@ export const ReviewSchema = SchemaFactory.createForClass(Review);
 // Indexes
 ReviewSchema.index(
   { storeId: 1, externalId: 1 },
-  { unique: true, sparse: true },
+  {
+    unique: true,
+    partialFilterExpression: { externalId: { $exists: true, $ne: null } },
+  },
 );
 ReviewSchema.index({ storeId: 1, productExternalId: 1 });
 ReviewSchema.index({ storeId: 1, status: 1 });
