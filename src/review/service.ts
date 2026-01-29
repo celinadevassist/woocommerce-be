@@ -183,12 +183,35 @@ export class ReviewService {
 
     const sortField = query.sortBy || 'createdAt';
     const sortOrder = query.sortOrder === 'asc' ? 1 : -1;
-    const sort: any = { [sortField]: sortOrder };
 
-    const [reviews, total] = await Promise.all([
-      this.reviewModel.find(filter).sort(sort).skip(skip).limit(size),
-      this.reviewModel.countDocuments(filter),
-    ]);
+    let reviews: ReviewDocument[];
+    let total: number;
+
+    if (sortField === 'wooCreatedAt') {
+      // Use aggregation to fall back to createdAt when wooCreatedAt is null
+      const pipeline: any[] = [
+        { $match: filter },
+        {
+          $addFields: {
+            _sortDate: { $ifNull: ['$wooCreatedAt', '$createdAt'] },
+          },
+        },
+        { $sort: { _sortDate: sortOrder } },
+        { $skip: skip },
+        { $limit: size },
+        { $project: { _sortDate: 0 } },
+      ];
+      [reviews, total] = await Promise.all([
+        this.reviewModel.aggregate(pipeline),
+        this.reviewModel.countDocuments(filter),
+      ]);
+    } else {
+      const sort: any = { [sortField]: sortOrder };
+      [reviews, total] = await Promise.all([
+        this.reviewModel.find(filter).sort(sort).skip(skip).limit(size),
+        this.reviewModel.countDocuments(filter),
+      ]);
+    }
 
     // Fetch product info for reviews
     const productIds = [
@@ -1171,10 +1194,10 @@ export class ReviewService {
   }
 
   private toInterface(
-    doc: ReviewDocument,
+    doc: ReviewDocument | any,
     product?: ProductDocument | null,
   ): IReview {
-    const obj = doc.toObject();
+    const obj = typeof doc.toObject === 'function' ? doc.toObject() : doc;
     return {
       _id: obj._id.toString(),
       externalId: obj.externalId,
@@ -1733,6 +1756,7 @@ export class ReviewService {
       tags: dto.tags || [],
       internalNotes: dto.internalNotes,
       photos: [],
+      wooCreatedAt: new Date(),
       isDeleted: false,
     };
 
@@ -1957,7 +1981,11 @@ export class ReviewService {
           const parsedDate = new Date(dateStr);
           if (!isNaN(parsedDate.getTime())) {
             reviewData.wooCreatedAt = parsedDate;
+          } else {
+            reviewData.wooCreatedAt = new Date();
           }
+        } else {
+          reviewData.wooCreatedAt = new Date();
         }
 
         if (localProduct) {

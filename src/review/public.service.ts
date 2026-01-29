@@ -267,6 +267,7 @@ export class PublicReviewService {
       isPublished: false,
       tags: [],
       photos: [],
+      wooCreatedAt: new Date(),
       isDeleted: false,
     };
 
