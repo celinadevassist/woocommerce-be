@@ -28,7 +28,7 @@ export class PluginsController {
 
   // Latest plugin versions - update these when releasing new versions
   private readonly latestVersions = {
-    'cartflow-bridge': '1.1.0',
+    'cartflow-bridge': '1.2.0',
   };
 
   @Get()
@@ -43,6 +43,7 @@ export class PluginsController {
         description:
           'REST API bridge for CartFlow to manage WordPress & WooCommerce settings that lack native API support',
         features: [
+          'Checkout Currency Conversion: Convert order totals to payment gateway currency',
           'Smart Shipping: Auto-hide paid shipping when free shipping qualifies',
           'Manage Site Title, Tagline, Admin Email',
           'Configure Timezone, Date/Time Format',
@@ -138,6 +139,14 @@ export class PluginsController {
         license: 'GPL v2 or later',
         changelog: [
           {
+            version: '1.2.0',
+            changes: [
+              'Added Checkout Currency Conversion: auto-fetch exchange rates, configurable margin, convert order totals at checkout',
+              'Added currency conversion REST endpoints (GET/POST features/currency, GET features/currency/live-rate)',
+              'Stores original currency and total in order meta for auditing',
+            ],
+          },
+          {
             version: '1.1.0',
             changes: [
               'Added Smart Shipping: Automatically hides paid shipping methods when free shipping is available',
@@ -163,6 +172,20 @@ export class PluginsController {
             path: '/wp-json/cartflow/v1/features/shipping',
             description:
               'Configure smart shipping (hide paid methods when free shipping qualifies)',
+          },
+          {
+            category: 'Currency Conversion',
+            methods: ['GET', 'POST'],
+            path: '/wp-json/cartflow/v1/features/currency',
+            description:
+              'Configure checkout currency conversion (gateway currency, margin, rate override)',
+          },
+          {
+            category: 'Currency Conversion',
+            methods: ['GET'],
+            path: '/wp-json/cartflow/v1/features/currency/live-rate',
+            description:
+              'Get live exchange rate between base and target currencies',
           },
           {
             category: 'General Settings',

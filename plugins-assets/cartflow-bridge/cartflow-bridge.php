@@ -3,7 +3,7 @@
  * Plugin Name: CartFlow Bridge
  * Plugin URI: https://cartflow.app
  * Description: REST API bridge for CartFlow to manage WordPress & WooCommerce settings that lack native API support
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: CartFlow
  * Author URI: https://cartflow.app
  * License: GPL v2 or later
@@ -37,6 +37,12 @@ class CartFlow_Bridge {
         // Smart Shipping: Hide other methods when free shipping is available
         if (get_option('cartflow_hide_shipping_when_free', 'yes') === 'yes') {
             add_filter('woocommerce_package_rates', array($this, 'hide_shipping_when_free_available'), 100, 2);
+        }
+
+        // Currency Conversion: Convert order totals at checkout
+        $currency_settings = get_option('cartflow_currency_features', array());
+        if (!empty($currency_settings['enabled'])) {
+            add_action('woocommerce_checkout_create_order', array($this, 'convert_order_currency'), 10, 2);
         }
     }
 
@@ -271,6 +277,26 @@ class CartFlow_Bridge {
         register_rest_route($this->namespace, '/features/shipping', array(
             'methods' => 'POST',
             'callback' => array($this, 'update_shipping_features'),
+            'permission_callback' => array($this, 'check_permission'),
+        ));
+
+        // ==================== CURRENCY CONVERSION FEATURES ====================
+
+        register_rest_route($this->namespace, '/features/currency', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'get_currency_features'),
+            'permission_callback' => array($this, 'check_permission'),
+        ));
+
+        register_rest_route($this->namespace, '/features/currency', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'update_currency_features'),
+            'permission_callback' => array($this, 'check_permission'),
+        ));
+
+        register_rest_route($this->namespace, '/features/currency/live-rate', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'get_live_exchange_rate'),
             'permission_callback' => array($this, 'check_permission'),
         ));
     }
@@ -1154,6 +1180,10 @@ class CartFlow_Bridge {
                     'enabled' => get_option('cartflow_hide_shipping_when_free', 'yes') === 'yes',
                     'description' => 'Automatically hide paid shipping when free shipping is available',
                 ),
+                'currency_conversion' => array(
+                    'enabled' => !empty(get_option('cartflow_currency_features', array())['enabled']),
+                    'description' => 'Convert checkout totals to payment gateway currency with configurable margin',
+                ),
             ),
         ));
     }
@@ -1181,6 +1211,218 @@ class CartFlow_Bridge {
             'message' => __('Shipping features updated.', 'cartflow-bridge'),
             'updated' => $updated,
         ));
+    }
+
+    // ==================== CURRENCY CONVERSION FEATURES ====================
+
+    public function get_currency_features($request) {
+        $defaults = array(
+            'enabled' => false,
+            'base_currency' => function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : 'USD',
+            'gateway_currency' => 'USD',
+            'margin_percent' => 0,
+            'rate_override' => null,
+            'cached_rate' => null,
+            'cached_rate_time' => null,
+        );
+
+        $settings = get_option('cartflow_currency_features', array());
+        $settings = wp_parse_args($settings, $defaults);
+
+        // Always reflect the current WooCommerce base currency
+        if (function_exists('get_woocommerce_currency')) {
+            $settings['base_currency'] = get_woocommerce_currency();
+        }
+
+        return rest_ensure_response($settings);
+    }
+
+    public function update_currency_features($request) {
+        $params = $request->get_json_params();
+        $updated = array();
+
+        $current = get_option('cartflow_currency_features', array());
+
+        $allowed_fields = array('enabled', 'gateway_currency', 'margin_percent', 'rate_override');
+
+        foreach ($allowed_fields as $field) {
+            if (array_key_exists($field, $params)) {
+                $value = $params[$field];
+
+                // Validate specific fields
+                if ($field === 'margin_percent') {
+                    $value = floatval($value);
+                    if ($value < 0 || $value > 50) {
+                        return new WP_Error('invalid_margin', __('Margin must be between 0 and 50 percent.', 'cartflow-bridge'), array('status' => 400));
+                    }
+                }
+
+                if ($field === 'rate_override' && $value !== null) {
+                    $value = floatval($value);
+                    if ($value <= 0) {
+                        return new WP_Error('invalid_rate', __('Rate override must be a positive number.', 'cartflow-bridge'), array('status' => 400));
+                    }
+                }
+
+                if ($field === 'enabled') {
+                    $value = (bool) $value;
+                }
+
+                $current[$field] = $value;
+                $updated[$field] = $value;
+            }
+        }
+
+        update_option('cartflow_currency_features', $current);
+
+        return rest_ensure_response(array(
+            'success' => true,
+            'message' => __('Currency conversion settings updated.', 'cartflow-bridge'),
+            'updated' => $updated,
+        ));
+    }
+
+    /**
+     * Fetch exchange rate from external API with transient caching
+     */
+    private function fetch_exchange_rate($base, $target) {
+        $transient_key = 'cartflow_exchange_rate_' . strtoupper($base) . '_' . strtoupper($target);
+        $cached = get_transient($transient_key);
+
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        $url = 'https://open.er-api.com/v6/latest/' . strtoupper($base);
+        $response = wp_remote_get($url, array('timeout' => 15));
+
+        if (is_wp_error($response)) {
+            return new WP_Error('rate_fetch_failed', __('Failed to fetch exchange rate: ', 'cartflow-bridge') . $response->get_error_message(), array('status' => 502));
+        }
+
+        $body = json_decode(wp_remote_retrieve_body($response), true);
+
+        if (empty($body['result']) || $body['result'] !== 'success') {
+            return new WP_Error('rate_parse_failed', __('Invalid response from exchange rate API.', 'cartflow-bridge'), array('status' => 502));
+        }
+
+        $target_upper = strtoupper($target);
+        if (!isset($body['rates'][$target_upper])) {
+            return new WP_Error('rate_not_found', sprintf(__('Exchange rate not found for %s.', 'cartflow-bridge'), $target_upper), array('status' => 404));
+        }
+
+        $rate = floatval($body['rates'][$target_upper]);
+
+        // Cache for 12 hours
+        set_transient($transient_key, $rate, 12 * HOUR_IN_SECONDS);
+
+        // Store in currency settings for reference
+        $settings = get_option('cartflow_currency_features', array());
+        $settings['cached_rate'] = $rate;
+        $settings['cached_rate_time'] = current_time('mysql');
+        update_option('cartflow_currency_features', $settings);
+
+        return $rate;
+    }
+
+    public function get_live_exchange_rate($request) {
+        $settings = get_option('cartflow_currency_features', array());
+
+        $base = $request->get_param('base');
+        if (!$base) {
+            $base = function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : 'USD';
+        }
+
+        $target = $request->get_param('target');
+        if (!$target) {
+            $target = isset($settings['gateway_currency']) ? $settings['gateway_currency'] : 'USD';
+        }
+
+        $transient_key = 'cartflow_exchange_rate_' . strtoupper($base) . '_' . strtoupper($target);
+        $cached_rate = get_transient($transient_key);
+        $is_cached = ($cached_rate !== false);
+
+        $rate = $this->fetch_exchange_rate($base, $target);
+
+        if (is_wp_error($rate)) {
+            return $rate;
+        }
+
+        return rest_ensure_response(array(
+            'base' => strtoupper($base),
+            'target' => strtoupper($target),
+            'rate' => $rate,
+            'cached' => $is_cached,
+            'last_updated' => isset($settings['cached_rate_time']) ? $settings['cached_rate_time'] : null,
+        ));
+    }
+
+    /**
+     * Convert order currency at checkout
+     */
+    public function convert_order_currency($order, $data) {
+        $settings = get_option('cartflow_currency_features', array());
+
+        if (empty($settings['enabled'])) {
+            return;
+        }
+
+        $base_currency = function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : 'USD';
+        $gateway_currency = isset($settings['gateway_currency']) ? $settings['gateway_currency'] : 'USD';
+
+        // Skip if currencies are the same
+        if (strtoupper($base_currency) === strtoupper($gateway_currency)) {
+            return;
+        }
+
+        $margin = isset($settings['margin_percent']) ? floatval($settings['margin_percent']) : 0;
+
+        // Get exchange rate (manual override or auto)
+        if (!empty($settings['rate_override']) && floatval($settings['rate_override']) > 0) {
+            $rate = floatval($settings['rate_override']);
+        } else {
+            $rate = $this->fetch_exchange_rate($base_currency, $gateway_currency);
+            if (is_wp_error($rate)) {
+                // Log error but don't block checkout - use cached rate if available
+                if (!empty($settings['cached_rate'])) {
+                    $rate = floatval($settings['cached_rate']);
+                } else {
+                    return; // Cannot convert without a rate
+                }
+            }
+        }
+
+        // Apply margin
+        $final_rate = $rate * (1 + $margin / 100);
+
+        // Store original values in order meta
+        $original_total = $order->get_total();
+        $order->update_meta_data('_cartflow_original_currency', $base_currency);
+        $order->update_meta_data('_cartflow_original_total', $original_total);
+        $order->update_meta_data('_cartflow_exchange_rate', $final_rate);
+        $order->update_meta_data('_cartflow_margin_percent', $margin);
+
+        // Update order currency
+        $order->set_currency($gateway_currency);
+
+        // Recalculate line item prices
+        foreach ($order->get_items() as $item) {
+            $item->set_subtotal($item->get_subtotal() * $final_rate);
+            $item->set_total($item->get_total() * $final_rate);
+        }
+
+        // Recalculate shipping
+        foreach ($order->get_shipping_methods() as $shipping) {
+            $shipping->set_total($shipping->get_total() * $final_rate);
+        }
+
+        // Recalculate fees
+        foreach ($order->get_fees() as $fee) {
+            $fee->set_total($fee->get_total() * $final_rate);
+        }
+
+        // Update order total
+        $order->set_total($original_total * $final_rate);
     }
 
     // ==================== HELPERS ====================

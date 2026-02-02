@@ -91,6 +91,58 @@ export class StoreSettingsController {
     );
   }
 
+  // ============== CURRENCY CONVERSION FEATURES ==============
+
+  @Get('features/currency')
+  @ApiOperation({ summary: 'Get currency conversion feature settings' })
+  @ApiQuery({ name: 'storeId', required: true })
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async getCurrencyFeatures(
+    @Query('storeId') storeId: string,
+    @User() user: UserDocument,
+  ) {
+    return await this.storeSettingsService.getCurrencyFeatures(
+      storeId,
+      user._id.toString(),
+    );
+  }
+
+  @Post('features/currency')
+  @ApiOperation({ summary: 'Update currency conversion feature settings' })
+  @ApiQuery({ name: 'storeId', required: true })
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async updateCurrencyFeatures(
+    @Query('storeId') storeId: string,
+    @Body() data: any,
+    @User() user: UserDocument,
+  ) {
+    return await this.storeSettingsService.updateCurrencyFeatures(
+      storeId,
+      user._id.toString(),
+      data,
+    );
+  }
+
+  @Get('features/currency/live-rate')
+  @ApiOperation({ summary: 'Get live exchange rate for currency conversion' })
+  @ApiQuery({ name: 'storeId', required: true })
+  @ApiQuery({ name: 'base', required: false })
+  @ApiQuery({ name: 'target', required: false })
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async getLiveExchangeRate(
+    @Query('storeId') storeId: string,
+    @Query('base') base: string,
+    @Query('target') target: string,
+    @User() user: UserDocument,
+  ) {
+    return await this.storeSettingsService.getLiveExchangeRate(
+      storeId,
+      user._id.toString(),
+      base,
+      target,
+    );
+  }
+
   // ============== GENERAL SETTINGS ==============
 
   @Get('general')

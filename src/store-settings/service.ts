@@ -271,6 +271,52 @@ export class StoreSettingsService {
     return this.pluginRequest(credentials, 'POST', 'features/shipping', data);
   }
 
+  // ============== CURRENCY CONVERSION FEATURES ==============
+
+  /**
+   * Get currency conversion feature settings
+   */
+  async getCurrencyFeatures(storeId: string, userId: string): Promise<any> {
+    const store = await this.getStoreWithAccess(storeId, userId);
+    const credentials = this.getCredentials(store);
+    return this.pluginRequest(credentials, 'GET', 'features/currency');
+  }
+
+  /**
+   * Update currency conversion feature settings
+   */
+  async updateCurrencyFeatures(
+    storeId: string,
+    userId: string,
+    data: any,
+  ): Promise<any> {
+    const store = await this.getStoreWithAccess(storeId, userId);
+    const credentials = this.getCredentials(store);
+    return this.pluginRequest(credentials, 'POST', 'features/currency', data);
+  }
+
+  /**
+   * Get live exchange rate from the store's WordPress plugin
+   */
+  async getLiveExchangeRate(
+    storeId: string,
+    userId: string,
+    base?: string,
+    target?: string,
+  ): Promise<any> {
+    const store = await this.getStoreWithAccess(storeId, userId);
+    const credentials = this.getCredentials(store);
+    const query: string[] = [];
+    if (base) query.push(`base=${base}`);
+    if (target) query.push(`target=${target}`);
+    const qs = query.length ? `?${query.join('&')}` : '';
+    return this.pluginRequest(
+      credentials,
+      'GET',
+      `features/currency/live-rate${qs}`,
+    );
+  }
+
   // ============== GENERAL SETTINGS ==============
 
   /**
