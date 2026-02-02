@@ -41,7 +41,7 @@ export class PluginsController {
         name: 'CartFlow Bridge',
         version: this.latestVersions['cartflow-bridge'],
         description:
-          'REST API bridge for CartFlow to manage WordPress & WooCommerce settings that lack native API support',
+          'REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, and checkout currency conversion',
         features: [
           'Checkout Currency Conversion: Convert order totals to payment gateway currency',
           'Smart Shipping: Auto-hide paid shipping when free shipping qualifies',
@@ -134,7 +134,7 @@ export class PluginsController {
         name: 'CartFlow Bridge',
         version: this.latestVersions['cartflow-bridge'],
         description:
-          'REST API bridge for CartFlow to manage WordPress & WooCommerce settings',
+          'REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, and checkout currency conversion',
         author: 'CartFlow',
         license: 'GPL v2 or later',
         changelog: [

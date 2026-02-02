@@ -2,7 +2,7 @@
 /**
  * Plugin Name: CartFlow Bridge
  * Plugin URI: https://cartflow.app
- * Description: REST API bridge for CartFlow to manage WordPress & WooCommerce settings that lack native API support
+ * Description: REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, and checkout currency conversion
  * Version: 1.2.0
  * Author: CartFlow
  * Author URI: https://cartflow.app
@@ -1828,6 +1828,34 @@ class CartFlow_Bridge {
                         <td><code>GET</code></td>
                         <td><code>/wp-json/cartflow/v1/locations/countries</code></td>
                         <td><?php _e('Get all countries with states (including custom)', 'cartflow-bridge'); ?></td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3><?php _e('Smart Features', 'cartflow-bridge'); ?></h3>
+            <table class="wp-list-table widefat fixed striped">
+                <thead>
+                    <tr>
+                        <th><?php _e('Method', 'cartflow-bridge'); ?></th>
+                        <th><?php _e('Endpoint', 'cartflow-bridge'); ?></th>
+                        <th><?php _e('Description', 'cartflow-bridge'); ?></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>GET/POST</code></td>
+                        <td><code>/wp-json/cartflow/v1/features/shipping</code></td>
+                        <td><?php _e('Smart Shipping: hide paid methods when free shipping qualifies', 'cartflow-bridge'); ?></td>
+                    </tr>
+                    <tr>
+                        <td><code>GET/POST</code></td>
+                        <td><code>/wp-json/cartflow/v1/features/currency</code></td>
+                        <td><?php _e('Currency Conversion: configure gateway currency, margin, and rate override', 'cartflow-bridge'); ?></td>
+                    </tr>
+                    <tr>
+                        <td><code>GET</code></td>
+                        <td><code>/wp-json/cartflow/v1/features/currency/live-rate</code></td>
+                        <td><?php _e('Get live exchange rate between base and target currencies', 'cartflow-bridge'); ?></td>
                     </tr>
                 </tbody>
             </table>
