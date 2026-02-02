@@ -1578,11 +1578,18 @@ class CartFlow_Bridge {
     public function register_settings() {
         register_setting('cartflow_bridge', 'cartflow_bridge_api_key');
         register_setting('cartflow_bridge', 'cartflow_hide_shipping_when_free');
+        register_setting('cartflow_bridge', 'cartflow_currency_features');
     }
 
     public function render_admin_page() {
         $api_key = get_option('cartflow_bridge_api_key', '');
         $hide_shipping_when_free = get_option('cartflow_hide_shipping_when_free', 'yes');
+        $currency_settings = wp_parse_args(get_option('cartflow_currency_features', array()), array(
+            'enabled' => false,
+            'gateway_currency' => 'USD',
+            'margin_percent' => 0,
+            'rate_override' => null,
+        ));
 
         if (isset($_POST['generate_api_key']) && check_admin_referer('cartflow_bridge_nonce')) {
             $api_key = wp_generate_password(32, false);
@@ -1594,6 +1601,17 @@ class CartFlow_Bridge {
             $hide_shipping_when_free = isset($_POST['hide_shipping_when_free']) ? 'yes' : 'no';
             update_option('cartflow_hide_shipping_when_free', $hide_shipping_when_free);
             echo '<div class="notice notice-success"><p>' . __('Shipping settings saved!', 'cartflow-bridge') . '</p></div>';
+        }
+
+        if (isset($_POST['save_currency_settings']) && check_admin_referer('cartflow_bridge_currency_nonce')) {
+            $currency_settings['enabled'] = isset($_POST['currency_enabled']);
+            $currency_settings['gateway_currency'] = sanitize_text_field($_POST['gateway_currency'] ?? 'USD');
+            $margin = floatval($_POST['margin_percent'] ?? 0);
+            $currency_settings['margin_percent'] = max(0, min(50, $margin));
+            $rate_override = $_POST['rate_override'] ?? '';
+            $currency_settings['rate_override'] = ($rate_override !== '' && floatval($rate_override) > 0) ? floatval($rate_override) : null;
+            update_option('cartflow_currency_features', $currency_settings);
+            echo '<div class="notice notice-success"><p>' . __('Currency conversion settings saved!', 'cartflow-bridge') . '</p></div>';
         }
 
         // Get plugin version
@@ -1651,7 +1669,63 @@ class CartFlow_Bridge {
                     </tr>
                 </table>
                 <p class="submit">
-                    <input type="submit" name="save_shipping_settings" class="button-primary" value="<?php _e('Save Features', 'cartflow-bridge'); ?>">
+                    <input type="submit" name="save_shipping_settings" class="button-primary" value="<?php _e('Save Shipping', 'cartflow-bridge'); ?>">
+                </p>
+            </form>
+
+            <form method="post">
+                <?php wp_nonce_field('cartflow_bridge_currency_nonce'); ?>
+                <table class="form-table">
+                    <tr>
+                        <th scope="row"><?php _e('Currency Conversion', 'cartflow-bridge'); ?></th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="currency_enabled" value="1" <?php checked(!empty($currency_settings['enabled'])); ?>>
+                                <?php _e('Enable checkout currency conversion', 'cartflow-bridge'); ?>
+                            </label>
+                            <p class="description">
+                                <?php _e('Convert order totals at checkout from your store currency to the payment gateway currency. The converted amount is shown to customers when they select a card payment method.', 'cartflow-bridge'); ?>
+                            </p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><?php _e('Base Currency', 'cartflow-bridge'); ?></th>
+                        <td>
+                            <code><?php echo esc_html(function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : 'N/A'); ?></code>
+                            <p class="description"><?php _e('Auto-detected from WooCommerce settings.', 'cartflow-bridge'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="gateway_currency"><?php _e('Gateway Currency', 'cartflow-bridge'); ?></label></th>
+                        <td>
+                            <select name="gateway_currency" id="gateway_currency">
+                                <?php
+                                $currencies = array('USD' => 'USD - US Dollar', 'EUR' => 'EUR - Euro', 'GBP' => 'GBP - British Pound', 'AED' => 'AED - UAE Dirham', 'SAR' => 'SAR - Saudi Riyal');
+                                foreach ($currencies as $code => $label) {
+                                    printf('<option value="%s" %s>%s</option>', esc_attr($code), selected($currency_settings['gateway_currency'], $code, false), esc_html($label));
+                                }
+                                ?>
+                            </select>
+                            <p class="description"><?php _e('The currency your payment gateway requires.', 'cartflow-bridge'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="margin_percent"><?php _e('Margin %', 'cartflow-bridge'); ?></label></th>
+                        <td>
+                            <input type="number" name="margin_percent" id="margin_percent" value="<?php echo esc_attr($currency_settings['margin_percent']); ?>" min="0" max="50" step="0.5" class="small-text">
+                            <p class="description"><?php _e('Percentage added on top of the exchange rate (0-50%).', 'cartflow-bridge'); ?></p>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="rate_override"><?php _e('Rate Override', 'cartflow-bridge'); ?></label></th>
+                        <td>
+                            <input type="number" name="rate_override" id="rate_override" value="<?php echo esc_attr($currency_settings['rate_override'] ?? ''); ?>" min="0" step="0.000001" class="small-text" placeholder="<?php _e('Auto', 'cartflow-bridge'); ?>">
+                            <p class="description"><?php _e('Leave empty to use the auto-fetched exchange rate. Set a value to override.', 'cartflow-bridge'); ?></p>
+                        </td>
+                    </tr>
+                </table>
+                <p class="submit">
+                    <input type="submit" name="save_currency_settings" class="button-primary" value="<?php _e('Save Currency', 'cartflow-bridge'); ?>">
                 </p>
             </form>
 
