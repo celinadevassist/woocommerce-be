@@ -1397,8 +1397,11 @@ class CartFlow_Bridge {
         // Apply margin
         $final_rate = $rate * (1 + $margin / 100);
 
+        // Decimal places for the gateway currency
+        $decimals = absint(get_option('woocommerce_price_num_decimals', 2));
+
         // Store original values in order meta
-        $original_total = $order->get_total();
+        $original_total = floatval($order->get_total());
         $order->update_meta_data('_cartflow_original_currency', $base_currency);
         $order->update_meta_data('_cartflow_original_total', $original_total);
         $order->update_meta_data('_cartflow_exchange_rate', $final_rate);
@@ -1409,22 +1412,22 @@ class CartFlow_Bridge {
 
         // Recalculate line item prices
         foreach ($order->get_items() as $item) {
-            $item->set_subtotal($item->get_subtotal() * $final_rate);
-            $item->set_total($item->get_total() * $final_rate);
+            $item->set_subtotal(round(floatval($item->get_subtotal()) * $final_rate, $decimals));
+            $item->set_total(round(floatval($item->get_total()) * $final_rate, $decimals));
         }
 
         // Recalculate shipping
         foreach ($order->get_shipping_methods() as $shipping) {
-            $shipping->set_total($shipping->get_total() * $final_rate);
+            $shipping->set_total(round(floatval($shipping->get_total()) * $final_rate, $decimals));
         }
 
         // Recalculate fees
         foreach ($order->get_fees() as $fee) {
-            $fee->set_total($fee->get_total() * $final_rate);
+            $fee->set_total(round(floatval($fee->get_total()) * $final_rate, $decimals));
         }
 
         // Update order total
-        $order->set_total($original_total * $final_rate);
+        $order->set_total(round($original_total * $final_rate, $decimals));
     }
 
     /**
