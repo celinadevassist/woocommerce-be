@@ -39,10 +39,12 @@ class CartFlow_Bridge {
             add_filter('woocommerce_package_rates', array($this, 'hide_shipping_when_free_available'), 100, 2);
         }
 
-        // Currency Conversion: Convert order totals at checkout
+        // Currency Conversion: Convert order totals at checkout + show notice
         $currency_settings = get_option('cartflow_currency_features', array());
         if (!empty($currency_settings['enabled'])) {
             add_action('woocommerce_checkout_create_order', array($this, 'convert_order_currency'), 10, 2);
+            add_action('woocommerce_review_order_after_order_total', array($this, 'display_currency_conversion_notice'));
+            add_action('wp_footer', array($this, 'currency_conversion_checkout_script'));
         }
     }
 
@@ -1423,6 +1425,113 @@ class CartFlow_Bridge {
 
         // Update order total
         $order->set_total($original_total * $final_rate);
+    }
+
+    /**
+     * Display currency conversion notice in the checkout order review table
+     */
+    public function display_currency_conversion_notice() {
+        $settings = get_option('cartflow_currency_features', array());
+
+        if (empty($settings['enabled'])) {
+            return;
+        }
+
+        $base_currency = function_exists('get_woocommerce_currency') ? get_woocommerce_currency() : 'USD';
+        $gateway_currency = isset($settings['gateway_currency']) ? $settings['gateway_currency'] : 'USD';
+
+        if (strtoupper($base_currency) === strtoupper($gateway_currency)) {
+            return;
+        }
+
+        $margin = isset($settings['margin_percent']) ? floatval($settings['margin_percent']) : 0;
+
+        // Get rate
+        if (!empty($settings['rate_override']) && floatval($settings['rate_override']) > 0) {
+            $rate = floatval($settings['rate_override']);
+        } else {
+            $rate = $this->fetch_exchange_rate($base_currency, $gateway_currency);
+            if (is_wp_error($rate)) {
+                if (!empty($settings['cached_rate'])) {
+                    $rate = floatval($settings['cached_rate']);
+                } else {
+                    return;
+                }
+            }
+        }
+
+        $final_rate = $rate * (1 + $margin / 100);
+        $cart_total = WC()->cart->get_total('edit');
+        $converted_total = $cart_total * $final_rate;
+
+        $currency_symbol = get_woocommerce_currency_symbol($gateway_currency);
+
+        ?>
+        <tr class="cartflow-currency-notice" id="cartflow-currency-row" style="display: none;">
+            <th><?php echo esc_html($gateway_currency); ?> <?php _e('Equivalent', 'cartflow-bridge'); ?></th>
+            <td data-title="<?php echo esc_attr($gateway_currency); ?> Equivalent">
+                <strong><?php echo esc_html($currency_symbol . number_format($converted_total, 2)); ?></strong>
+                <br>
+                <small style="color: #777;">
+                    <?php printf(
+                        __('Rate: 1 %1$s = %2$s %3$s', 'cartflow-bridge'),
+                        esc_html($base_currency),
+                        number_format($final_rate, 4),
+                        esc_html($gateway_currency)
+                    ); ?>
+                    <?php if ($margin > 0): ?>
+                        <?php printf(__('(incl. %s%% margin)', 'cartflow-bridge'), number_format($margin, 1)); ?>
+                    <?php endif; ?>
+                </small>
+            </td>
+        </tr>
+        <?php
+    }
+
+    /**
+     * JavaScript to show/hide the currency notice based on selected payment method
+     */
+    public function currency_conversion_checkout_script() {
+        if (!is_checkout()) {
+            return;
+        }
+        ?>
+        <script type="text/javascript">
+        (function() {
+            function toggleCurrencyNotice() {
+                var row = document.getElementById('cartflow-currency-row');
+                if (!row) return;
+
+                var selected = document.querySelector('input[name="payment_method"]:checked');
+                if (!selected) {
+                    row.style.display = 'none';
+                    return;
+                }
+
+                // Show for all non-COD payment methods (card, stripe, paypal, etc.)
+                var method = selected.value;
+                if (method === 'cod' || method === 'cheque' || method === 'bacs') {
+                    row.style.display = 'none';
+                } else {
+                    row.style.display = '';
+                }
+            }
+
+            // Run on page load
+            document.addEventListener('DOMContentLoaded', toggleCurrencyNotice);
+
+            // Run when payment method changes
+            document.body.addEventListener('change', function(e) {
+                if (e.target && e.target.name === 'payment_method') {
+                    toggleCurrencyNotice();
+                }
+            });
+
+            // Run after WooCommerce updates the order review via AJAX
+            jQuery(document.body).on('updated_checkout', toggleCurrencyNotice);
+        })();
+        </script>
+        <?php
     }
 
     // ==================== HELPERS ====================
