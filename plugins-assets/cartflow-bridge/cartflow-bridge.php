@@ -21,6 +21,7 @@ class CartFlow_Bridge {
 
     private static $instance = null;
     private $namespace = 'cartflow/v1';
+    private $override_decimals = null;
 
     public static function get_instance() {
         if (null === self::$instance) {
@@ -1402,6 +1403,11 @@ class CartFlow_Bridge {
         $zero_decimal_currencies = array('BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF');
         $decimals = in_array(strtoupper($gateway_currency), $zero_decimal_currencies) ? 0 : 2;
 
+        // Override WooCommerce's price decimals so set_total/set_subtotal don't re-round
+        // using the store's base currency decimals (e.g. 0 for EGP)
+        $this->override_decimals = $decimals;
+        add_filter('wc_get_price_decimals', array($this, 'filter_price_decimals'), 999);
+
         // Store original values in order meta
         $original_total = floatval($order->get_total());
         $order->update_meta_data('_cartflow_original_currency', $base_currency);
@@ -1430,6 +1436,20 @@ class CartFlow_Bridge {
 
         // Update order total
         $order->set_total(round($original_total * $final_rate, $decimals));
+
+        // Remove the override so it doesn't affect the rest of WordPress
+        remove_filter('wc_get_price_decimals', array($this, 'filter_price_decimals'), 999);
+        $this->override_decimals = null;
+    }
+
+    /**
+     * Filter to override WooCommerce price decimals during currency conversion
+     */
+    public function filter_price_decimals($decimals) {
+        if ($this->override_decimals !== null) {
+            return $this->override_decimals;
+        }
+        return $decimals;
     }
 
     /**
