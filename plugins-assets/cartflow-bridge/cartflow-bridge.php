@@ -1397,8 +1397,10 @@ class CartFlow_Bridge {
         // Apply margin
         $final_rate = $rate * (1 + $margin / 100);
 
-        // Decimal places for the gateway currency
-        $decimals = absint(get_option('woocommerce_price_num_decimals', 2));
+        // Decimal places for the gateway currency (not the store setting, which is for the base currency)
+        // Most currencies use 2 decimals; zero-decimal currencies listed below
+        $zero_decimal_currencies = array('BIF', 'CLP', 'DJF', 'GNF', 'JPY', 'KMF', 'KRW', 'MGA', 'PYG', 'RWF', 'UGX', 'VND', 'VUV', 'XAF', 'XOF', 'XPF');
+        $decimals = in_array(strtoupper($gateway_currency), $zero_decimal_currencies) ? 0 : 2;
 
         // Store original values in order meta
         $original_total = floatval($order->get_total());
