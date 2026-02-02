@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import * as Joi from 'joi';
-import { FulfillmentStatus, OrderStatus } from './enum';
+import { FulfillmentStatus, OrderStatus, PaymentStatus } from './enum';
 
 export class UpdateOrderDto {
   @ApiPropertyOptional({
@@ -14,6 +14,12 @@ export class UpdateOrderDto {
     default: true,
   })
   syncToStore?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'Payment status',
+    enum: PaymentStatus,
+  })
+  paymentStatus?: PaymentStatus;
 
   @ApiPropertyOptional({
     description: 'Fulfillment status',
@@ -42,6 +48,9 @@ export const UpdateOrderSchema = Joi.object().keys({
     .valid(...Object.values(OrderStatus))
     .optional(),
   syncToStore: Joi.boolean().default(true).optional(),
+  paymentStatus: Joi.string()
+    .valid(...Object.values(PaymentStatus))
+    .optional(),
   fulfillmentStatus: Joi.string()
     .valid(...Object.values(FulfillmentStatus))
     .optional(),

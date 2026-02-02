@@ -262,6 +262,7 @@ export class OrderService {
 
     // Update fields
     if (dto.status) order.status = dto.status;
+    if (dto.paymentStatus) order.paymentStatus = dto.paymentStatus;
     if (dto.fulfillmentStatus) order.fulfillmentStatus = dto.fulfillmentStatus;
     if (dto.trackingNumber) order.trackingNumber = dto.trackingNumber;
     if (dto.trackingCarrier) order.trackingCarrier = dto.trackingCarrier;
