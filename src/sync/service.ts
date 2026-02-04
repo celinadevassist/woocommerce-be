@@ -500,12 +500,15 @@ export class SyncService {
       job.completedAt = new Date();
       await job.save();
 
-      // Update store sync status
+      // Update store sync status with actual DB count (not just items synced in this batch)
+      const totalProducts = await this.productService.getProductCountByStore(
+        store._id.toString(),
+      );
       await this.storeService.updateSyncStatus(
         store._id.toString(),
         'products',
         SyncStatus.SYNCED,
-        job.processedItems,
+        totalProducts,
       );
 
       // Update store last sync timestamp
@@ -515,7 +518,7 @@ export class SyncService {
       );
 
       this.logger.log(
-        `Product sync completed for store ${store._id}: ${job.processedItems} products synced`,
+        `Product sync completed for store ${store._id}: ${job.processedItems} products synced (total: ${totalProducts})`,
       );
     } catch (error) {
       this.logger.error(
@@ -726,15 +729,18 @@ export class SyncService {
       job.completedAt = new Date();
       await job.save();
 
+      const totalOrders = await this.orderService.getOrderCountByStore(
+        store._id.toString(),
+      );
       await this.storeService.updateSyncStatus(
         store._id.toString(),
         'orders',
         SyncStatus.SYNCED,
-        job.processedItems,
+        totalOrders,
       );
 
       this.logger.log(
-        `Order sync completed for store ${store._id}: ${job.processedItems} orders synced`,
+        `Order sync completed for store ${store._id}: ${job.processedItems} orders synced (total: ${totalOrders})`,
       );
     } catch (error) {
       this.logger.error(`Order sync failed for job ${jobId}: ${error.message}`);
@@ -883,15 +889,18 @@ export class SyncService {
       job.completedAt = new Date();
       await job.save();
 
+      const totalCustomers = await this.customerService.getCustomerCountByStore(
+        store._id.toString(),
+      );
       await this.storeService.updateSyncStatus(
         store._id.toString(),
         'customers',
         SyncStatus.SYNCED,
-        job.processedItems,
+        totalCustomers,
       );
 
       this.logger.log(
-        `Customer sync completed for store ${store._id}: ${job.processedItems} customers synced`,
+        `Customer sync completed for store ${store._id}: ${job.processedItems} customers synced (total: ${totalCustomers})`,
       );
     } catch (error) {
       this.logger.error(
@@ -1042,15 +1051,18 @@ export class SyncService {
       job.completedAt = new Date();
       await job.save();
 
+      const totalReviews = await this.reviewService.getReviewCountByStore(
+        store._id.toString(),
+      );
       await this.storeService.updateSyncStatus(
         store._id.toString(),
         'reviews',
         SyncStatus.SYNCED,
-        job.processedItems,
+        totalReviews,
       );
 
       this.logger.log(
-        `Review sync completed for store ${store._id}: ${job.processedItems} reviews synced`,
+        `Review sync completed for store ${store._id}: ${job.processedItems} reviews synced (total: ${totalReviews})`,
       );
     } catch (error) {
       this.logger.error(

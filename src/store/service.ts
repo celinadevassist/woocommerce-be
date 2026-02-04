@@ -406,6 +406,9 @@ export class StoreService {
     }
     if (error) {
       updateData[`syncStatus.${entityType}.error`] = error;
+    } else {
+      // Clear previous error on success
+      updateData[`syncStatus.${entityType}.error`] = null;
     }
 
     await this.storeModel.updateOne(
