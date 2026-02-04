@@ -46,6 +46,9 @@ export class ScheduledSyncService implements OnModuleInit {
     this.logger.debug('Checking for stores due for scheduled sync...');
 
     try {
+      // Clean up stuck jobs before starting new syncs (15 min threshold)
+      await this.cleanupStuckJobs(15 * 60 * 1000);
+
       // Find all active stores with autoSync enabled
       const stores = await this.storeModel.find({
         isDeleted: false,
@@ -315,15 +318,18 @@ ${
   }
 
   /**
-   * Clean up stuck sync jobs on startup
+   * Clean up stuck sync jobs
+   * @param thresholdMs - How long a job must be stuck before cleanup (default: 1 hour)
    */
-  private async cleanupStuckJobs(): Promise<void> {
-    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  private async cleanupStuckJobs(
+    thresholdMs: number = 60 * 60 * 1000,
+  ): Promise<void> {
+    const cutoff = new Date(Date.now() - thresholdMs);
 
-    // Find jobs that have been running/pending for more than 1 hour
+    // Find jobs that have been running/pending longer than the threshold
     const stuckJobs = await this.syncJobModel.find({
       status: { $in: [SyncJobStatus.PENDING, SyncJobStatus.RUNNING] },
-      updatedAt: { $lt: oneHourAgo },
+      updatedAt: { $lt: cutoff },
     });
 
     if (stuckJobs.length > 0) {
