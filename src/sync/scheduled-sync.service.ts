@@ -106,6 +106,21 @@ export class ScheduledSyncService implements OnModuleInit {
   }
 
   /**
+   * Check if a specific entity type has a running sync job for a store
+   */
+  private async hasRunningJob(
+    storeId: Types.ObjectId,
+    entityType: SyncEntityType,
+  ): Promise<boolean> {
+    const job = await this.syncJobModel.findOne({
+      storeId,
+      entityType,
+      status: { $in: [SyncJobStatus.PENDING, SyncJobStatus.RUNNING] },
+    });
+    return !!job;
+  }
+
+  /**
    * Run scheduled sync for all entity types
    * Uses DELTA sync by default to only fetch changed records since last sync
    */
@@ -137,6 +152,13 @@ export class ScheduledSyncService implements OnModuleInit {
     // Run delta sync for products and orders
     for (const entity of deltaSyncEntities) {
       try {
+        // Skip if this entity already has a running sync job
+        if (await this.hasRunningJob(store._id, entity.type)) {
+          this.logger.debug(
+            `${entity.type} sync already in progress for ${store.name}, skipping`,
+          );
+          continue;
+        }
         if (typeof this.syncService[entity.method] === 'function') {
           await this.syncService[entity.method](
             storeId,
@@ -147,16 +169,30 @@ export class ScheduledSyncService implements OnModuleInit {
           await this.delay(2000);
         }
       } catch (error) {
-        this.logger.error(
-          `Scheduled ${entity.type} sync failed for ${store.name}: ${error.message}`,
-        );
-        await this.recordSyncError(store, entity.type, error.message);
+        // Don't record "already in progress" as a real error
+        if (error.message?.includes('already in progress')) {
+          this.logger.debug(
+            `${entity.type} sync already in progress for ${store.name}, skipping`,
+          );
+        } else {
+          this.logger.error(
+            `Scheduled ${entity.type} sync failed for ${store.name}: ${error.message}`,
+          );
+          await this.recordSyncError(store, entity.type, error.message);
+        }
       }
     }
 
     // Run full sync for customers and reviews (no delta support)
     for (const entity of fullSyncEntities) {
       try {
+        // Skip if this entity already has a running sync job
+        if (await this.hasRunningJob(store._id, entity.type)) {
+          this.logger.debug(
+            `${entity.type} sync already in progress for ${store.name}, skipping`,
+          );
+          continue;
+        }
         if (typeof this.syncService[entity.method] === 'function') {
           await this.syncService[entity.method](
             storeId,
@@ -166,10 +202,17 @@ export class ScheduledSyncService implements OnModuleInit {
           await this.delay(2000);
         }
       } catch (error) {
-        this.logger.error(
-          `Scheduled ${entity.type} sync failed for ${store.name}: ${error.message}`,
-        );
-        await this.recordSyncError(store, entity.type, error.message);
+        // Don't record "already in progress" as a real error
+        if (error.message?.includes('already in progress')) {
+          this.logger.debug(
+            `${entity.type} sync already in progress for ${store.name}, skipping`,
+          );
+        } else {
+          this.logger.error(
+            `Scheduled ${entity.type} sync failed for ${store.name}: ${error.message}`,
+          );
+          await this.recordSyncError(store, entity.type, error.message);
+        }
       }
     }
 
