@@ -7,21 +7,31 @@ import {
   Body,
   Param,
   Query,
+  Res,
   UseGuards,
   UsePipes,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
+import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
+  ApiParam,
+  ApiConsumes,
+  ApiBody,
 } from '@nestjs/swagger';
 import { User } from '../decorators/user.decorator';
 import { UserDocument } from '../schema/user.schema';
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
 import { LanguageSchema } from '../dtos/lang.dto';
+import { Multer } from 'multer';
 import { LocationLibraryService } from './service';
 import {
   CreateStateGroupDto,
@@ -152,6 +162,107 @@ export class LocationLibraryController {
       countryCode,
       groupId,
     );
+  }
+
+  // ============== CSV EXPORT/IMPORT ==============
+
+  @Get('states/export')
+  @ApiOperation({ summary: 'Export states to CSV' })
+  @ApiResponse({ status: 200, description: 'Returns CSV file' })
+  @ApiQuery({ name: 'countryCode', required: true })
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async exportCsv(
+    @User() user: UserDocument,
+    @Query('countryCode') countryCode: string,
+    @Res() res: Response,
+  ): Promise<void> {
+    if (!countryCode) {
+      throw new BadRequestException('Country code is required');
+    }
+    const csv = await this.locationLibraryService.exportStatesToCsv(
+      user._id.toString(),
+      countryCode,
+    );
+    const filename = `states-${countryCode.toUpperCase()}-export-${new Date().toISOString().split('T')[0]}.csv`;
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    );
+    res.send(csv);
+  }
+
+  @Post('states/import')
+  @ApiOperation({ summary: 'Import states from CSV' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiResponse({ status: 201, description: 'States imported successfully' })
+  @ApiConsumes('multipart/form-data')
+  @ApiQuery({ name: 'countryCode', required: true })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: { type: 'string', format: 'binary' },
+      },
+    },
+  })
+  @UseInterceptors(FileInterceptor('file'))
+  async importFromCsv(
+    @UploadedFile() file: Multer.File,
+    @Query('countryCode') countryCode: string,
+    @User() user: UserDocument,
+  ) {
+    if (!file) {
+      throw new BadRequestException('No file provided');
+    }
+    if (!countryCode) {
+      throw new BadRequestException('Country code is required');
+    }
+
+    return await this.locationLibraryService.importStatesFromCsv(
+      user._id.toString(),
+      countryCode,
+      file.buffer.toString('utf-8'),
+    );
+  }
+
+  @Get('states/import/template')
+  @ApiOperation({ summary: 'Download CSV import template for states' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiResponse({ status: 200, description: 'Returns CSV template file' })
+  async getImportTemplate(@Res() res: Response) {
+    const headers = [
+      'Country Code',
+      'State Code',
+      'State Name',
+      'Original Name',
+      'Groups',
+      'Type',
+      'Order',
+      'Notes',
+    ];
+
+    const exampleRow = [
+      'EG',
+      'EGALX',
+      'Alexandria',
+      'Alexandria',
+      'Delta Region; Northern Egypt',
+      'Override',
+      '1',
+      'Main port city',
+    ];
+
+    const BOM = '\uFEFF';
+    const csv = BOM + [headers.join(','), exampleRow.join(',')].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader(
+      'Content-Disposition',
+      'attachment; filename="states-import-template.csv"',
+    );
+    res.send(csv);
   }
 
   @Get('states/:stateId')

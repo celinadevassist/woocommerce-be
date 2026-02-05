@@ -400,6 +400,257 @@ export class LocationLibraryService {
     }
   }
 
+  // ============== CSV EXPORT/IMPORT ==============
+
+  async exportStatesToCsv(
+    userId: string,
+    countryCode: string,
+  ): Promise<string> {
+    const states = await this.localStateModel
+      .find({
+        ownerId: new Types.ObjectId(userId),
+        countryCode: countryCode.toUpperCase(),
+      })
+      .populate('groups')
+      .sort({ order: 1, stateName: 1 });
+
+    const headers = [
+      'Country Code',
+      'State Code',
+      'State Name',
+      'Original Name',
+      'Groups',
+      'Type',
+      'Order',
+      'Notes',
+    ];
+
+    const rows = states.map((state) => [
+      state.countryCode,
+      state.stateCode,
+      state.stateName || '',
+      state.originalName || '',
+      (state.groups as any[]).map((g) => g.name).join('; '),
+      state.isNew ? 'New' : 'Override',
+      state.order ?? 0,
+      state.notes || '',
+    ]);
+
+    const escapeValue = (val: any): string => {
+      const str = String(val ?? '');
+      if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const BOM = '\uFEFF';
+    const csvContent =
+      BOM +
+      [
+        headers.map(escapeValue).join(','),
+        ...rows.map((row) => row.map(escapeValue).join(',')),
+      ].join('\n');
+
+    return csvContent;
+  }
+
+  async importStatesFromCsv(
+    userId: string,
+    countryCode: string,
+    csvContent: string,
+  ): Promise<{
+    total: number;
+    created: number;
+    updated: number;
+    failed: number;
+    errors: { row: number; error: string }[];
+  }> {
+    const upperCountry = countryCode.toUpperCase();
+    const content = csvContent.replace(/^\uFEFF/, '');
+    const lines = content
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean);
+
+    if (lines.length < 2) {
+      throw new BadRequestException(
+        'CSV file must have at least a header row and one data row',
+      );
+    }
+
+    const headerLine = this.parseCsvLine(lines[0]);
+    const headerMap = new Map<string, number>();
+    headerLine.forEach((h, i) => headerMap.set(h.trim().toLowerCase(), i));
+
+    // Validate required headers
+    const stateCodeIdx = headerMap.get('state code');
+    const stateNameIdx = headerMap.get('state name');
+    if (stateCodeIdx === undefined || stateNameIdx === undefined) {
+      throw new BadRequestException(
+        'CSV must contain "State Code" and "State Name" columns',
+      );
+    }
+
+    const countryCodeIdx = headerMap.get('country code');
+    const originalNameIdx = headerMap.get('original name');
+    const groupsIdx = headerMap.get('groups');
+    const typeIdx = headerMap.get('type');
+    const orderIdx = headerMap.get('order');
+    const notesIdx = headerMap.get('notes');
+
+    // Pre-load existing groups
+    const existingGroups = await this.stateGroupModel.find({
+      ownerId: new Types.ObjectId(userId),
+      countryCode: upperCountry,
+    });
+    const groupMap = new Map<string, Types.ObjectId>();
+    for (const g of existingGroups) {
+      groupMap.set(g.name.toLowerCase(), g._id);
+    }
+
+    let created = 0;
+    let updated = 0;
+    let failed = 0;
+    const errors: { row: number; error: string }[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      try {
+        const fields = this.parseCsvLine(lines[i]);
+        const stateCode = fields[stateCodeIdx]?.trim();
+        const stateName = fields[stateNameIdx]?.trim();
+
+        if (!stateCode || !stateName) {
+          errors.push({
+            row: i + 1,
+            error: 'State Code and State Name are required',
+          });
+          failed++;
+          continue;
+        }
+
+        // Validate country code if column exists
+        if (countryCodeIdx !== undefined) {
+          const rowCountry = fields[countryCodeIdx]?.trim().toUpperCase();
+          if (rowCountry && rowCountry !== upperCountry) {
+            errors.push({
+              row: i + 1,
+              error: `Country code "${rowCountry}" does not match selected country "${upperCountry}"`,
+            });
+            failed++;
+            continue;
+          }
+        }
+
+        // Resolve groups
+        const groupIds: Types.ObjectId[] = [];
+        if (groupsIdx !== undefined && fields[groupsIdx]?.trim()) {
+          const groupNames = fields[groupsIdx]
+            .split(';')
+            .map((n) => n.trim())
+            .filter(Boolean);
+          for (const gName of groupNames) {
+            const key = gName.toLowerCase();
+            if (groupMap.has(key)) {
+              groupIds.push(groupMap.get(key));
+            } else {
+              // Auto-create group
+              const newGroup = new this.stateGroupModel({
+                name: gName,
+                countryCode: upperCountry,
+                color: '#3B82F6',
+                ownerId: new Types.ObjectId(userId),
+              });
+              await newGroup.save();
+              groupMap.set(key, newGroup._id);
+              groupIds.push(newGroup._id);
+            }
+          }
+        }
+
+        const isNew =
+          typeIdx !== undefined
+            ? fields[typeIdx]?.trim().toLowerCase() === 'new'
+            : false;
+        const order =
+          orderIdx !== undefined
+            ? parseInt(fields[orderIdx]?.trim(), 10) || 0
+            : 0;
+        const originalName =
+          originalNameIdx !== undefined
+            ? fields[originalNameIdx]?.trim() || ''
+            : '';
+        const notes =
+          notesIdx !== undefined ? fields[notesIdx]?.trim() || '' : '';
+
+        // Upsert: find by owner + countryCode + stateCode
+        const existing = await this.localStateModel.findOne({
+          ownerId: new Types.ObjectId(userId),
+          countryCode: upperCountry,
+          stateCode,
+        });
+
+        if (existing) {
+          existing.stateName = stateName;
+          if (originalName) existing.originalName = originalName;
+          existing.groups = groupIds as any;
+          existing.isNew = isNew;
+          existing.order = order;
+          if (notes) existing.notes = notes;
+          await existing.save();
+          updated++;
+        } else {
+          const state = new this.localStateModel({
+            countryCode: upperCountry,
+            stateCode,
+            stateName,
+            originalName: originalName || undefined,
+            groups: groupIds,
+            isNew,
+            order,
+            notes: notes || undefined,
+            ownerId: new Types.ObjectId(userId),
+          });
+          await state.save();
+          created++;
+        }
+      } catch (error) {
+        errors.push({ row: i + 1, error: error.message });
+        failed++;
+      }
+    }
+
+    return { total: lines.length - 1, created, updated, failed, errors };
+  }
+
+  private parseCsvLine(line: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < line.length; i++) {
+      const char = line[i];
+      const nextChar = line[i + 1];
+
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          current += '"';
+          i++;
+        } else {
+          inQuotes = !inQuotes;
+        }
+      } else if (char === ',' && !inQuotes) {
+        result.push(current);
+        current = '';
+      } else {
+        current += char;
+      }
+    }
+    result.push(current);
+
+    return result;
+  }
+
   // ============== IMPORT FROM WOOCOMMERCE ==============
 
   async importFromWooCommerce(
