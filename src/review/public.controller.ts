@@ -7,6 +7,7 @@ import {
   Body,
   Res,
   Header,
+  UseGuards,
   BadRequestException,
   NotFoundException,
   Logger,
@@ -21,13 +22,13 @@ import {
 } from '@nestjs/swagger';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import { Throttle } from '@nestjs/throttler';
+import { CustomThrottlerGuard } from '../guards/throttle.guard';
 import { PublicReviewService } from './public.service';
 import { Store, StoreDocument } from '../store/schema';
 import { ReviewType } from './enum';
 
 @ApiTags('Public Reviews API')
-@SkipThrottle()
 @Controller('widget/store-reviews')
 export class PublicReviewController {
   private readonly logger = new Logger(PublicReviewController.name);
@@ -170,6 +171,7 @@ export class PublicReviewController {
   }
 
   @Post()
+  @UseGuards(CustomThrottlerGuard)
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   @ApiOperation({ summary: 'Submit a public review (rate limited)' })
   @ApiQuery({

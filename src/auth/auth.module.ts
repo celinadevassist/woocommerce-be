@@ -1,5 +1,4 @@
 import { forwardRef, Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { PassportModule } from '@nestjs/passport';
@@ -18,8 +17,6 @@ import { LoggerService } from 'src/logger/logger.service';
 import { MetadataModule } from 'src/common_metadata_module/module';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
-import { CustomThrottlerGuard } from '../guards/throttle.guard';
-
 @Module({
   imports: [
     ConfigModule,
@@ -46,10 +43,6 @@ import { CustomThrottlerGuard } from '../guards/throttle.guard';
     MailrelayService,
     MailerService,
     LoggerService,
-    {
-      provide: APP_GUARD,
-      useClass: CustomThrottlerGuard,
-    },
   ],
   exports: [JwtStrategy, AuthService],
 })

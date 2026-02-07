@@ -1350,14 +1350,23 @@ export class ProductService {
 
             if (deleteIds.length > 0) {
               try {
-                this.logger.log(
-                  `[BulkDelete] Batch deleting ${deleteIds.length} variants from WooCommerce (product ${parentExternalId})`,
-                );
-                await this.wooCommerceService.batchVariations(
-                  credentials,
-                  parentExternalId,
-                  { delete: deleteIds },
-                );
+                // Chunk into batches of 25 to avoid 413 Payload Too Large
+                const chunkSize = 25;
+                for (
+                  let i = 0;
+                  i < deleteIds.length;
+                  i += chunkSize
+                ) {
+                  const chunk = deleteIds.slice(i, i + chunkSize);
+                  this.logger.log(
+                    `[BulkDelete] Batch deleting chunk ${Math.floor(i / chunkSize) + 1} (${chunk.length} variants) from WooCommerce (product ${parentExternalId})`,
+                  );
+                  await this.wooCommerceService.batchVariations(
+                    credentials,
+                    parentExternalId,
+                    { delete: chunk },
+                  );
+                }
                 this.logger.log(
                   `[BulkDelete] Successfully batch deleted ${deleteIds.length} variants from WooCommerce`,
                 );
@@ -3821,11 +3830,25 @@ export class ProductService {
       isDeleted: false,
     });
 
+    // Filter to only variants that have populated attributes for reliable dedup
+    const variantsWithAttrs = existingVariations.filter(
+      (v) => v.attributes && v.attributes.length > 0,
+    );
+    const variantsWithoutAttrs =
+      existingVariations.length - variantsWithAttrs.length;
+
+    if (variantsWithoutAttrs > 0) {
+      this.logger.warn(
+        `${variantsWithoutAttrs} existing variations have empty attributes and cannot be deduped. ` +
+          `Consider running backfillVariantAttributes for store ${product.storeId}.`,
+      );
+    }
+
     // Create a set of existing attribute combinations for fast lookup
     // Key format: "attrName1:option1|attrName2:option2" (sorted by attribute name)
     const existingCombinationKeys = new Set(
-      existingVariations.map((variant) => {
-        const sortedAttrs = [...(variant.attributes || [])]
+      variantsWithAttrs.map((variant) => {
+        const sortedAttrs = [...variant.attributes]
           .sort((a, b) => a.name.localeCompare(b.name))
           .map((a) => `${a.name.toLowerCase()}:${a.option.toLowerCase()}`)
           .join('|');
@@ -3876,16 +3899,26 @@ export class ProductService {
       consumerSecret: store.credentials.consumerSecret,
     };
 
+    // Build lookup for WooCommerce attribute IDs (reuse storeAttributes from above)
+    const attrNameToWooId = new Map(
+      storeAttributes.map((attr) => [attr.name.toLowerCase(), attr.wooId]),
+    );
+
     // Create variations in WooCommerce
     const variationsToCreate = combinations.map((combo, index) => ({
       regular_price: options.regularPrice || '',
-      sku: options.sku ? `${options.sku}-${index + 1}` : '',
+      sku: options.sku ? `${options.sku}-${existingVariations.length + index + 1}` : '',
       stock_status: 'instock',
       manage_stock: false,
-      attributes: variationAttributes.map((attr, i) => ({
-        name: attr.name,
-        option: combo[i],
-      })),
+      attributes: variationAttributes.map((attr, i) => {
+        const wooId =
+          attr.externalId || attrNameToWooId.get(attr.name.toLowerCase()) || 0;
+        return {
+          ...(wooId ? { id: wooId } : {}),
+          name: attr.name,
+          option: combo[i],
+        };
+      }),
     }));
 
     try {
@@ -3899,7 +3932,15 @@ export class ProductService {
       // Sync the created variations to local database
       const createdVariations = result.create || [];
 
-      for (const wooVariation of createdVariations) {
+      for (let i = 0; i < createdVariations.length; i++) {
+        const wooVariation = createdVariations[i];
+        // Use WooCommerce response attributes, but fall back to our request payload
+        // when WooCommerce returns empty/incomplete attributes in batch responses
+        const wooAttrs =
+          wooVariation.attributes?.filter((a) => a.name && a.option) || [];
+        const requestAttrs = variationsToCreate[i]?.attributes || [];
+        const finalAttrs = wooAttrs.length > 0 ? wooAttrs : requestAttrs;
+
         await this.variantModel.findOneAndUpdate(
           { storeId: product.storeId, externalId: wooVariation.id },
           {
@@ -3914,11 +3955,10 @@ export class ProductService {
             stockQuantity: wooVariation.stock_quantity,
             stockStatus: wooVariation.stock_status || 'instock',
             manageStock: wooVariation.manage_stock || false,
-            attributes:
-              wooVariation.attributes?.map((a) => ({
-                name: a.name,
-                option: a.option,
-              })) || [],
+            attributes: finalAttrs.map((a) => ({
+              name: a.name,
+              option: a.option,
+            })),
             image: wooVariation.image
               ? {
                   externalId: wooVariation.image.id,

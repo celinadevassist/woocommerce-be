@@ -16,6 +16,7 @@ import {
   ApiResponse,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import { CustomThrottlerGuard } from '../guards/throttle.guard';
 
 import { Scopes, User } from '../decorators';
 
@@ -35,6 +36,7 @@ import { UserDocument } from 'src/schema';
 @ApiTags('auth')
 @ApiBearerAuth()
 @Controller(':lang/auth')
+@UseGuards(CustomThrottlerGuard)
 export class AuthController {
   constructor(private authService: AuthService) {}
   @Post('signup')

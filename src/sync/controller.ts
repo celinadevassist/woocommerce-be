@@ -9,7 +9,6 @@ import {
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
-import { SkipThrottle } from '@nestjs/throttler';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiTags,
@@ -237,7 +236,6 @@ export class SyncController {
   }
 
   @Get('store/:storeId/progress')
-  @SkipThrottle()
   @ApiOperation({ summary: 'Get sync progress for a store' })
   @ApiResponse({ status: 200, description: 'Progress retrieved successfully' })
   @ApiQuery({ name: 'entityType', required: false, enum: SyncEntityType })

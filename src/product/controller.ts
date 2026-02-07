@@ -18,7 +18,6 @@ import {
 import { Request, Response } from 'express';
 import { Multer } from 'multer';
 import { AuthGuard } from '@nestjs/passport';
-import { SkipThrottle } from '@nestjs/throttler';
 import { FileInterceptor } from '@nestjs/platform-express';
 import {
   ApiTags,
@@ -312,7 +311,6 @@ export class ProductController {
   }
 
   @Post('variants/backfill-attributes')
-  @SkipThrottle()
   @ApiOperation({
     summary: 'Backfill variant attributes from WooCommerce',
   })

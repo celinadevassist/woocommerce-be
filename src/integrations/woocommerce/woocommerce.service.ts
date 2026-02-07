@@ -341,7 +341,7 @@ export class WooCommerceService implements IPlatformAdapter {
       sku?: string;
       stock_status?: string;
       manage_stock?: boolean;
-      attributes: Array<{ name: string; option: string }>;
+      attributes: Array<{ id?: number; name: string; option: string }>;
     }>,
   ): Promise<{ create: WooProductVariation[] }> {
     return this.request<{ create: WooProductVariation[] }>(
