@@ -332,29 +332,53 @@ export class ProductImportService {
         startedAt: new Date(),
       });
 
-      const results: IImportResult[] = [];
+      const CONCURRENCY = 3;
 
-      for (let i = 0; i < products.length; i++) {
-        const product = products[i];
-        const startTime = Date.now();
+      for (let i = 0; i < products.length; i += CONCURRENCY) {
+        // Check for cancellation before each batch
+        const job = await this.importModel
+          .findById(jobId)
+          .select('status')
+          .lean();
+        if (job?.status === ImportStatus.CANCELLED) break;
 
-        // Update current product
+        const batch = products.slice(i, i + CONCURRENCY);
+        const batchLabel =
+          batch.length === 1
+            ? batch[0].title
+            : `Products ${i + 1}-${Math.min(i + CONCURRENCY, products.length)} of ${products.length}`;
+
         await this.importModel.findByIdAndUpdate(jobId, {
-          currentProduct: product.title,
+          currentProduct: batchLabel,
+          currentStep: null,
         });
 
-        try {
-          const result = await this.importSingleProduct(
-            store,
-            product,
-            settings,
-          );
-          results.push({
-            ...result,
-            duration: Date.now() - startTime,
-          });
+        const batchResults = await Promise.allSettled(
+          batch.map((product) =>
+            this.importSingleProduct(store, product, settings, jobId),
+          ),
+        );
 
-          // Update progress
+        // Process each settled result and update counters
+        for (let j = 0; j < batchResults.length; j++) {
+          const settled = batchResults[j];
+          const product = batch[j];
+
+          let result: IImportResult;
+          if (settled.status === 'fulfilled') {
+            result = settled.value;
+          } else {
+            this.logger.error(
+              `Failed to import product ${product.title}: ${settled.reason?.message}`,
+            );
+            result = {
+              externalId: product.externalId,
+              title: product.title,
+              status: 'failed',
+              error: settled.reason?.message || 'Unknown error',
+            };
+          }
+
           const update: any = {
             $push: { results: result },
           };
@@ -368,25 +392,6 @@ export class ProductImportService {
           }
 
           await this.importModel.findByIdAndUpdate(jobId, update);
-        } catch (error) {
-          this.logger.error(
-            `Failed to import product ${product.title}: ${error.message}`,
-          );
-
-          const failedResult: IImportResult = {
-            externalId: product.externalId,
-            title: product.title,
-            status: 'failed',
-            error: error.message,
-            duration: Date.now() - startTime,
-          };
-
-          results.push(failedResult);
-
-          await this.importModel.findByIdAndUpdate(jobId, {
-            $push: { results: failedResult },
-            $inc: { failedProducts: 1 },
-          });
         }
       }
 
@@ -395,6 +400,7 @@ export class ProductImportService {
         status: ImportStatus.COMPLETED,
         completedAt: new Date(),
         currentProduct: null,
+        currentStep: null,
       });
 
       this.logger.log(`Import job ${jobId} completed`);
@@ -416,6 +422,7 @@ export class ProductImportService {
     store: StoreDocument,
     product: ISelectedProduct,
     settings: IImportSettings,
+    jobId?: string,
   ): Promise<IImportResult> {
     this.logger.log(
       `[Import] Starting product: ${product.title} (${
@@ -434,6 +441,11 @@ export class ProductImportService {
     };
 
     // Create product in WooCommerce (images can take a long time to download)
+    if (jobId) {
+      await this.importModel.findByIdAndUpdate(jobId, {
+        currentStep: `Creating "${product.title}" in WooCommerce...`,
+      });
+    }
     this.logger.log(
       `[Import] Creating product in WooCommerce: ${product.title}`,
     );
@@ -449,6 +461,11 @@ export class ProductImportService {
     );
 
     // Save to local database
+    if (jobId) {
+      await this.importModel.findByIdAndUpdate(jobId, {
+        currentStep: `Saving "${product.title}" to database...`,
+      });
+    }
     const localProduct = new this.productModel({
       storeId: store._id,
       externalId: createdProduct.id,
@@ -501,12 +518,18 @@ export class ProductImportService {
       product.options?.length > 0
     ) {
       try {
+        if (jobId) {
+          await this.importModel.findByIdAndUpdate(jobId, {
+            currentStep: `Generating variations for "${product.title}"...`,
+          });
+        }
         variationsGenerated = await this.generateVariations(
           store,
           createdProduct.id,
           localProduct._id.toString(),
           product,
           settings,
+          jobId,
         );
       } catch (error) {
         this.logger.warn(
@@ -773,6 +796,7 @@ export class ProductImportService {
     localProductId: string,
     product: ISelectedProduct,
     settings: IImportSettings,
+    jobId?: string,
   ): Promise<number> {
     const credentials = {
       url: store.url,
@@ -865,143 +889,154 @@ export class ProductImportService {
 
     let created = 0;
 
-    for (const combination of combinations) {
-      try {
-        // Find matching variant from source (if any) to get price/sku
-        const matchingVariant = product.variants.find((v) =>
-          v.options.every(
-            (opt) =>
-              combination.find((c) => c.name === opt.name)?.value === opt.value,
-          ),
-        );
+    // Build all variation payloads upfront
+    const allVariationPayloads: any[] = combinations.map((combination) => {
+      // Find matching variant from source (if any) to get price/sku
+      const matchingVariant = product.variants.find((v) =>
+        v.options.every(
+          (opt) =>
+            combination.find((c) => c.name === opt.name)?.value === opt.value,
+        ),
+      );
 
-        const variantPrice =
-          matchingVariant?.price || product.variants[0]?.price || '0';
-        const calculatedPrice = this.calculateVariationPrice(
-          variantPrice,
-          settings,
-        );
+      const variantPrice =
+        matchingVariant?.price || product.variants[0]?.price || '0';
+      const calculatedPrice = this.calculateVariationPrice(
+        variantPrice,
+        settings,
+      );
 
-        // Map attributes for variation - use ID for global attributes
-        const mappedAttributes = combination.map((attr) => {
-          const attrData: any = { option: attr.value };
-          // Use attribute ID for global WooCommerce attributes (preferred)
-          if (attr.id) {
-            attrData.id = attr.id;
-          } else {
-            attrData.name = attr.name;
-          }
-          return attrData;
+      // Map attributes for variation - use ID for global attributes
+      const mappedAttributes = combination.map((attr) => {
+        const attrData: any = { option: attr.value };
+        if (attr.id) {
+          attrData.id = attr.id;
+        } else {
+          attrData.name = attr.name;
+        }
+        return attrData;
+      });
+
+      const variationData: any = {
+        sku: '',
+        stock_status: settings.stockStatus,
+        manage_stock: settings.manageStock,
+        stock_quantity: settings.manageStock
+          ? settings.stockQuantity || 0
+          : undefined,
+        attributes: mappedAttributes,
+      };
+
+      // Only set price if not empty mode
+      if (calculatedPrice !== undefined) {
+        variationData.regular_price = calculatedPrice;
+      }
+
+      // Include variant image if available
+      if (matchingVariant?.image?.src) {
+        variationData.image = { src: matchingVariant.image.src };
+      }
+
+      // Handle sale price (only if prices are not empty)
+      if (calculatedPrice !== undefined && matchingVariant?.compareAtPrice) {
+        const comparePrice = parseFloat(matchingVariant.compareAtPrice);
+        const regularPrice = parseFloat(variantPrice);
+        if (comparePrice > regularPrice) {
+          variationData.regular_price = this.calculateVariationPrice(
+            matchingVariant.compareAtPrice,
+            settings,
+          );
+          variationData.sale_price = calculatedPrice;
+        }
+      }
+
+      return variationData;
+    });
+
+    // Process in chunks using batch API
+    const CHUNK_SIZE = 25;
+
+    for (let i = 0; i < allVariationPayloads.length; i += CHUNK_SIZE) {
+      const chunk = allVariationPayloads.slice(i, i + CHUNK_SIZE);
+
+      if (jobId) {
+        await this.importModel.findByIdAndUpdate(jobId, {
+          currentStep: `Generating variations for "${product.title}" (${created}/${combinations.length})...`,
         });
+      }
 
-        const variationData: any = {
-          // SKU intentionally left empty - user will set manually
-          sku: '',
-          stock_status: settings.stockStatus,
-          manage_stock: settings.manageStock,
-          stock_quantity: settings.manageStock
-            ? settings.stockQuantity || 0
-            : undefined,
-          attributes: mappedAttributes,
-        };
+      this.logger.log(
+        `[Import] Batch creating ${chunk.length} variations (${created}/${combinations.length}) for product ${product.title}`,
+      );
 
-        // Only set price if not empty mode
-        if (calculatedPrice !== undefined) {
-          variationData.regular_price = calculatedPrice;
-        }
-
-        // Include variant image if available
-        if (matchingVariant?.image?.src) {
-          variationData.image = { src: matchingVariant.image.src };
-        }
-
-        // Handle sale price (only if prices are not empty)
-        if (calculatedPrice !== undefined && matchingVariant?.compareAtPrice) {
-          const comparePrice = parseFloat(matchingVariant.compareAtPrice);
-          const regularPrice = parseFloat(variantPrice);
-          if (comparePrice > regularPrice) {
-            variationData.regular_price = this.calculateVariationPrice(
-              matchingVariant.compareAtPrice,
-              settings,
-            );
-            (variationData as any).sale_price = calculatedPrice;
-          }
-        }
-
-        // Log variation data for debugging
-        this.logger.log(
-          `[Import] Creating variation with data: ${JSON.stringify({
-            attributes: variationData.attributes,
-            regular_price: variationData.regular_price,
-            stock_status: variationData.stock_status,
-            manage_stock: variationData.manage_stock,
-          })}`,
-        );
-
-        const createdVariation = await this.wooCommerceService.createVariation(
+      try {
+        const result = await this.wooCommerceService.batchCreateVariations(
           credentials,
           wooProductId,
-          variationData,
+          chunk,
         );
 
-        // Get variation title from WooCommerce response attributes (e.g., "Gold / Large")
-        const variationTitle =
-          createdVariation.attributes?.map((attr) => attr.option).join(' / ') ||
-          'Variant';
+        // Save each created variation to local DB
+        for (const createdVariation of result.create || []) {
+          const variationTitle =
+            createdVariation.attributes
+              ?.map((attr) => attr.option)
+              .join(' / ') || 'Variant';
 
-        // Save variation to local database using WooCommerce response data
-        const localVariant = new this.variantModel({
-          productId: new Types.ObjectId(localProductId),
-          storeId: store._id,
-          externalId: createdVariation.id,
-          parentExternalId: wooProductId,
-          sku: createdVariation.sku || '',
-          permalink: createdVariation.permalink,
-          description: variationTitle,
-          price: createdVariation.price || undefined,
-          regularPrice: createdVariation.regular_price || undefined,
-          salePrice: createdVariation.sale_price || undefined,
-          onSale: createdVariation.on_sale || false,
-          status: createdVariation.status || 'publish',
-          purchasable: createdVariation.purchasable ?? true,
-          virtual: createdVariation.virtual || false,
-          downloadable: createdVariation.downloadable || false,
-          manageStock: createdVariation.manage_stock || false,
-          stockQuantity: createdVariation.stock_quantity,
-          stockStatus: createdVariation.stock_status || 'instock',
-          weight: createdVariation.weight,
-          dimensions: createdVariation.dimensions,
-          image: createdVariation.image?.src
-            ? {
-                src: createdVariation.image.src,
-                alt: createdVariation.image.alt || variationTitle,
-              }
-            : undefined,
-          // Use attributes from WooCommerce response
-          attributes: (createdVariation.attributes || []).map((attr) => ({
-            externalId: attr.id,
-            name: attr.name,
-            option: attr.option,
-          })),
-          dateCreatedWoo: createdVariation.date_created
-            ? new Date(createdVariation.date_created)
-            : undefined,
-          dateModifiedWoo: createdVariation.date_modified
-            ? new Date(createdVariation.date_modified)
-            : undefined,
-          lastSyncedAt: new Date(),
-          pendingSync: false,
-          isDeleted: false,
-        });
+          const localVariant = new this.variantModel({
+            productId: new Types.ObjectId(localProductId),
+            storeId: store._id,
+            externalId: createdVariation.id,
+            parentExternalId: wooProductId,
+            sku: createdVariation.sku || '',
+            permalink: createdVariation.permalink,
+            description: variationTitle,
+            price: createdVariation.price || undefined,
+            regularPrice: createdVariation.regular_price || undefined,
+            salePrice: createdVariation.sale_price || undefined,
+            onSale: createdVariation.on_sale || false,
+            status: createdVariation.status || 'publish',
+            purchasable: createdVariation.purchasable ?? true,
+            virtual: createdVariation.virtual || false,
+            downloadable: createdVariation.downloadable || false,
+            manageStock: createdVariation.manage_stock || false,
+            stockQuantity: createdVariation.stock_quantity,
+            stockStatus: createdVariation.stock_status || 'instock',
+            weight: createdVariation.weight,
+            dimensions: createdVariation.dimensions,
+            image: createdVariation.image?.src
+              ? {
+                  src: createdVariation.image.src,
+                  alt: createdVariation.image.alt || variationTitle,
+                }
+              : undefined,
+            attributes: (createdVariation.attributes || []).map((attr) => ({
+              externalId: attr.id,
+              name: attr.name,
+              option: attr.option,
+            })),
+            dateCreatedWoo: createdVariation.date_created
+              ? new Date(createdVariation.date_created)
+              : undefined,
+            dateModifiedWoo: createdVariation.date_modified
+              ? new Date(createdVariation.date_modified)
+              : undefined,
+            lastSyncedAt: new Date(),
+            pendingSync: false,
+            isDeleted: false,
+          });
 
-        await localVariant.save();
-        this.logger.log(
-          `[Import] Saved local variation: ${variationTitle} (ID: ${createdVariation.id})`,
-        );
+          await localVariant.save();
+          this.logger.log(
+            `[Import] Saved local variation: ${variationTitle} (ID: ${createdVariation.id})`,
+          );
 
-        created++;
+          created++;
+        }
       } catch (error) {
-        this.logger.warn(`Failed to create variation: ${error.message}`);
+        this.logger.warn(
+          `Failed to batch create variations (chunk ${i / CHUNK_SIZE + 1}): ${error.message}`,
+        );
       }
     }
 
@@ -1079,6 +1114,7 @@ export class ProductImportService {
         failed: job.failedProducts,
         skipped: job.skippedProducts,
         current: job.currentProduct,
+        currentStep: job.currentStep,
         percentage: total > 0 ? Math.round((completed / total) * 100) : 0,
       },
       results: job.results || [],

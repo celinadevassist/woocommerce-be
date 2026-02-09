@@ -43,6 +43,9 @@ export class ProductImport {
   currentProduct?: string;
 
   @Prop()
+  currentStep?: string;
+
+  @Prop()
   startedAt?: Date;
 
   @Prop()

@@ -182,5 +182,6 @@ export interface IImportProgress {
   failed: number;
   skipped: number;
   current?: string;
+  currentStep?: string;
   percentage: number;
 }
