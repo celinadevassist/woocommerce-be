@@ -125,6 +125,38 @@ export class SubscriptionService {
     const periodEnd = new Date(periodStart);
     periodEnd.setDate(periodEnd.getDate() + BILLING_CYCLE_DAYS);
 
+    // Skip if invoice already exists for this billing period
+    const existingInvoice = await this.invoiceModel.findOne({
+      subscriptionId: subscription._id,
+      periodStart: periodStart,
+      status: { $in: [InvoiceStatus.PENDING, InvoiceStatus.OVERDUE] },
+      isDeleted: false,
+    });
+    if (existingInvoice) {
+      this.logger.warn(
+        `Invoice already exists for subscription ${subscription._id}, period ${periodStart}`,
+      );
+      return existingInvoice;
+    }
+
+    // Cancel all previous unpaid invoices for this subscription
+    // User should not pay for months they didn't use
+    const cancelledResult = await this.invoiceModel.updateMany(
+      {
+        subscriptionId: subscription._id,
+        status: { $in: [InvoiceStatus.PENDING, InvoiceStatus.OVERDUE] },
+        isDeleted: false,
+      },
+      {
+        $set: { status: InvoiceStatus.CANCELLED },
+      },
+    );
+    if (cancelledResult.modifiedCount > 0) {
+      this.logger.log(
+        `Cancelled ${cancelledResult.modifiedCount} previous unpaid invoice(s) for subscription ${subscription._id}`,
+      );
+    }
+
     // Generate invoice number: INV-YYYY-NNNNN
     const year = now.getFullYear();
     const count = await this.invoiceModel.countDocuments({

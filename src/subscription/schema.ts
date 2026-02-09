@@ -186,3 +186,13 @@ export const InvoiceSchema = SchemaFactory.createForClass(Invoice);
 InvoiceSchema.index({ storeId: 1, status: 1, createdAt: -1 });
 InvoiceSchema.index({ dueDate: 1, status: 1 }); // For finding overdue invoices
 InvoiceSchema.index({ invoiceNumber: 1 });
+// Prevent duplicate active invoices for the same billing period
+InvoiceSchema.index(
+  { subscriptionId: 1, periodStart: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      status: { $in: ['pending', 'overdue'] },
+    },
+  },
+);
