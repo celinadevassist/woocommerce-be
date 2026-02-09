@@ -411,6 +411,7 @@ export class BulkUpdateProductDto {
     variation?: boolean;
     options: string[];
   }[];
+  categoryIds?: string[];
   priceAdjustment?: {
     type: 'increase' | 'decrease';
     method: 'percentage' | 'fixed';
@@ -443,6 +444,7 @@ export const BulkUpdateProductSchema = Joi.object().keys({
       }),
     )
     .optional(),
+  categoryIds: Joi.array().items(Joi.string()).optional(),
   priceAdjustment: Joi.object({
     type: Joi.string().valid('increase', 'decrease').required(),
     method: Joi.string().valid('percentage', 'fixed').required(),

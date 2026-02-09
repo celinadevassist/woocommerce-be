@@ -946,6 +946,21 @@ export class ProductService {
           );
         }
 
+        if (dto.categoryIds !== undefined) {
+          const categoryDocs = await this.categoryModel
+            .find({
+              _id: { $in: dto.categoryIds.map((id) => new Types.ObjectId(id)) },
+              storeId: product.storeId,
+              isDeleted: false,
+            })
+            .select('externalId name slug');
+          product.categories = categoryDocs.map((c) => ({
+            externalId: c.externalId,
+            name: c.name || '',
+            slug: c.slug || '',
+          }));
+        }
+
         if (dto.priceAdjustment) {
           const currentPrice = parseFloat(product.regularPrice || '0');
           let adjustment = dto.priceAdjustment.value;
