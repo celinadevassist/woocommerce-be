@@ -874,18 +874,23 @@ export class OrderService {
       // Override to store base currency
       orderData.currency = originalCurrency;
 
-      // The bridge converts shipping lines but has a bug where it doesn't
-      // update the order-level shipping_total field. Compute shipping from
-      // the shipping lines (which ARE correctly converted) instead.
+      // The bridge converts line-level items (shipping_lines, coupon_lines,
+      // fee_lines) but has a bug where it doesn't update the order-level
+      // summary fields (shipping_total, discount_total). Derive these from
+      // the line items which ARE correctly converted.
       const shippingFromLines = (wooOrder.shipping_lines || [])
         .reduce((sum, line) => sum + parseFloat(line.total || '0'), 0);
       const shippingTaxFromLines = (wooOrder.shipping_lines || [])
         .reduce((sum, line) => sum + parseFloat(line.total_tax || '0'), 0);
+      const discountFromLines = (wooOrder.coupon_lines || [])
+        .reduce((sum, line) => sum + parseFloat(line.discount || '0'), 0);
+      const discountTaxFromLines = (wooOrder.coupon_lines || [])
+        .reduce((sum, line) => sum + parseFloat(line.discount_tax || '0'), 0);
 
       // Reverse-convert all totals
       orderData.total = this.reverseConvertAmount(wooOrder.total, exchangeRate, d);
-      orderData.discountTotal = this.reverseConvertAmount(wooOrder.discount_total, exchangeRate, d);
-      orderData.discountTax = this.reverseConvertAmount(wooOrder.discount_tax, exchangeRate, d);
+      orderData.discountTotal = this.reverseConvertAmount(discountFromLines, exchangeRate, d);
+      orderData.discountTax = this.reverseConvertAmount(discountTaxFromLines, exchangeRate, d);
       orderData.shippingTotal = this.reverseConvertAmount(shippingFromLines, exchangeRate, d);
       orderData.shippingTax = this.reverseConvertAmount(shippingTaxFromLines, exchangeRate, d);
       orderData.cartTax = this.reverseConvertAmount(wooOrder.cart_tax, exchangeRate, d);
