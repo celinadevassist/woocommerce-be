@@ -29,6 +29,7 @@ export interface IOrderLineItem {
   localVariantId?: string;
   quantity: number;
   sku?: string;
+  image?: string;
   price: number;
   subtotal: string;
   subtotalTax: string;

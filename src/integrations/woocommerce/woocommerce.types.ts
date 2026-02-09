@@ -313,6 +313,7 @@ export interface WooOrderLineItem {
   total_tax: string;
   sku: string;
   price: number;
+  image?: { id: number; src: string };
   meta_data: WooMetaData[];
 }
 

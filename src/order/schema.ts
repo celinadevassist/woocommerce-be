@@ -74,6 +74,9 @@ export class OrderLineItem {
   sku?: string;
 
   @Prop()
+  image?: string;
+
+  @Prop()
   price: number;
 
   @Prop()
