@@ -875,11 +875,23 @@ export class OrderService {
       orderData.currency = originalCurrency;
 
       // Detect if shipping was actually converted by the bridge.
-      // If shipping_total > total in WooCommerce data, it was NOT converted
-      // (shipping in EGP can't exceed the USD-converted total).
-      const shippingWasConverted =
-        parseFloat(wooOrder.shipping_total || '0') <=
-        parseFloat(wooOrder.total || '0');
+      // Test both interpretations against _cartflow_original_total and
+      // pick whichever makes the math add up.
+      const reversedItemsSum = wooOrder.line_items.reduce(
+        (sum, item) => sum + parseFloat(item.total || '0') / exchangeRate,
+        0,
+      );
+      const shippingAsConverted =
+        parseFloat(wooOrder.shipping_total || '0') / exchangeRate;
+      const shippingAsRaw = parseFloat(wooOrder.shipping_total || '0');
+      const { originalTotal } = conversionMeta;
+      const diffIfConverted = Math.abs(
+        originalTotal - (reversedItemsSum + shippingAsConverted),
+      );
+      const diffIfRaw = Math.abs(
+        originalTotal - (reversedItemsSum + shippingAsRaw),
+      );
+      const shippingWasConverted = diffIfConverted <= diffIfRaw;
 
       // Reverse-convert all totals
       orderData.total = this.reverseConvertAmount(wooOrder.total, exchangeRate, d);
