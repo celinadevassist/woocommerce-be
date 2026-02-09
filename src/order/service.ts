@@ -874,35 +874,20 @@ export class OrderService {
       // Override to store base currency
       orderData.currency = originalCurrency;
 
-      // Detect if shipping was actually converted by the bridge.
-      // Test both interpretations against _cartflow_original_total and
-      // pick whichever makes the math add up.
-      const reversedItemsSum = wooOrder.line_items.reduce(
-        (sum, item) => sum + parseFloat(item.total || '0') / exchangeRate,
-        0,
-      );
-      const shippingAsConverted =
-        parseFloat(wooOrder.shipping_total || '0') / exchangeRate;
-      const shippingAsRaw = parseFloat(wooOrder.shipping_total || '0');
-      const { originalTotal } = conversionMeta;
-      const diffIfConverted = Math.abs(
-        originalTotal - (reversedItemsSum + shippingAsConverted),
-      );
-      const diffIfRaw = Math.abs(
-        originalTotal - (reversedItemsSum + shippingAsRaw),
-      );
-      const shippingWasConverted = diffIfConverted <= diffIfRaw;
+      // The bridge converts shipping lines but has a bug where it doesn't
+      // update the order-level shipping_total field. Compute shipping from
+      // the shipping lines (which ARE correctly converted) instead.
+      const shippingFromLines = (wooOrder.shipping_lines || [])
+        .reduce((sum, line) => sum + parseFloat(line.total || '0'), 0);
+      const shippingTaxFromLines = (wooOrder.shipping_lines || [])
+        .reduce((sum, line) => sum + parseFloat(line.total_tax || '0'), 0);
 
       // Reverse-convert all totals
       orderData.total = this.reverseConvertAmount(wooOrder.total, exchangeRate, d);
       orderData.discountTotal = this.reverseConvertAmount(wooOrder.discount_total, exchangeRate, d);
       orderData.discountTax = this.reverseConvertAmount(wooOrder.discount_tax, exchangeRate, d);
-      orderData.shippingTotal = shippingWasConverted
-        ? this.reverseConvertAmount(wooOrder.shipping_total, exchangeRate, d)
-        : wooOrder.shipping_total;
-      orderData.shippingTax = shippingWasConverted
-        ? this.reverseConvertAmount(wooOrder.shipping_tax, exchangeRate, d)
-        : wooOrder.shipping_tax;
+      orderData.shippingTotal = this.reverseConvertAmount(shippingFromLines, exchangeRate, d);
+      orderData.shippingTax = this.reverseConvertAmount(shippingTaxFromLines, exchangeRate, d);
       orderData.cartTax = this.reverseConvertAmount(wooOrder.cart_tax, exchangeRate, d);
       orderData.totalTax = this.reverseConvertAmount(wooOrder.total_tax, exchangeRate, d);
 
@@ -923,17 +908,13 @@ export class OrderService {
         taxClass: item.tax_class,
       }));
 
-      // Reverse-convert shipping lines (only if shipping was actually converted)
+      // Reverse-convert shipping lines (these are correctly converted by bridge)
       orderData.shippingLines = (wooOrder.shipping_lines || []).map((line) => ({
         externalId: line.id,
         methodTitle: line.method_title,
         methodId: line.method_id,
-        total: shippingWasConverted
-          ? this.reverseConvertAmount(line.total, exchangeRate, d)
-          : line.total,
-        totalTax: shippingWasConverted
-          ? this.reverseConvertAmount(line.total_tax, exchangeRate, d)
-          : line.total_tax,
+        total: this.reverseConvertAmount(line.total, exchangeRate, d),
+        totalTax: this.reverseConvertAmount(line.total_tax, exchangeRate, d),
       }));
 
       // Reverse-convert fee lines
