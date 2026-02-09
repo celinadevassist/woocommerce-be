@@ -712,6 +712,42 @@ export class OrderService {
   }
 
   /**
+   * Reverse-convert an amount from payment currency back to store base currency
+   */
+  private reverseConvertAmount(
+    amount: string | number,
+    rate: number,
+    decimals = 2,
+  ): string {
+    const num = typeof amount === 'number' ? amount : parseFloat(amount);
+    if (isNaN(num) || rate <= 0) return String(amount);
+    return (num / rate).toFixed(decimals);
+  }
+
+  /**
+   * Extract CartFlow Bridge currency conversion metadata from WooCommerce order
+   */
+  private extractCurrencyConversionMeta(
+    metaData: Array<{ key: string; value: any }>,
+  ): {
+    originalCurrency: string;
+    originalTotal: number;
+    exchangeRate: number;
+  } | null {
+    if (!metaData?.length) return null;
+    const get = (key: string) => metaData.find((m) => m.key === key)?.value;
+    const originalCurrency = get('_cartflow_original_currency');
+    const exchangeRate = parseFloat(get('_cartflow_exchange_rate'));
+    if (!originalCurrency || !exchangeRate || exchangeRate <= 0) return null;
+    return {
+      originalCurrency: String(originalCurrency),
+      originalTotal:
+        parseFloat(get('_cartflow_original_total')) || 0,
+      exchangeRate,
+    };
+  }
+
+  /**
    * Upsert order from WooCommerce data (used during sync)
    */
   async upsertFromWoo(
@@ -821,6 +857,73 @@ export class OrderService {
       isDeleted: false,
     };
 
+    // Reverse-convert amounts if CartFlow Bridge currency conversion was applied
+    const conversionMeta = this.extractCurrencyConversionMeta(
+      wooOrder.meta_data || [],
+    );
+    if (conversionMeta) {
+      const { originalCurrency, exchangeRate } = conversionMeta;
+      const d = 2;
+
+      // Save payment gateway info
+      orderData.paidCurrency = wooOrder.currency;
+      orderData.paidTotal = wooOrder.total;
+      orderData.conversionRate = exchangeRate;
+
+      // Override to store base currency
+      orderData.currency = originalCurrency;
+
+      // Reverse-convert all totals
+      orderData.total = this.reverseConvertAmount(wooOrder.total, exchangeRate, d);
+      orderData.discountTotal = this.reverseConvertAmount(wooOrder.discount_total, exchangeRate, d);
+      orderData.discountTax = this.reverseConvertAmount(wooOrder.discount_tax, exchangeRate, d);
+      orderData.shippingTotal = this.reverseConvertAmount(wooOrder.shipping_total, exchangeRate, d);
+      orderData.shippingTax = this.reverseConvertAmount(wooOrder.shipping_tax, exchangeRate, d);
+      orderData.cartTax = this.reverseConvertAmount(wooOrder.cart_tax, exchangeRate, d);
+      orderData.totalTax = this.reverseConvertAmount(wooOrder.total_tax, exchangeRate, d);
+
+      // Reverse-convert line items
+      orderData.lineItems = wooOrder.line_items.map((item) => ({
+        externalId: item.id,
+        name: item.name,
+        productId: item.product_id,
+        variationId: item.variation_id,
+        quantity: item.quantity,
+        sku: item.sku,
+        price: parseFloat(this.reverseConvertAmount(item.price, exchangeRate, d)),
+        subtotal: this.reverseConvertAmount(item.subtotal, exchangeRate, d),
+        subtotalTax: this.reverseConvertAmount(item.subtotal_tax, exchangeRate, d),
+        total: this.reverseConvertAmount(item.total, exchangeRate, d),
+        totalTax: this.reverseConvertAmount(item.total_tax, exchangeRate, d),
+        taxClass: item.tax_class,
+      }));
+
+      // Reverse-convert shipping lines
+      orderData.shippingLines = (wooOrder.shipping_lines || []).map((line) => ({
+        externalId: line.id,
+        methodTitle: line.method_title,
+        methodId: line.method_id,
+        total: this.reverseConvertAmount(line.total, exchangeRate, d),
+        totalTax: this.reverseConvertAmount(line.total_tax, exchangeRate, d),
+      }));
+
+      // Reverse-convert fee lines
+      orderData.feeLines = (wooOrder.fee_lines || []).map((line) => ({
+        externalId: line.id,
+        name: line.name,
+        total: this.reverseConvertAmount(line.total, exchangeRate, d),
+        totalTax: this.reverseConvertAmount(line.total_tax, exchangeRate, d),
+      }));
+
+      // Reverse-convert coupon lines
+      orderData.couponLines = (wooOrder.coupon_lines || []).map((line) => ({
+        externalId: line.id,
+        code: line.code,
+        discount: this.reverseConvertAmount(line.discount, exchangeRate, d),
+        discountTax: this.reverseConvertAmount(line.discount_tax, exchangeRate, d),
+      }));
+    }
+
     // Find or create customer from order billing info (every order must have a customer)
     let localCustomerId: Types.ObjectId | undefined;
     try {
@@ -910,6 +1013,12 @@ export class OrderService {
       // Preserve existing local customer if already set
       if (!localCustomerId && existingOrder.localCustomerId) {
         orderData['localCustomerId'] = existingOrder.localCustomerId;
+      }
+      // Preserve conversion data if not in this sync (e.g. meta_data stripped)
+      if (!orderData.paidCurrency && existingOrder.paidCurrency) {
+        orderData.paidCurrency = existingOrder.paidCurrency;
+        orderData.paidTotal = existingOrder.paidTotal;
+        orderData.conversionRate = existingOrder.conversionRate;
       }
 
       Object.assign(existingOrder, orderData);
@@ -1094,11 +1203,19 @@ export class OrderService {
             consumerSecret: store.credentials.consumerSecret,
           };
 
+          // Convert refund amount to payment currency if order was converted
+          let wooRefundAmount = dto.amount;
+          if (order.conversionRate && order.paidCurrency) {
+            wooRefundAmount = (
+              parseFloat(dto.amount) * order.conversionRate
+            ).toFixed(2);
+          }
+
           const wooRefund = await this.wooCommerceService.createRefund(
             credentials,
             order.externalId,
             {
-              amount: dto.amount,
+              amount: wooRefundAmount,
               reason: dto.reason,
               api_refund: dto.apiRefund ?? false,
             },
@@ -1938,6 +2055,9 @@ export class OrderService {
       fulfillmentStatus: obj.fulfillmentStatus,
       currency: obj.currency,
       currencySymbol: obj.currencySymbol,
+      paidCurrency: obj.paidCurrency,
+      paidTotal: obj.paidTotal,
+      conversionRate: obj.conversionRate,
       pricesIncludeTax: obj.pricesIncludeTax,
       discountTotal: obj.discountTotal,
       discountTax: obj.discountTax,

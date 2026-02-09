@@ -114,6 +114,9 @@ export interface IOrder {
   fulfillmentStatus: FulfillmentStatus;
   currency: string;
   currencySymbol?: string;
+  paidCurrency?: string;
+  paidTotal?: string;
+  conversionRate?: number;
   pricesIncludeTax?: boolean;
   discountTotal?: string;
   discountTax?: string;

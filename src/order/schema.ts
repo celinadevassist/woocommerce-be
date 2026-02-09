@@ -266,6 +266,15 @@ export class Order extends Document {
   @Prop()
   currencySymbol?: string;
 
+  @Prop()
+  paidCurrency?: string;
+
+  @Prop()
+  paidTotal?: string;
+
+  @Prop()
+  conversionRate?: number;
+
   @Prop({ default: false })
   pricesIncludeTax: boolean;
 
