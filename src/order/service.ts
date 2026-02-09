@@ -874,12 +874,23 @@ export class OrderService {
       // Override to store base currency
       orderData.currency = originalCurrency;
 
+      // Detect if shipping was actually converted by the bridge.
+      // If shipping_total > total in WooCommerce data, it was NOT converted
+      // (shipping in EGP can't exceed the USD-converted total).
+      const shippingWasConverted =
+        parseFloat(wooOrder.shipping_total || '0') <=
+        parseFloat(wooOrder.total || '0');
+
       // Reverse-convert all totals
       orderData.total = this.reverseConvertAmount(wooOrder.total, exchangeRate, d);
       orderData.discountTotal = this.reverseConvertAmount(wooOrder.discount_total, exchangeRate, d);
       orderData.discountTax = this.reverseConvertAmount(wooOrder.discount_tax, exchangeRate, d);
-      orderData.shippingTotal = this.reverseConvertAmount(wooOrder.shipping_total, exchangeRate, d);
-      orderData.shippingTax = this.reverseConvertAmount(wooOrder.shipping_tax, exchangeRate, d);
+      orderData.shippingTotal = shippingWasConverted
+        ? this.reverseConvertAmount(wooOrder.shipping_total, exchangeRate, d)
+        : wooOrder.shipping_total;
+      orderData.shippingTax = shippingWasConverted
+        ? this.reverseConvertAmount(wooOrder.shipping_tax, exchangeRate, d)
+        : wooOrder.shipping_tax;
       orderData.cartTax = this.reverseConvertAmount(wooOrder.cart_tax, exchangeRate, d);
       orderData.totalTax = this.reverseConvertAmount(wooOrder.total_tax, exchangeRate, d);
 
@@ -900,13 +911,17 @@ export class OrderService {
         taxClass: item.tax_class,
       }));
 
-      // Reverse-convert shipping lines
+      // Reverse-convert shipping lines (only if shipping was actually converted)
       orderData.shippingLines = (wooOrder.shipping_lines || []).map((line) => ({
         externalId: line.id,
         methodTitle: line.method_title,
         methodId: line.method_id,
-        total: this.reverseConvertAmount(line.total, exchangeRate, d),
-        totalTax: this.reverseConvertAmount(line.total_tax, exchangeRate, d),
+        total: shippingWasConverted
+          ? this.reverseConvertAmount(line.total, exchangeRate, d)
+          : line.total,
+        totalTax: shippingWasConverted
+          ? this.reverseConvertAmount(line.total_tax, exchangeRate, d)
+          : line.total_tax,
       }));
 
       // Reverse-convert fee lines
