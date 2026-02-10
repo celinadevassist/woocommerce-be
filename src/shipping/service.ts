@@ -204,11 +204,29 @@ export class ShippingService {
         },
       );
 
+      // Attempt to clear WooCommerce's auto-assigned default locations
+      try {
+        await this.wooCommerceService.updateShippingZoneLocations(
+          credentials,
+          zone.id,
+          [],
+        );
+      } catch (e) {
+        // WooCommerce may reject empty locations — that's fine
+      }
+
+      // Fetch actual locations (WooCommerce may have kept the default)
+      const locations =
+        await this.wooCommerceService.getShippingZoneLocations(
+          credentials,
+          zone.id,
+        );
+
       return {
         id: zone.id,
         name: zone.name,
         order: zone.order,
-        locations: [],
+        locations: locations as IShippingZoneLocation[],
         methods: [],
       };
     } catch (error) {
