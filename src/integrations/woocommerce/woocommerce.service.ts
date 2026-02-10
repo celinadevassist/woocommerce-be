@@ -1667,6 +1667,19 @@ export class WooCommerceService implements IPlatformAdapter {
   }
 
   /**
+   * Get all hidden states from CartFlow plugin
+   */
+  async getHiddenStates(
+    credentials: WooCommerceCredentials,
+  ): Promise<Record<string, string[]>> {
+    return this.cartflowRequest<Record<string, string[]>>(
+      credentials,
+      'GET',
+      'locations/hidden-states',
+    );
+  }
+
+  /**
    * Get all countries with states (including custom) from CartFlow Locations plugin
    */
   async getCountriesWithCustomStates(

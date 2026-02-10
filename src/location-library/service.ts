@@ -285,7 +285,8 @@ export class LocationLibraryService {
   /**
    * Toggle state enabled/disabled and sync the change to WooCommerce.
    * Uses the CartFlow plugin's visibility endpoint to hide/show states
-   * from the WooCommerce checkout dropdown.
+   * from the WooCommerce checkout dropdown. Verifies the change took
+   * effect and reverts the local DB if WooCommerce didn't apply it.
    */
   async toggleStateEnabled(
     userId: string,
@@ -294,22 +295,38 @@ export class LocationLibraryService {
     storeId: string,
   ): Promise<LocalStateDocument> {
     const state = await this.getState(userId, stateId);
+    const previousEnabled = state.enabled;
     state.enabled = enabled;
     await state.save();
 
     try {
-      await this.shippingService.setStateVisibility(
+      const result = await this.shippingService.setStateVisibility(
         storeId,
         userId,
         state.countryCode,
         state.stateCode,
         enabled,
       );
+
+      if (!result.verified) {
+        // WooCommerce didn't actually apply the change — revert local DB
+        state.enabled = previousEnabled;
+        await state.save();
+        throw new Error(
+          `WooCommerce did not apply the visibility change for ${state.countryCode}:${state.stateCode}. The state may be controlled by another plugin or theme.`,
+        );
+      }
     } catch (error) {
+      if (error.message?.includes('WooCommerce did not apply')) {
+        throw error;
+      }
+      // Revert local DB on any sync failure
+      state.enabled = previousEnabled;
+      await state.save();
       this.logger.warn(
-        `Failed to sync state visibility to WooCommerce: ${error.message}`,
+        `Failed to sync state visibility to WooCommerce, reverted local change: ${error.message}`,
       );
-      // Don't revert the local change — the user can re-sync later
+      throw error;
     }
 
     return (await state.populate('groups')) as LocalStateDocument;

@@ -732,7 +732,8 @@ export class ShippingService {
   }
 
   /**
-   * Set state visibility in WooCommerce checkout via CartFlow plugin
+   * Set state visibility in WooCommerce checkout via CartFlow plugin,
+   * then verify by reading back the hidden states list.
    */
   async setStateVisibility(
     storeId: string,
@@ -742,6 +743,7 @@ export class ShippingService {
     visible: boolean,
   ): Promise<{
     success: boolean;
+    verified: boolean;
     message: string;
     country_code: string;
     state_code: string;
@@ -750,12 +752,27 @@ export class ShippingService {
     const credentials = await this.getStoreCredentials(storeId, userId);
 
     try {
-      return await this.wooCommerceService.setStateVisibility(
+      const result = await this.wooCommerceService.setStateVisibility(
         credentials,
         countryCode,
         stateCode,
         visible,
       );
+
+      // Verify by reading back the hidden states
+      const hiddenStates =
+        await this.wooCommerceService.getHiddenStates(credentials);
+      const countryHidden = hiddenStates[countryCode] || [];
+      const isHidden = countryHidden.includes(stateCode);
+      const verified = visible ? !isHidden : isHidden;
+
+      if (!verified) {
+        this.logger.warn(
+          `State visibility verification failed: ${countryCode}:${stateCode} expected ${visible ? 'visible' : 'hidden'} but found ${isHidden ? 'hidden' : 'visible'}`,
+        );
+      }
+
+      return { ...result, verified };
     } catch (error) {
       if (error.response?.status === 404) {
         throw new InvalidInputException(
