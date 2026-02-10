@@ -97,6 +97,9 @@ export class OrderLineItem {
   @Prop({ type: Object })
   metaData?: Record<string, any>;
 
+  @Prop({ type: Object })
+  attributes?: Record<string, string>;
+
   // Unit tracking for fulfillment
   @Prop({
     type: [{ type: MongooseSchema.Types.ObjectId, ref: 'ProductUnit' }],

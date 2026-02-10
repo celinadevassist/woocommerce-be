@@ -724,6 +724,22 @@ export class OrderService {
     return (num / rate).toFixed(decimals);
   }
 
+  private extractVariantAttributes(
+    metaData: any[],
+  ): Record<string, string> | undefined {
+    if (!metaData?.length) return undefined;
+    const attrs: Record<string, string> = {};
+    for (const meta of metaData) {
+      if (
+        meta.key?.startsWith('pa_') ||
+        (meta.display_key && meta.display_key !== meta.key)
+      ) {
+        attrs[meta.display_key || meta.key] = meta.display_value || meta.value;
+      }
+    }
+    return Object.keys(attrs).length > 0 ? attrs : undefined;
+  }
+
   /**
    * Extract CartFlow Bridge currency conversion metadata from WooCommerce order
    */
@@ -828,6 +844,8 @@ export class OrderService {
         total: item.total,
         totalTax: item.total_tax,
         taxClass: item.tax_class,
+        attributes: this.extractVariantAttributes(item.meta_data),
+        metaData: item.meta_data,
       })),
       shippingLines:
         wooOrder.shipping_lines?.map((line) => ({
@@ -911,6 +929,8 @@ export class OrderService {
         total: this.reverseConvertAmount(item.total, exchangeRate, d),
         totalTax: this.reverseConvertAmount(item.total_tax, exchangeRate, d),
         taxClass: item.tax_class,
+        attributes: this.extractVariantAttributes(item.meta_data),
+        metaData: item.meta_data,
       }));
 
       // Reverse-convert shipping lines (these are correctly converted by bridge)
