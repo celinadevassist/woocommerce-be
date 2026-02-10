@@ -1044,8 +1044,16 @@ class CartFlow_Bridge {
         update_option('cartflow_hidden_states', $hidden);
         $this->clear_wc_cache();
 
+        // Verify by reading back from DB (same request, no cache issues)
+        wp_cache_delete('cartflow_hidden_states', 'options');
+        $saved = get_option('cartflow_hidden_states', array());
+        $country_hidden = isset($saved[$country_code]) ? $saved[$country_code] : array();
+        $is_hidden = in_array($state_code, $country_hidden);
+        $verified = $visible ? !$is_hidden : $is_hidden;
+
         return rest_ensure_response(array(
             'success' => true,
+            'verified' => $verified,
             'message' => $visible
                 ? sprintf(__('State %s:%s is now visible in checkout.', 'cartflow-bridge'), $country_code, $state_code)
                 : sprintf(__('State %s:%s is now hidden from checkout.', 'cartflow-bridge'), $country_code, $state_code),

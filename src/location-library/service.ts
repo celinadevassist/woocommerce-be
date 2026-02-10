@@ -293,12 +293,11 @@ export class LocationLibraryService {
     stateId: string,
     enabled: boolean,
     storeId: string,
-  ): Promise<LocalStateDocument> {
+  ) {
     const state = await this.getState(userId, stateId);
-    const previousEnabled = state.enabled;
-    state.enabled = enabled;
-    await state.save();
 
+    // WooCommerce is the source of truth — sync there first
+    let verified = true;
     try {
       const result = await this.shippingService.setStateVisibility(
         storeId,
@@ -307,29 +306,24 @@ export class LocationLibraryService {
         state.stateCode,
         enabled,
       );
-
-      if (!result.verified) {
-        // WooCommerce didn't actually apply the change — revert local DB
-        state.enabled = previousEnabled;
-        await state.save();
-        throw new Error(
-          `WooCommerce did not apply the visibility change for ${state.countryCode}:${state.stateCode}. The state may be controlled by another plugin or theme.`,
-        );
-      }
+      verified = result.verified;
     } catch (error) {
-      if (error.message?.includes('WooCommerce did not apply')) {
-        throw error;
-      }
-      // Revert local DB on any sync failure
-      state.enabled = previousEnabled;
-      await state.save();
       this.logger.warn(
-        `Failed to sync state visibility to WooCommerce, reverted local change: ${error.message}`,
+        `Failed to sync state visibility to WooCommerce: ${error.message}`,
       );
-      throw error;
+      throw new BadRequestException(
+        `Failed to sync to WooCommerce: ${error.message}`,
+      );
     }
 
-    return (await state.populate('groups')) as LocalStateDocument;
+    // Only update local DB if WooCommerce confirmed the change
+    if (verified) {
+      state.enabled = enabled;
+      await state.save();
+    }
+
+    const populated = (await state.populate('groups')) as LocalStateDocument;
+    return { ...populated.toObject(), verified };
   }
 
   // ============== COUNTRIES SUMMARY ==============

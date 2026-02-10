@@ -1653,6 +1653,7 @@ export class WooCommerceService implements IPlatformAdapter {
     visible: boolean,
   ): Promise<{
     success: boolean;
+    verified: boolean;
     message: string;
     country_code: string;
     state_code: string;

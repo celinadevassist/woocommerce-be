@@ -759,16 +759,12 @@ export class ShippingService {
         visible,
       );
 
-      // Verify by reading back the hidden states
-      const hiddenStates =
-        await this.wooCommerceService.getHiddenStates(credentials);
-      const countryHidden = hiddenStates[countryCode] || [];
-      const isHidden = countryHidden.includes(stateCode);
-      const verified = visible ? !isHidden : isHidden;
+      // Use the verified field from the plugin response (verified in same PHP request)
+      const verified = result.verified !== false;
 
       if (!verified) {
         this.logger.warn(
-          `State visibility verification failed: ${countryCode}:${stateCode} expected ${visible ? 'visible' : 'hidden'} but found ${isHidden ? 'hidden' : 'visible'}`,
+          `State visibility verification failed: ${countryCode}:${stateCode} — plugin could not confirm the change was saved`,
         );
       }
 
