@@ -73,7 +73,7 @@ export class PluginsController {
     @Param('pluginId') pluginId: string,
     @Res() res: Response,
   ) {
-    const allowedPlugins = ['cartflow-bridge', 'cartflow-locations'];
+    const allowedPlugins = ['cartflow-bridge'];
 
     if (!allowedPlugins.includes(pluginId)) {
       return res.status(404).json({ error: 'Plugin not found' });
