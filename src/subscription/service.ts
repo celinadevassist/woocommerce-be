@@ -167,18 +167,34 @@ export class SubscriptionService {
     // Due date is immediate - no grace period, store is blocked until paid
     const dueDate = now;
 
+    // Calculate effective amount (apply discount if any)
+    const discount = subscription.discount || 0;
+    const amount =
+      discount > 0
+        ? Math.round(subscription.pricePerMonth * (1 - discount / 100) * 100) /
+          100
+        : subscription.pricePerMonth;
+
+    // Auto-mark as paid if amount is zero (free plan / 100% discount)
+    const isZeroAmount = amount <= 0;
+
     const invoice = await this.invoiceModel.create({
       invoiceNumber,
       storeId: subscription.storeId,
       subscriptionId: subscription._id,
-      status: InvoiceStatus.PENDING,
+      status: isZeroAmount ? InvoiceStatus.PAID : InvoiceStatus.PENDING,
       periodStart,
       periodEnd,
-      amount: subscription.pricePerMonth,
+      amount,
       currency: subscription.currency,
       dueDate,
       storeName,
       storeUrl,
+      ...(isZeroAmount && {
+        paidAt: now,
+        paymentMethod: 'zero_amount',
+        paymentReference: 'Auto-paid: $0 invoice',
+      }),
     });
 
     // Update subscription with new billing cycle
@@ -191,7 +207,7 @@ export class SubscriptionService {
     await subscription.save();
 
     this.logger.log(
-      `Generated invoice ${invoiceNumber} for store ${subscription.storeId}, amount: $${subscription.pricePerMonth}. Store blocked until payment.`,
+      `Generated invoice ${invoiceNumber} for store ${subscription.storeId}, amount: $${amount}${isZeroAmount ? ' (auto-paid)' : '. Store blocked until payment.'}`,
     );
     return invoice;
   }
