@@ -213,6 +213,7 @@ export class LocationLibraryService {
     }
 
     if (dto.stateName) state.stateName = dto.stateName;
+    if (dto.enabled !== undefined) state.enabled = dto.enabled;
     if (dto.order !== undefined) state.order = dto.order;
     if (dto.notes !== undefined) state.notes = dto.notes;
 
@@ -281,6 +282,39 @@ export class LocationLibraryService {
     return { created, skipped, states: results };
   }
 
+  /**
+   * Toggle state enabled/disabled and sync the change to WooCommerce.
+   * Uses the CartFlow plugin's visibility endpoint to hide/show states
+   * from the WooCommerce checkout dropdown.
+   */
+  async toggleStateEnabled(
+    userId: string,
+    stateId: string,
+    enabled: boolean,
+    storeId: string,
+  ): Promise<LocalStateDocument> {
+    const state = await this.getState(userId, stateId);
+    state.enabled = enabled;
+    await state.save();
+
+    try {
+      await this.shippingService.setStateVisibility(
+        storeId,
+        userId,
+        state.countryCode,
+        state.stateCode,
+        enabled,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Failed to sync state visibility to WooCommerce: ${error.message}`,
+      );
+      // Don't revert the local change — the user can re-sync later
+    }
+
+    return (await state.populate('groups')) as LocalStateDocument;
+  }
+
   // ============== COUNTRIES SUMMARY ==============
 
   async getCountriesSummary(
@@ -336,24 +370,17 @@ export class LocationLibraryService {
     groupsSynced: number;
     message: string;
   }> {
-    // Get states to sync (with populated groups)
+    // Get states to sync (with populated groups), only enabled states
     let states: LocalStateDocument[];
+    const baseQuery: any = {
+      ownerId: new Types.ObjectId(userId),
+      countryCode: countryCode.toUpperCase(),
+      enabled: { $ne: false },
+    };
     if (stateIds && stateIds.length > 0) {
-      states = await this.localStateModel
-        .find({
-          _id: { $in: stateIds.map((id) => new Types.ObjectId(id)) },
-          ownerId: new Types.ObjectId(userId),
-          countryCode: countryCode.toUpperCase(),
-        })
-        .populate('groups');
-    } else {
-      states = await this.localStateModel
-        .find({
-          ownerId: new Types.ObjectId(userId),
-          countryCode: countryCode.toUpperCase(),
-        })
-        .populate('groups');
+      baseQuery._id = { $in: stateIds.map((id) => new Types.ObjectId(id)) };
     }
+    states = await this.localStateModel.find(baseQuery).populate('groups');
 
     if (states.length === 0) {
       throw new BadRequestException('No states found to sync');
@@ -421,6 +448,7 @@ export class LocationLibraryService {
       'Original Name',
       'Groups',
       'Type',
+      'Enabled',
       'Order',
       'Notes',
     ];
@@ -432,6 +460,7 @@ export class LocationLibraryService {
       state.originalName || '',
       (state.groups as any[]).map((g) => g.name).join('; '),
       state.isNew ? 'New' : 'Override',
+      state.enabled !== false ? 'Yes' : 'No',
       state.order ?? 0,
       state.notes || '',
     ]);
@@ -496,6 +525,7 @@ export class LocationLibraryService {
     const originalNameIdx = headerMap.get('original name');
     const groupsIdx = headerMap.get('groups');
     const typeIdx = headerMap.get('type');
+    const enabledIdx = headerMap.get('enabled');
     const orderIdx = headerMap.get('order');
     const notesIdx = headerMap.get('notes');
 
@@ -572,6 +602,10 @@ export class LocationLibraryService {
           typeIdx !== undefined
             ? fields[typeIdx]?.trim().toLowerCase() === 'new'
             : false;
+        const enabled =
+          enabledIdx !== undefined
+            ? fields[enabledIdx]?.trim().toLowerCase() !== 'no'
+            : true;
         const order =
           orderIdx !== undefined
             ? parseInt(fields[orderIdx]?.trim(), 10) || 0
@@ -595,6 +629,7 @@ export class LocationLibraryService {
           if (originalName) existing.originalName = originalName;
           existing.groups = groupIds as any;
           existing.isNew = isNew;
+          existing.enabled = enabled;
           existing.order = order;
           if (notes) existing.notes = notes;
           await existing.save();
@@ -607,6 +642,7 @@ export class LocationLibraryService {
             originalName: originalName || undefined,
             groups: groupIds,
             isNew,
+            enabled,
             order,
             notes: notes || undefined,
             ownerId: new Types.ObjectId(userId),

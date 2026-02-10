@@ -28,7 +28,7 @@ export class PluginsController {
 
   // Latest plugin versions - update these when releasing new versions
   private readonly latestVersions = {
-    'cartflow-bridge': '1.2.0',
+    'cartflow-bridge': '1.3.0',
   };
 
   @Get()
@@ -50,6 +50,7 @@ export class PluginsController {
           'Control User Registration & Default Roles',
           'Update WooCommerce Store Settings',
           'Add Custom States/Locations for Shipping',
+          'State Visibility: Hide/show states from WooCommerce checkout',
           'Access System Info (PHP, MySQL, Plugins, Themes)',
         ],
         requirements: [
@@ -138,6 +139,15 @@ export class PluginsController {
         author: 'CartFlow',
         license: 'GPL v2 or later',
         changelog: [
+          {
+            version: '1.3.0',
+            changes: [
+              'Added state visibility toggle: hide/show any state (built-in or custom) from WooCommerce checkout',
+              'New REST endpoint: PUT /locations/states/{country}/{state}/visibility',
+              'New REST endpoint: GET /locations/hidden-states',
+              'Hidden states are filtered from the woocommerce_states hook',
+            ],
+          },
           {
             version: '1.2.0',
             changes: [
@@ -230,6 +240,19 @@ export class PluginsController {
             methods: ['GET', 'POST', 'PUT', 'DELETE'],
             path: '/wp-json/cartflow/v1/locations/states',
             description: 'Manage custom states for shipping zones',
+          },
+          {
+            category: 'State Visibility',
+            methods: ['PUT'],
+            path: '/wp-json/cartflow/v1/locations/states/{country}/{state}/visibility',
+            description:
+              'Hide/show a state from WooCommerce checkout (works for built-in and custom states)',
+          },
+          {
+            category: 'State Visibility',
+            methods: ['GET'],
+            path: '/wp-json/cartflow/v1/locations/hidden-states',
+            description: 'Get all hidden states',
           },
           {
             category: 'System Info',

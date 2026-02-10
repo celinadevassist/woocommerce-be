@@ -3,7 +3,7 @@
  * Plugin Name: CartFlow Bridge
  * Plugin URI: https://cartflow.app
  * Description: REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, and checkout currency conversion
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: CartFlow
  * Author URI: https://cartflow.app
  * License: GPL v2 or later
@@ -218,6 +218,20 @@ class CartFlow_Bridge {
         register_rest_route($this->namespace, '/locations/countries', array(
             'methods' => 'GET',
             'callback' => array($this, 'get_countries'),
+            'permission_callback' => array($this, 'check_permission'),
+        ));
+
+        // ==================== STATE VISIBILITY ====================
+
+        register_rest_route($this->namespace, '/locations/states/(?P<country_code>[A-Z]{2})/(?P<state_code>[A-Za-z0-9_-]+)/visibility', array(
+            'methods' => 'PUT',
+            'callback' => array($this, 'set_state_visibility'),
+            'permission_callback' => array($this, 'check_permission'),
+        ));
+
+        register_rest_route($this->namespace, '/locations/hidden-states', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'get_hidden_states'),
             'permission_callback' => array($this, 'check_permission'),
         ));
 
@@ -998,6 +1012,51 @@ class CartFlow_Bridge {
             'message' => sprintf(__('%d states updated for %s.', 'cartflow-bridge'), count($new_states), $country_code),
             'groups_synced' => count($groups),
         ));
+    }
+
+    // ==================== STATE VISIBILITY ====================
+
+    public function set_state_visibility($request) {
+        $country_code = strtoupper($request->get_param('country_code'));
+        $state_code = $request->get_param('state_code');
+        $params = $request->get_json_params();
+        $visible = isset($params['visible']) ? (bool) $params['visible'] : true;
+
+        $hidden = get_option('cartflow_hidden_states', array());
+
+        if (!isset($hidden[$country_code])) {
+            $hidden[$country_code] = array();
+        }
+
+        if ($visible) {
+            // Remove from hidden list
+            $hidden[$country_code] = array_values(array_diff($hidden[$country_code], array($state_code)));
+            if (empty($hidden[$country_code])) {
+                unset($hidden[$country_code]);
+            }
+        } else {
+            // Add to hidden list
+            if (!in_array($state_code, $hidden[$country_code])) {
+                $hidden[$country_code][] = $state_code;
+            }
+        }
+
+        update_option('cartflow_hidden_states', $hidden);
+        $this->clear_wc_cache();
+
+        return rest_ensure_response(array(
+            'success' => true,
+            'message' => $visible
+                ? sprintf(__('State %s:%s is now visible in checkout.', 'cartflow-bridge'), $country_code, $state_code)
+                : sprintf(__('State %s:%s is now hidden from checkout.', 'cartflow-bridge'), $country_code, $state_code),
+            'country_code' => $country_code,
+            'state_code' => $state_code,
+            'visible' => $visible,
+        ));
+    }
+
+    public function get_hidden_states($request) {
+        return rest_ensure_response(get_option('cartflow_hidden_states', array()));
     }
 
     // ==================== STATE GROUPS ====================
@@ -1917,8 +1976,9 @@ class CartFlow_Bridge {
     }
 }
 
-// Inject custom states into WooCommerce
+// Inject custom states into WooCommerce and remove hidden states
 add_filter('woocommerce_states', function($states) {
+    // Add custom states
     $custom_states = get_option('cartflow_custom_states', array());
     foreach ($custom_states as $country_code => $country_states) {
         if (!isset($states[$country_code])) {
@@ -1931,6 +1991,17 @@ add_filter('woocommerce_states', function($states) {
             asort($states[$country_code]);
         }
     }
+
+    // Remove hidden states (works for both built-in and custom states)
+    $hidden_states = get_option('cartflow_hidden_states', array());
+    foreach ($hidden_states as $country_code => $hidden_codes) {
+        if (isset($states[$country_code]) && is_array($hidden_codes)) {
+            foreach ($hidden_codes as $state_code) {
+                unset($states[$country_code][$state_code]);
+            }
+        }
+    }
+
     return $states;
 });
 

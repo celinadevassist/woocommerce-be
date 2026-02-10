@@ -732,6 +732,46 @@ export class ShippingService {
   }
 
   /**
+   * Set state visibility in WooCommerce checkout via CartFlow plugin
+   */
+  async setStateVisibility(
+    storeId: string,
+    userId: string,
+    countryCode: string,
+    stateCode: string,
+    visible: boolean,
+  ): Promise<{
+    success: boolean;
+    message: string;
+    country_code: string;
+    state_code: string;
+    visible: boolean;
+  }> {
+    const credentials = await this.getStoreCredentials(storeId, userId);
+
+    try {
+      return await this.wooCommerceService.setStateVisibility(
+        credentials,
+        countryCode,
+        stateCode,
+        visible,
+      );
+    } catch (error) {
+      if (error.response?.status === 404) {
+        throw new InvalidInputException(
+          'CartFlow Locations plugin',
+          'plugin v1.1.0+ is required for state visibility',
+        );
+      }
+      this.logger.error(
+        `Failed to set state visibility: ${error.message}`,
+        error.stack,
+      );
+      throw new SystemErrorException('set state visibility', error.message);
+    }
+  }
+
+  /**
    * Get all countries with custom states (uses CartFlow plugin endpoint)
    */
   async getCountriesWithCustomStates(

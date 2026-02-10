@@ -76,6 +76,9 @@ export class CreateLocalStateDto {
   @ApiPropertyOptional({ example: false })
   isNew?: boolean;
 
+  @ApiPropertyOptional({ example: true })
+  enabled?: boolean;
+
   @ApiPropertyOptional({ example: 0 })
   order?: number;
 
@@ -90,6 +93,7 @@ export const CreateLocalStateSchema = Joi.object({
   originalName: Joi.string().optional().allow('').max(200),
   groups: Joi.array().items(Joi.string().hex().length(24)).optional(),
   isNew: Joi.boolean().optional(),
+  enabled: Joi.boolean().optional(),
   order: Joi.number().optional().min(0),
   notes: Joi.string().optional().allow('').max(500),
 });
@@ -101,6 +105,9 @@ export class UpdateLocalStateDto {
   @ApiPropertyOptional({ example: ['groupId1', 'groupId2'] })
   groups?: string[];
 
+  @ApiPropertyOptional({ example: true })
+  enabled?: boolean;
+
   @ApiPropertyOptional({ example: 1 })
   order?: number;
 
@@ -111,6 +118,7 @@ export class UpdateLocalStateDto {
 export const UpdateLocalStateSchema = Joi.object({
   stateName: Joi.string().optional().min(1).max(200),
   groups: Joi.array().items(Joi.string().hex().length(24)).optional(),
+  enabled: Joi.boolean().optional(),
   order: Joi.number().optional().min(0),
   notes: Joi.string().optional().allow('').max(500),
 });

@@ -313,6 +313,30 @@ export class LocationLibraryController {
     );
   }
 
+  @Put('states/:stateId/toggle-enabled')
+  @ApiOperation({
+    summary: 'Toggle state enabled/disabled and sync to WooCommerce',
+  })
+  @ApiResponse({ status: 200, description: 'State toggled' })
+  @ApiQuery({ name: 'storeId', required: true })
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async toggleStateEnabled(
+    @User() user: UserDocument,
+    @Param('stateId') stateId: string,
+    @Query('storeId') storeId: string,
+    @Body() body: { enabled: boolean },
+  ) {
+    if (!storeId) {
+      throw new BadRequestException('storeId is required');
+    }
+    return this.locationLibraryService.toggleStateEnabled(
+      user._id.toString(),
+      stateId,
+      body.enabled,
+      storeId,
+    );
+  }
+
   @Delete('states/:stateId')
   @ApiOperation({ summary: 'Delete a local state' })
   @ApiResponse({ status: 200, description: 'State deleted' })

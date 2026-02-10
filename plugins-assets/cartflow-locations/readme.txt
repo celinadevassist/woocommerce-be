@@ -4,7 +4,7 @@ Tags: woocommerce, shipping, locations, states, countries
 Requires at least: 5.0
 Tested up to: 6.4
 Requires PHP: 7.4
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -18,6 +18,7 @@ custom states/regions for WooCommerce shipping zones via a REST API.
 **Features:**
 
 * REST API endpoints for managing custom locations
+* Hide/show states from WooCommerce checkout (built-in and custom)
 * Automatic injection of custom states into WooCommerce
 * Multiple authentication methods (WC API, Application Passwords, API Key)
 * Admin interface for manual management
@@ -75,7 +76,24 @@ All endpoints require authentication. Use one of:
 **Get all countries with states:**
 `GET /wp-json/cartflow/v1/locations/countries`
 
+**Hide/show a state from checkout:**
+`PUT /wp-json/cartflow/v1/locations/states/{country_code}/{state_code}/visibility`
+```json
+{
+  "visible": false
+}
+```
+
+**Get hidden states:**
+`GET /wp-json/cartflow/v1/locations/hidden-states`
+
 == Changelog ==
+
+= 1.1.0 =
+* Added state visibility toggle — hide/show any state (built-in or custom) from WooCommerce checkout
+* New REST endpoint: PUT /locations/states/{country}/{state}/visibility
+* New REST endpoint: GET /locations/hidden-states
+* Hidden states are filtered from woocommerce_states hook
 
 = 1.0.0 =
 * Initial release

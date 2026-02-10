@@ -42,6 +42,13 @@ export class LocalState {
   @Prop({ default: false })
   isNew: boolean;
 
+  @ApiProperty({
+    description: 'Whether this state is enabled for WooCommerce checkout',
+    default: true,
+  })
+  @Prop({ default: true })
+  enabled: boolean;
+
   @ApiProperty({ description: 'Display order within country' })
   @Prop({ default: 0 })
   order: number;

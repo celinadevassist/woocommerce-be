@@ -1644,6 +1644,29 @@ export class WooCommerceService implements IPlatformAdapter {
   }
 
   /**
+   * Set state visibility in WooCommerce checkout via CartFlow Locations plugin
+   */
+  async setStateVisibility(
+    credentials: WooCommerceCredentials,
+    countryCode: string,
+    stateCode: string,
+    visible: boolean,
+  ): Promise<{
+    success: boolean;
+    message: string;
+    country_code: string;
+    state_code: string;
+    visible: boolean;
+  }> {
+    return this.cartflowRequest(
+      credentials,
+      'PUT',
+      `locations/states/${countryCode}/${stateCode}/visibility`,
+      { visible },
+    );
+  }
+
+  /**
    * Get all countries with states (including custom) from CartFlow Locations plugin
    */
   async getCountriesWithCustomStates(

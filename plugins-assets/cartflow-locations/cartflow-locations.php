@@ -3,7 +3,7 @@
  * Plugin Name: CartFlow Custom Locations
  * Plugin URI: https://cartflow.app
  * Description: Allows CartFlow to manage custom countries and states via REST API
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: CartFlow
  * Author URI: https://cartflow.app
  * License: GPL v2 or later
@@ -18,6 +18,7 @@ class CartFlow_Custom_Locations {
 
     private static $instance = null;
     private $option_name = 'cartflow_custom_states';
+    private $hidden_option_name = 'cartflow_hidden_states';
 
     public static function get_instance() {
         if (null === self::$instance) {
@@ -106,6 +107,26 @@ class CartFlow_Custom_Locations {
                     'type' => 'array',
                 ),
             ),
+        ));
+
+        // Set state visibility (hide/show in checkout)
+        register_rest_route($namespace, '/locations/states/(?P<country_code>[A-Z]{2})/(?P<state_code>[A-Za-z0-9_-]+)/visibility', array(
+            'methods' => 'PUT',
+            'callback' => array($this, 'set_state_visibility'),
+            'permission_callback' => array($this, 'check_api_permission'),
+            'args' => array(
+                'visible' => array(
+                    'required' => true,
+                    'type' => 'boolean',
+                ),
+            ),
+        ));
+
+        // Get hidden states
+        register_rest_route($namespace, '/locations/hidden-states', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'get_hidden_states'),
+            'permission_callback' => array($this, 'check_api_permission'),
         ));
 
         // Get all countries (WooCommerce + custom)
@@ -316,6 +337,56 @@ class CartFlow_Custom_Locations {
     }
 
     /**
+     * Set state visibility (hide/show from checkout)
+     * Works for both built-in WooCommerce states and custom states
+     */
+    public function set_state_visibility($request) {
+        $country_code = strtoupper($request->get_param('country_code'));
+        $state_code = $request->get_param('state_code');
+        $visible = $request->get_param('visible');
+
+        $hidden = get_option($this->hidden_option_name, array());
+
+        if (!isset($hidden[$country_code])) {
+            $hidden[$country_code] = array();
+        }
+
+        if ($visible) {
+            // Remove from hidden list
+            $hidden[$country_code] = array_values(array_diff($hidden[$country_code], array($state_code)));
+            if (empty($hidden[$country_code])) {
+                unset($hidden[$country_code]);
+            }
+        } else {
+            // Add to hidden list
+            if (!in_array($state_code, $hidden[$country_code])) {
+                $hidden[$country_code][] = $state_code;
+            }
+        }
+
+        update_option($this->hidden_option_name, $hidden);
+        $this->clear_wc_cache();
+
+        return rest_ensure_response(array(
+            'success' => true,
+            'message' => $visible
+                ? sprintf(__('State %s:%s is now visible in checkout', 'cartflow-locations'), $country_code, $state_code)
+                : sprintf(__('State %s:%s is now hidden from checkout', 'cartflow-locations'), $country_code, $state_code),
+            'country_code' => $country_code,
+            'state_code' => $state_code,
+            'visible' => $visible,
+        ));
+    }
+
+    /**
+     * Get all hidden states
+     */
+    public function get_hidden_states($request) {
+        $hidden = get_option($this->hidden_option_name, array());
+        return rest_ensure_response($hidden);
+    }
+
+    /**
      * Get all countries with states (WooCommerce + custom)
      */
     public function get_countries($request) {
@@ -358,9 +429,10 @@ class CartFlow_Custom_Locations {
     }
 
     /**
-     * Inject custom states into WooCommerce
+     * Inject custom states into WooCommerce and remove hidden states
      */
     public function add_custom_states($states) {
+        // Add custom states
         $custom_states = get_option($this->option_name, array());
 
         foreach ($custom_states as $country_code => $country_states) {
@@ -375,6 +447,17 @@ class CartFlow_Custom_Locations {
             // Sort states alphabetically by name
             if (!empty($states[$country_code])) {
                 asort($states[$country_code]);
+            }
+        }
+
+        // Remove hidden states (works for both built-in and custom states)
+        $hidden_states = get_option($this->hidden_option_name, array());
+
+        foreach ($hidden_states as $country_code => $hidden_codes) {
+            if (isset($states[$country_code]) && is_array($hidden_codes)) {
+                foreach ($hidden_codes as $state_code) {
+                    unset($states[$country_code][$state_code]);
+                }
             }
         }
 
