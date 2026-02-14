@@ -1230,8 +1230,10 @@ export class OrderService {
     // Sync to WooCommerce if requested
     if (dto.syncToStore !== false && order.externalId) {
       try {
-        const store = await this.storeModel.findById(order.storeId);
-        if (store) {
+        const store = await this.storeModel
+          .findById(order.storeId)
+          .select('+credentials');
+        if (store?.credentials) {
           const credentials = {
             url: store.url,
             consumerKey: store.credentials.consumerKey,

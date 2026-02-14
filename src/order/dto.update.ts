@@ -145,7 +145,7 @@ export const CreateRefundSchema = Joi.object().keys({
   amount: Joi.string()
     .required()
     .pattern(/^\d+(\.\d{1,2})?$/),
-  reason: Joi.string().max(500).optional(),
+  reason: Joi.string().allow('').max(500).optional(),
   syncToStore: Joi.boolean().default(true),
   apiRefund: Joi.boolean().default(false),
 });
