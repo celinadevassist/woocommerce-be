@@ -28,7 +28,7 @@ export class PluginsController {
 
   // Latest plugin versions - update these when releasing new versions
   private readonly latestVersions = {
-    'cartflow-bridge': '1.3.0',
+    'cartflow-bridge': '1.4.0',
   };
 
   @Get()

@@ -3,7 +3,7 @@
  * Plugin Name: CartFlow Bridge
  * Plugin URI: https://cartflow.app
  * Description: REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, and checkout currency conversion
- * Version: 1.3.0
+ * Version: 1.4.0
  * Author: CartFlow
  * Author URI: https://cartflow.app
  * License: GPL v2 or later
@@ -43,7 +43,13 @@ class CartFlow_Bridge {
         // Currency Conversion: Convert order totals at checkout + show notice
         $currency_settings = get_option('cartflow_currency_features', array());
         if (!empty($currency_settings['enabled'])) {
-            add_action('woocommerce_checkout_create_order', array($this, 'convert_order_currency'), 10, 2);
+            // Use woocommerce_checkout_order_processed (fires AFTER all items including
+            // shipping are added to the order, but BEFORE payment processing).
+            // The earlier woocommerce_checkout_create_order hook fires before shipping
+            // lines exist, so shipping totals were never converted.
+            add_action('woocommerce_checkout_order_processed', array($this, 'convert_order_currency_by_id'), 10, 3);
+            // Block checkout (Store API) uses a different hook
+            add_action('woocommerce_store_api_checkout_order_processed', array($this, 'convert_order_currency'), 10, 1);
             add_action('woocommerce_review_order_after_order_total', array($this, 'display_currency_conversion_notice'));
             add_action('wp_footer', array($this, 'currency_conversion_checkout_script'));
         }
@@ -1428,9 +1434,29 @@ class CartFlow_Bridge {
     }
 
     /**
-     * Convert order currency at checkout
+     * Wrapper for classic checkout hook (woocommerce_checkout_order_processed)
+     * which passes ($order_id, $posted_data, $order)
      */
-    public function convert_order_currency($order, $data) {
+    public function convert_order_currency_by_id($order_id, $posted_data, $order) {
+        if (!$order) {
+            $order = wc_get_order($order_id);
+        }
+        if ($order) {
+            $this->convert_order_currency($order);
+        }
+    }
+
+    /**
+     * Convert order currency at checkout.
+     * Runs after the order is fully created (all line items, shipping, fees present)
+     * but before payment processing, so the gateway sees the converted total.
+     */
+    public function convert_order_currency($order) {
+        // Prevent double-conversion if both hooks fire
+        if ($order->get_meta('_cartflow_exchange_rate')) {
+            return;
+        }
+
         $settings = get_option('cartflow_currency_features', array());
 
         if (empty($settings['enabled'])) {
@@ -1485,24 +1511,30 @@ class CartFlow_Bridge {
         // Update order currency
         $order->set_currency($gateway_currency);
 
-        // Recalculate line item prices
+        // Convert line item prices
         foreach ($order->get_items() as $item) {
             $item->set_subtotal(round(floatval($item->get_subtotal()) * $final_rate, $decimals));
             $item->set_total(round(floatval($item->get_total()) * $final_rate, $decimals));
+            $item->save();
         }
 
-        // Recalculate shipping
-        foreach ($order->get_shipping_methods() as $shipping) {
+        // Convert shipping
+        foreach ($order->get_items('shipping') as $shipping) {
             $shipping->set_total(round(floatval($shipping->get_total()) * $final_rate, $decimals));
+            $shipping->save();
         }
 
-        // Recalculate fees
-        foreach ($order->get_fees() as $fee) {
+        // Convert fees
+        foreach ($order->get_items('fee') as $fee) {
             $fee->set_total(round(floatval($fee->get_total()) * $final_rate, $decimals));
+            $fee->save();
         }
 
         // Update order total
         $order->set_total(round($original_total * $final_rate, $decimals));
+
+        // Save the order (it was already saved before this hook fired)
+        $order->save();
 
         // Remove the override so it doesn't affect the rest of WordPress
         remove_filter('wc_get_price_decimals', array($this, 'filter_price_decimals'), 999);
