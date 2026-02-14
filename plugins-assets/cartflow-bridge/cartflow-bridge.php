@@ -1518,19 +1518,24 @@ class CartFlow_Bridge {
             $item->save();
         }
 
-        // Convert shipping
+        // Convert shipping line items
         foreach ($order->get_items('shipping') as $shipping) {
             $shipping->set_total(round(floatval($shipping->get_total()) * $final_rate, $decimals));
             $shipping->save();
         }
 
-        // Convert fees
+        // Convert fee line items
         foreach ($order->get_items('fee') as $fee) {
             $fee->set_total(round(floatval($fee->get_total()) * $final_rate, $decimals));
             $fee->save();
         }
 
-        // Update order total
+        // Convert order-level summary fields (used by emails and thank-you page)
+        $order->set_shipping_total(round(floatval($order->get_shipping_total()) * $final_rate, $decimals));
+        $order->set_shipping_tax(round(floatval($order->get_shipping_tax()) * $final_rate, $decimals));
+        $order->set_cart_tax(round(floatval($order->get_cart_tax()) * $final_rate, $decimals));
+        $order->set_discount_total(round(floatval($order->get_discount_total()) * $final_rate, $decimals));
+        $order->set_discount_tax(round(floatval($order->get_discount_tax()) * $final_rate, $decimals));
         $order->set_total(round($original_total * $final_rate, $decimals));
 
         // Save the order (it was already saved before this hook fired)
