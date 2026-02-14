@@ -1697,4 +1697,32 @@ export class WooCommerceService implements IPlatformAdapter {
       'locations/countries',
     );
   }
+
+  /**
+   * Sync custom fieldsets to WooCommerce via CartFlow Bridge plugin
+   */
+  async syncCustomFieldsets(
+    credentials: WooCommerceCredentials,
+    fieldsets: any[],
+  ): Promise<any> {
+    return this.cartflowRequest<any>(
+      credentials,
+      'POST',
+      'custom-fieldsets/sync',
+      { fieldsets },
+    );
+  }
+
+  /**
+   * Get custom fieldsets stored in WooCommerce
+   */
+  async getCustomFieldsets(
+    credentials: WooCommerceCredentials,
+  ): Promise<any[]> {
+    return this.cartflowRequest<any[]>(
+      credentials,
+      'GET',
+      'custom-fieldsets',
+    );
+  }
 }

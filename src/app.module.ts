@@ -47,6 +47,7 @@ import { PluginsModule } from './plugins/module';
 import { StoreSettingsModule } from './store-settings/module';
 import { LocationLibraryModule } from './location-library/module';
 import { ProductImportModule } from './product-import/module';
+import { CustomFieldsetModule } from './custom-fieldset/module';
 
 @Module({
   imports: [
@@ -101,6 +102,7 @@ import { ProductImportModule } from './product-import/module';
     StoreSettingsModule,
     LocationLibraryModule,
     ProductImportModule,
+    CustomFieldsetModule,
   ],
   controllers: [HealthController],
   providers: [ValidationPipe],

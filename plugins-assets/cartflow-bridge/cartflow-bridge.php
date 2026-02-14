@@ -2,8 +2,8 @@
 /**
  * Plugin Name: CartFlow Bridge
  * Plugin URI: https://cartflow.app
- * Description: REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, and checkout currency conversion
- * Version: 1.4.0
+ * Description: REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, checkout currency conversion, and custom product fields
+ * Version: 1.5.0
  * Author: CartFlow
  * Author URI: https://cartflow.app
  * License: GPL v2 or later
@@ -52,6 +52,17 @@ class CartFlow_Bridge {
             add_action('woocommerce_store_api_checkout_order_processed', array($this, 'convert_order_currency'), 10, 1);
             add_action('woocommerce_review_order_after_order_total', array($this, 'display_currency_conversion_notice'));
             add_action('wp_footer', array($this, 'currency_conversion_checkout_script'));
+        }
+
+        // Custom Product Fields: Render fields on product pages and capture in orders
+        $custom_fieldsets = get_option('cartflow_custom_fieldsets', array());
+        if (!empty($custom_fieldsets)) {
+            add_action('woocommerce_before_add_to_cart_button', array($this, 'render_custom_fields'));
+            add_filter('woocommerce_add_to_cart_validation', array($this, 'validate_custom_fields'), 10, 3);
+            add_filter('woocommerce_add_cart_item_data', array($this, 'add_custom_fields_to_cart'), 10, 3);
+            add_filter('woocommerce_get_item_data', array($this, 'display_custom_fields_in_cart'), 10, 2);
+            add_action('woocommerce_checkout_create_order_line_item', array($this, 'save_custom_fields_to_order'), 10, 4);
+            add_filter('woocommerce_order_item_display_meta_key', array($this, 'clean_custom_field_meta_key'), 10, 3);
         }
     }
 
@@ -320,6 +331,22 @@ class CartFlow_Bridge {
         register_rest_route($this->namespace, '/features/currency/live-rate', array(
             'methods' => 'GET',
             'callback' => array($this, 'get_live_exchange_rate'),
+            'permission_callback' => array($this, 'check_permission'),
+        ));
+
+        // ==================== CUSTOM FIELDSETS ====================
+
+        // Sync custom fieldsets from CartFlow backend
+        register_rest_route($this->namespace, '/custom-fieldsets/sync', array(
+            'methods' => 'POST',
+            'callback' => array($this, 'sync_custom_fieldsets'),
+            'permission_callback' => array($this, 'check_permission'),
+        ));
+
+        // Get stored custom fieldsets
+        register_rest_route($this->namespace, '/custom-fieldsets', array(
+            'methods' => 'GET',
+            'callback' => array($this, 'get_custom_fieldsets'),
             'permission_callback' => array($this, 'check_permission'),
         ));
     }
@@ -1260,6 +1287,11 @@ class CartFlow_Bridge {
                     'enabled' => !empty(get_option('cartflow_currency_features', array())['enabled']),
                     'description' => 'Convert checkout totals to payment gateway currency with configurable margin',
                 ),
+                'custom_fields' => array(
+                    'enabled' => !empty(get_option('cartflow_custom_fieldsets', array())),
+                    'count' => count(get_option('cartflow_custom_fieldsets', array())),
+                    'description' => 'Custom product fields (text inputs and image swatches) managed from CartFlow dashboard',
+                ),
             ),
         ));
     }
@@ -1431,6 +1463,385 @@ class CartFlow_Bridge {
             'cached' => $is_cached,
             'last_updated' => isset($settings['cached_rate_time']) ? $settings['cached_rate_time'] : null,
         ));
+    }
+
+    // ==================== CUSTOM FIELDSETS ====================
+
+    /**
+     * Sync custom fieldsets from CartFlow backend
+     * Receives full fieldsets JSON and stores as WP option
+     */
+    public function sync_custom_fieldsets($request) {
+        $fieldsets = $request->get_param('fieldsets');
+
+        if (!is_array($fieldsets)) {
+            return new \WP_Error('invalid_data', __('Fieldsets must be an array', 'cartflow-bridge'), array('status' => 400));
+        }
+
+        update_option('cartflow_custom_fieldsets', $fieldsets, false);
+
+        return rest_ensure_response(array(
+            'success' => true,
+            'message' => sprintf(__('%d fieldset(s) synced successfully', 'cartflow-bridge'), count($fieldsets)),
+            'count' => count($fieldsets),
+        ));
+    }
+
+    /**
+     * Get stored custom fieldsets
+     */
+    public function get_custom_fieldsets($request) {
+        $fieldsets = get_option('cartflow_custom_fieldsets', array());
+        return rest_ensure_response($fieldsets);
+    }
+
+    /**
+     * Get applicable fieldsets for a given product ID
+     */
+    private function get_fieldsets_for_product($product_id) {
+        $all_fieldsets = get_option('cartflow_custom_fieldsets', array());
+        if (empty($all_fieldsets)) {
+            return array();
+        }
+
+        // Get product category external IDs
+        $product_terms = wp_get_post_terms($product_id, 'product_cat', array('fields' => 'ids'));
+        $product_cat_ids = array();
+        if (!is_wp_error($product_terms)) {
+            foreach ($product_terms as $term_id) {
+                $product_cat_ids[] = $term_id;
+            }
+        }
+
+        $applicable = array();
+
+        foreach ($all_fieldsets as $fieldset) {
+            if (empty($fieldset['status']) || $fieldset['status'] !== 'active') {
+                continue;
+            }
+
+            $type = isset($fieldset['assignmentType']) ? $fieldset['assignmentType'] : '';
+
+            if ($type === 'all') {
+                $applicable[] = $fieldset;
+            } elseif ($type === 'product') {
+                $product_ext_ids = isset($fieldset['productExternalIds']) ? $fieldset['productExternalIds'] : array();
+                if (in_array($product_id, $product_ext_ids)) {
+                    $applicable[] = $fieldset;
+                }
+            } elseif ($type === 'category') {
+                $cat_ext_ids = isset($fieldset['categoryExternalIds']) ? $fieldset['categoryExternalIds'] : array();
+                if (!empty(array_intersect($product_cat_ids, $cat_ext_ids))) {
+                    $applicable[] = $fieldset;
+                }
+            }
+        }
+
+        // Sort by position
+        usort($applicable, function($a, $b) {
+            return ($a['position'] ?? 0) - ($b['position'] ?? 0);
+        });
+
+        return $applicable;
+    }
+
+    /**
+     * Render custom fields on the product page (before add-to-cart button)
+     */
+    public function render_custom_fields() {
+        global $product;
+        if (!$product) {
+            return;
+        }
+
+        $product_id = $product->get_id();
+        $fieldsets = $this->get_fieldsets_for_product($product_id);
+
+        if (empty($fieldsets)) {
+            return;
+        }
+
+        echo '<div class="cartflow-custom-fields">';
+
+        foreach ($fieldsets as $fieldset) {
+            $fieldset_name = sanitize_title($fieldset['name'] ?? '');
+            $fields = isset($fieldset['fields']) ? $fieldset['fields'] : array();
+
+            // Sort fields by position
+            usort($fields, function($a, $b) {
+                return ($a['position'] ?? 0) - ($b['position'] ?? 0);
+            });
+
+            if (!empty($fieldset['name'])) {
+                echo '<div class="cartflow-fieldset" data-fieldset="' . esc_attr($fieldset_name) . '">';
+                echo '<h4 class="cartflow-fieldset-title">' . esc_html($fieldset['name']) . '</h4>';
+            }
+
+            foreach ($fields as $field) {
+                $field_name = sanitize_title($field['name'] ?? '');
+                $field_key = 'cartflow_' . $fieldset_name . '_' . $field_name;
+                $field_type = isset($field['type']) ? $field['type'] : 'text';
+                $field_label = isset($field['label']) ? $field['label'] : $field_name;
+                $is_required = !empty($field['required']);
+                $required_attr = $is_required ? ' required' : '';
+                $required_mark = $is_required ? ' <span class="required">*</span>' : '';
+
+                echo '<div class="cartflow-field cartflow-field--' . esc_attr($field_type) . '">';
+                echo '<label for="' . esc_attr($field_key) . '">' . esc_html($field_label) . $required_mark . '</label>';
+
+                if ($field_type === 'text') {
+                    $placeholder = isset($field['placeholder']) ? $field['placeholder'] : '';
+                    echo '<input type="text" id="' . esc_attr($field_key) . '" name="' . esc_attr($field_key) . '" placeholder="' . esc_attr($placeholder) . '"' . $required_attr . ' class="cartflow-text-input" />';
+                } elseif ($field_type === 'image_swatch') {
+                    $options = isset($field['options']) ? $field['options'] : array();
+                    if (!empty($options)) {
+                        echo '<div class="cartflow-swatch-options" data-field="' . esc_attr($field_key) . '">';
+                        foreach ($options as $idx => $option) {
+                            $opt_value = isset($option['value']) ? $option['value'] : '';
+                            $opt_label = isset($option['label']) ? $option['label'] : '';
+                            $opt_image = isset($option['image']) ? $option['image'] : '';
+                            $opt_id = $field_key . '_' . $idx;
+
+                            echo '<label class="cartflow-swatch-option" for="' . esc_attr($opt_id) . '" title="' . esc_attr($opt_label) . '">';
+                            echo '<input type="radio" id="' . esc_attr($opt_id) . '" name="' . esc_attr($field_key) . '" value="' . esc_attr($opt_value) . '"' . $required_attr . ' class="cartflow-swatch-radio" />';
+                            if ($opt_image) {
+                                echo '<img src="' . esc_url($opt_image) . '" alt="' . esc_attr($opt_label) . '" class="cartflow-swatch-image" />';
+                            }
+                            echo '<span class="cartflow-swatch-label">' . esc_html($opt_label) . '</span>';
+                            echo '</label>';
+                        }
+                        echo '</div>';
+                    }
+                }
+
+                echo '</div>';
+            }
+
+            if (!empty($fieldset['name'])) {
+                echo '</div>';
+            }
+        }
+
+        echo '</div>';
+
+        // Inline CSS and JS for custom fields
+        $this->render_custom_fields_styles();
+    }
+
+    /**
+     * Render inline CSS and JS for custom fields
+     */
+    private function render_custom_fields_styles() {
+        ?>
+        <style>
+            .cartflow-custom-fields {
+                margin: 15px 0;
+            }
+            .cartflow-fieldset {
+                margin-bottom: 15px;
+            }
+            .cartflow-fieldset-title {
+                margin: 0 0 10px 0;
+                font-size: 1em;
+                font-weight: 600;
+            }
+            .cartflow-field {
+                margin-bottom: 12px;
+            }
+            .cartflow-field label {
+                display: block;
+                margin-bottom: 5px;
+                font-weight: 500;
+                font-size: 0.9em;
+            }
+            .cartflow-field .required {
+                color: #e00;
+            }
+            .cartflow-text-input {
+                width: 100%;
+                padding: 8px 12px;
+                border: 1px solid #ddd;
+                border-radius: 4px;
+                font-size: 0.95em;
+                box-sizing: border-box;
+            }
+            .cartflow-text-input:focus {
+                border-color: #3b82f6;
+                outline: none;
+                box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+            }
+            .cartflow-swatch-options {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            .cartflow-swatch-option {
+                position: relative;
+                display: inline-flex;
+                flex-direction: column;
+                align-items: center;
+                cursor: pointer;
+                border: 2px solid #ddd;
+                border-radius: 6px;
+                padding: 6px;
+                transition: border-color 0.2s, box-shadow 0.2s;
+                max-width: 80px;
+                text-align: center;
+            }
+            .cartflow-swatch-option:hover {
+                border-color: #999;
+            }
+            .cartflow-swatch-option.selected {
+                border-color: #3b82f6;
+                box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+            }
+            .cartflow-swatch-radio {
+                position: absolute;
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+            .cartflow-swatch-image {
+                width: 60px;
+                height: 60px;
+                object-fit: cover;
+                border-radius: 4px;
+            }
+            .cartflow-swatch-label {
+                display: block;
+                font-size: 0.75em;
+                margin-top: 4px;
+                line-height: 1.2;
+                word-break: break-word;
+            }
+        </style>
+        <script>
+            (function() {
+                document.addEventListener('change', function(e) {
+                    if (e.target.classList.contains('cartflow-swatch-radio')) {
+                        var container = e.target.closest('.cartflow-swatch-options');
+                        if (container) {
+                            container.querySelectorAll('.cartflow-swatch-option').forEach(function(opt) {
+                                opt.classList.remove('selected');
+                            });
+                            e.target.closest('.cartflow-swatch-option').classList.add('selected');
+                        }
+                    }
+                });
+            })();
+        </script>
+        <?php
+    }
+
+    /**
+     * Validate required custom fields before adding to cart
+     */
+    public function validate_custom_fields($passed, $product_id, $quantity) {
+        $fieldsets = $this->get_fieldsets_for_product($product_id);
+
+        foreach ($fieldsets as $fieldset) {
+            $fieldset_name = sanitize_title($fieldset['name'] ?? '');
+            $fields = isset($fieldset['fields']) ? $fieldset['fields'] : array();
+
+            foreach ($fields as $field) {
+                if (empty($field['required'])) {
+                    continue;
+                }
+
+                $field_name = sanitize_title($field['name'] ?? '');
+                $field_key = 'cartflow_' . $fieldset_name . '_' . $field_name;
+                $value = isset($_POST[$field_key]) ? sanitize_text_field($_POST[$field_key]) : '';
+
+                if (empty($value)) {
+                    $label = isset($field['label']) ? $field['label'] : $field_name;
+                    wc_add_notice(
+                        sprintf(__('"%s" is a required field.', 'cartflow-bridge'), $label),
+                        'error'
+                    );
+                    $passed = false;
+                }
+            }
+        }
+
+        return $passed;
+    }
+
+    /**
+     * Add custom field values to cart item data
+     */
+    public function add_custom_fields_to_cart($cart_item_data, $product_id, $variation_id) {
+        $fieldsets = $this->get_fieldsets_for_product($product_id);
+        $custom_data = array();
+
+        foreach ($fieldsets as $fieldset) {
+            $fieldset_name = sanitize_title($fieldset['name'] ?? '');
+            $fields = isset($fieldset['fields']) ? $fieldset['fields'] : array();
+
+            foreach ($fields as $field) {
+                $field_name = sanitize_title($field['name'] ?? '');
+                $field_key = 'cartflow_' . $fieldset_name . '_' . $field_name;
+                $value = isset($_POST[$field_key]) ? sanitize_text_field($_POST[$field_key]) : '';
+
+                if (!empty($value)) {
+                    $custom_data[$field_key] = array(
+                        'label' => isset($field['label']) ? $field['label'] : $field_name,
+                        'value' => $value,
+                        'fieldset' => isset($fieldset['name']) ? $fieldset['name'] : '',
+                    );
+                }
+            }
+        }
+
+        if (!empty($custom_data)) {
+            $cart_item_data['cartflow_custom_fields'] = $custom_data;
+        }
+
+        return $cart_item_data;
+    }
+
+    /**
+     * Display custom field values in cart and checkout
+     */
+    public function display_custom_fields_in_cart($item_data, $cart_item) {
+        if (isset($cart_item['cartflow_custom_fields'])) {
+            foreach ($cart_item['cartflow_custom_fields'] as $field_data) {
+                $item_data[] = array(
+                    'key' => $field_data['label'],
+                    'value' => $field_data['value'],
+                );
+            }
+        }
+        return $item_data;
+    }
+
+    /**
+     * Save custom field values as order item meta
+     */
+    public function save_custom_fields_to_order($item, $cart_item_key, $values, $order) {
+        if (isset($values['cartflow_custom_fields'])) {
+            foreach ($values['cartflow_custom_fields'] as $field_key => $field_data) {
+                $meta_key = '_' . $field_key;
+                $item->add_meta_data($meta_key, $field_data['value'], true);
+            }
+        }
+    }
+
+    /**
+     * Clean up custom field meta key display in order admin/emails
+     */
+    public function clean_custom_field_meta_key($display_key, $meta, $item) {
+        if (strpos($display_key, '_cartflow_') === 0) {
+            // Remove prefix and convert to readable label
+            $clean = str_replace('_cartflow_', '', $display_key);
+            $parts = explode('_', $clean, 2);
+            if (count($parts) === 2) {
+                // Format: fieldset-name_field-name → Field Name
+                $display_key = ucwords(str_replace('-', ' ', $parts[1]));
+            } else {
+                $display_key = ucwords(str_replace(array('-', '_'), ' ', $clean));
+            }
+        }
+        return $display_key;
     }
 
     /**
