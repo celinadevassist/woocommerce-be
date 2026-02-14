@@ -1035,10 +1035,15 @@ export class WooCommerceService implements IPlatformAdapter {
       );
       return response.data;
     } catch (error) {
+      const wooError = error.response?.data;
       this.logger.error(
-        `WooCommerce API error: ${method} ${endpoint}`,
-        error.message,
+        `WooCommerce API error: ${method} ${endpoint} — ${error.message}`,
+        wooError ? JSON.stringify(wooError) : '',
       );
+      // Throw a more descriptive error if WooCommerce provides one
+      if (wooError?.message) {
+        throw new Error(wooError.message);
+      }
       throw error;
     }
   }

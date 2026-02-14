@@ -1243,10 +1243,23 @@ export class OrderService {
           // Convert refund amount to payment currency if order was converted
           let wooRefundAmount = dto.amount;
           if (order.conversionRate && order.paidCurrency) {
-            wooRefundAmount = (
-              parseFloat(dto.amount) * order.conversionRate
-            ).toFixed(2);
+            const converted = parseFloat(dto.amount) * order.conversionRate;
+            // Cap at paidTotal to avoid rounding exceeding WooCommerce order total
+            const paidTotal = parseFloat(order.paidTotal || '0');
+            const existingWooRefunds = (order.refunds || []).reduce(
+              (sum, r) =>
+                sum + parseFloat(r.total || '0') * order.conversionRate,
+              0,
+            );
+            const maxWooRefundable = paidTotal - existingWooRefunds;
+            wooRefundAmount = Math.min(converted, maxWooRefundable).toFixed(2);
           }
+
+          this.logger.log(
+            `Creating WooCommerce refund: order=${order.externalId}, amount=${wooRefundAmount}, ` +
+            `originalAmount=${dto.amount}, conversionRate=${order.conversionRate}, ` +
+            `paidTotal=${order.paidTotal}, paidCurrency=${order.paidCurrency}, api_refund=${dto.apiRefund}`,
+          );
 
           const wooRefund = await this.wooCommerceService.createRefund(
             credentials,
