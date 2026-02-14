@@ -1196,10 +1196,30 @@ export class CustomerService {
       wooCustomer.billing?.phone,
     );
 
-    const existingCustomer = await this.customerModel.findOne({
-      storeId: new Types.ObjectId(storeId),
+    const storeObjId = new Types.ObjectId(storeId);
+
+    // Look up by externalId first, then fall back to email/phone to avoid
+    // creating duplicates when a customer was already created from an order
+    let existingCustomer = await this.customerModel.findOne({
+      storeId: storeObjId,
       externalId: wooCustomer.id,
     });
+
+    if (!existingCustomer) {
+      const email = wooCustomer.email?.toLowerCase();
+      if (email) {
+        existingCustomer = await this.customerModel.findOne({
+          storeId: storeObjId,
+          email,
+        });
+      }
+      if (!existingCustomer && normalizedPhone) {
+        existingCustomer = await this.customerModel.findOne({
+          storeId: storeObjId,
+          phone: normalizedPhone,
+        });
+      }
+    }
 
     // Skip creating new customers without a phone number
     if (!existingCustomer && !normalizedPhone) {
@@ -1210,7 +1230,7 @@ export class CustomerService {
     }
 
     const customerData = {
-      storeId: new Types.ObjectId(storeId),
+      storeId: storeObjId,
       externalId: wooCustomer.id,
       email: wooCustomer.email?.toLowerCase(),
       firstName: wooCustomer.first_name,
