@@ -382,6 +382,19 @@ export class CustomerController {
     return { success: true };
   }
 
+  // ==================== Bulk Operations ====================
+
+  @Post('bulk-delete')
+  @ApiOperation({ summary: 'Bulk soft-delete customers' })
+  @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
+  @ApiResponse({ status: 200, description: 'Customers deleted' })
+  async bulkDelete(
+    @User('_id') userId: string,
+    @Body() dto: { ids: string[] },
+  ) {
+    return this.customerService.bulkDelete(dto.ids, userId);
+  }
+
   @Get('segments/:segmentId/customers')
   @ApiOperation({ summary: 'Get customers in a segment' })
   @ApiResponse({ status: 200, description: 'Customers retrieved successfully' })

@@ -1495,6 +1495,23 @@ export class CustomerService {
   }
 
   /**
+   * Bulk soft-delete customers
+   */
+  async bulkDelete(
+    ids: string[],
+    userId: string,
+  ): Promise<{ deleted: number }> {
+    if (!ids?.length) return { deleted: 0 };
+
+    const objectIds = ids.map((id) => new Types.ObjectId(id));
+    const result = await this.customerModel.updateMany(
+      { _id: { $in: objectIds }, isDeleted: false },
+      { $set: { isDeleted: true } },
+    );
+    return { deleted: result.modifiedCount };
+  }
+
+  /**
    * Merge two customers into one (when discovered to be same person)
    * Keeps the primary customer, merges data from secondary, deletes secondary
    */
