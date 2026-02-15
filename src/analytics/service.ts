@@ -293,8 +293,8 @@ export class AnalyticsService {
           revenue: { $sum: { $toDouble: '$lineItems.total' } },
         },
       },
-      { $sort: { revenue: -1 } },
-      { $limit: 10 },
+      { $sort: { quantity: -1, revenue: -1 } },
+      { $limit: 20 },
     ]);
 
     // Get product images
@@ -343,8 +343,8 @@ export class AnalyticsService {
           totalSpent: { $sum: { $toDouble: '$total' } },
         },
       },
-      { $sort: { totalSpent: -1 } },
-      { $limit: 10 },
+      { $sort: { ordersCount: -1, totalSpent: -1 } },
+      { $limit: 20 },
     ]);
 
     return result.map((item: any) => ({
@@ -428,10 +428,12 @@ export class AnalyticsService {
    * Get recent orders
    */
   private async getRecentOrders(baseFilter: any): Promise<any[]> {
+    const now = new Date();
+    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
     const orders = await this.orderModel
-      .find(baseFilter)
-      .sort({ dateCreatedWoo: -1 })
-      .limit(5);
+      .find({ ...baseFilter, dateCreatedWoo: { $gte: weekAgo } })
+      .sort({ dateCreatedWoo: -1 });
 
     return orders.map((order) => ({
       _id: order._id.toString(),
