@@ -301,7 +301,7 @@ export class OrderService {
    * Sync order status to WooCommerce
    */
   private async syncOrderStatusToWoo(order: OrderDocument): Promise<void> {
-    const store = await this.storeModel.findById(order.storeId);
+    const store = await this.storeModel.findById(order.storeId).select('+credentials');
     if (!store) {
       throw new Error('Store not found');
     }

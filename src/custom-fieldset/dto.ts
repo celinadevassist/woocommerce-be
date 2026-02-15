@@ -1,55 +1,35 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import * as Joi from 'joi';
-import { FieldType, FieldsetStatus, AssignmentType } from './enum';
-
-// ==================== SUB DTOs ====================
-
-export class SwatchOptionDto {
-  @ApiProperty({ description: 'Option label' })
-  label: string;
-
-  @ApiProperty({ description: 'Option value' })
-  value: string;
-
-  @ApiPropertyOptional({ description: 'Image URL for swatch' })
-  image?: string;
-}
-
-export class CustomFieldDto {
-  @ApiProperty({ description: 'Internal field name' })
-  name: string;
-
-  @ApiProperty({ description: 'Display label on product page' })
-  label: string;
-
-  @ApiProperty({ description: 'Field type', enum: FieldType })
-  type: FieldType;
-
-  @ApiPropertyOptional({ description: 'Whether field is required' })
-  required?: boolean;
-
-  @ApiPropertyOptional({ description: 'Placeholder for text fields' })
-  placeholder?: string;
-
-  @ApiPropertyOptional({
-    description: 'Options for image_swatch fields',
-    type: [SwatchOptionDto],
-  })
-  options?: SwatchOptionDto[];
-
-  @ApiPropertyOptional({ description: 'Display order' })
-  position?: number;
-}
+import {
+  FieldType,
+  FieldsetStatus,
+  AssignmentType,
+  PriceModifierType,
+  FieldsetScope,
+} from './enum';
 
 // ==================== Joi Sub-Schemas ====================
 
-const SwatchOptionSchema = Joi.object().keys({
+const FieldConditionJoiSchema = Joi.object().keys({
+  fieldName: Joi.string().required(),
+  operator: Joi.string()
+    .valid('equals', 'not_equals', 'contains', 'is_empty', 'is_not_empty')
+    .required(),
+  value: Joi.string().optional().allow('').default(''),
+});
+
+const SwatchOptionJoiSchema = Joi.object().keys({
   label: Joi.string().required(),
   value: Joi.string().required(),
   image: Joi.string().uri().optional().allow(''),
+  priceType: Joi.string()
+    .valid(...Object.values(PriceModifierType))
+    .optional()
+    .default(PriceModifierType.NONE),
+  priceAmount: Joi.number().optional().default(0),
 });
 
-const CustomFieldSchema = Joi.object().keys({
+const CustomFieldJoiSchema = Joi.object().keys({
   name: Joi.string().min(1).max(100).required(),
   label: Joi.string().min(1).max(255).required(),
   type: Joi.string()
@@ -57,32 +37,45 @@ const CustomFieldSchema = Joi.object().keys({
     .required(),
   required: Joi.boolean().optional().default(false),
   placeholder: Joi.string().optional().allow(''),
-  options: Joi.array().items(SwatchOptionSchema).optional().default([]),
+  min: Joi.number().optional(),
+  max: Joi.number().optional(),
+  checkboxLabel: Joi.string().optional().allow(''),
+  // Price add-on
+  priceType: Joi.string()
+    .valid(...Object.values(PriceModifierType))
+    .optional()
+    .default(PriceModifierType.NONE),
+  priceAmount: Joi.number().optional().default(0),
+  // Conditional logic
+  conditions: Joi.array().items(FieldConditionJoiSchema).optional().default([]),
+  // Color picker
+  defaultColor: Joi.string().optional().allow(''),
+  // Date picker
+  minDate: Joi.string().optional().allow(''),
+  maxDate: Joi.string().optional().allow(''),
+  // File upload
+  allowedFileTypes: Joi.string().optional().allow(''),
+  maxFileSize: Joi.number().optional(),
+  // Options & position
+  options: Joi.array().items(SwatchOptionJoiSchema).optional().default([]),
   position: Joi.number().min(0).optional().default(0),
 });
+
+const objectIdPattern = /^[0-9a-fA-F]{24}$/;
 
 // ==================== CREATE DTO ====================
 
 export class CreateCustomFieldsetDto {
-  @ApiProperty({ description: 'Fieldset name' })
   name: string;
-
-  @ApiPropertyOptional({ description: 'Status', enum: FieldsetStatus })
   status?: FieldsetStatus;
-
-  @ApiProperty({ description: 'Assignment type', enum: AssignmentType })
+  scope?: FieldsetScope;
   assignmentType: AssignmentType;
-
-  @ApiPropertyOptional({ description: 'Product IDs (when assignmentType=product)' })
   productIds?: string[];
-
-  @ApiPropertyOptional({ description: 'Category IDs (when assignmentType=category)' })
   categoryIds?: string[];
-
-  @ApiProperty({ description: 'Fields in this fieldset', type: [CustomFieldDto] })
-  fields: CustomFieldDto[];
-
-  @ApiPropertyOptional({ description: 'Sort position' })
+  tagIds?: string[];
+  productTypes?: string[];
+  attributeIds?: string[];
+  fields: any[];
   position?: number;
 }
 
@@ -92,43 +85,50 @@ export const CreateCustomFieldsetSchema = Joi.object().keys({
     .valid(...Object.values(FieldsetStatus))
     .optional()
     .default(FieldsetStatus.ACTIVE),
+  scope: Joi.string()
+    .valid(...Object.values(FieldsetScope))
+    .optional()
+    .default(FieldsetScope.PRODUCT),
   assignmentType: Joi.string()
     .valid(...Object.values(AssignmentType))
     .required(),
   productIds: Joi.array()
-    .items(Joi.string().pattern(/^[0-9a-fA-F]{24}$/))
+    .items(Joi.string().pattern(objectIdPattern))
     .optional()
     .default([]),
   categoryIds: Joi.array()
-    .items(Joi.string().pattern(/^[0-9a-fA-F]{24}$/))
+    .items(Joi.string().pattern(objectIdPattern))
     .optional()
     .default([]),
-  fields: Joi.array().items(CustomFieldSchema).min(1).required(),
+  tagIds: Joi.array()
+    .items(Joi.string().pattern(objectIdPattern))
+    .optional()
+    .default([]),
+  productTypes: Joi.array()
+    .items(Joi.string().valid('simple', 'variable', 'grouped', 'external'))
+    .optional()
+    .default([]),
+  attributeIds: Joi.array()
+    .items(Joi.string().pattern(objectIdPattern))
+    .optional()
+    .default([]),
+  fields: Joi.array().items(CustomFieldJoiSchema).min(1).required(),
   position: Joi.number().min(0).optional().default(0),
 });
 
 // ==================== UPDATE DTO ====================
 
 export class UpdateCustomFieldsetDto {
-  @ApiPropertyOptional({ description: 'Fieldset name' })
   name?: string;
-
-  @ApiPropertyOptional({ description: 'Status', enum: FieldsetStatus })
   status?: FieldsetStatus;
-
-  @ApiPropertyOptional({ description: 'Assignment type', enum: AssignmentType })
+  scope?: FieldsetScope;
   assignmentType?: AssignmentType;
-
-  @ApiPropertyOptional({ description: 'Product IDs' })
   productIds?: string[];
-
-  @ApiPropertyOptional({ description: 'Category IDs' })
   categoryIds?: string[];
-
-  @ApiPropertyOptional({ description: 'Fields', type: [CustomFieldDto] })
-  fields?: CustomFieldDto[];
-
-  @ApiPropertyOptional({ description: 'Sort position' })
+  tagIds?: string[];
+  productTypes?: string[];
+  attributeIds?: string[];
+  fields?: any[];
   position?: number;
 }
 
@@ -137,47 +137,50 @@ export const UpdateCustomFieldsetSchema = Joi.object().keys({
   status: Joi.string()
     .valid(...Object.values(FieldsetStatus))
     .optional(),
+  scope: Joi.string()
+    .valid(...Object.values(FieldsetScope))
+    .optional(),
   assignmentType: Joi.string()
     .valid(...Object.values(AssignmentType))
     .optional(),
   productIds: Joi.array()
-    .items(Joi.string().pattern(/^[0-9a-fA-F]{24}$/))
+    .items(Joi.string().pattern(objectIdPattern))
     .optional(),
   categoryIds: Joi.array()
-    .items(Joi.string().pattern(/^[0-9a-fA-F]{24}$/))
+    .items(Joi.string().pattern(objectIdPattern))
     .optional(),
-  fields: Joi.array().items(CustomFieldSchema).min(1).optional(),
+  tagIds: Joi.array()
+    .items(Joi.string().pattern(objectIdPattern))
+    .optional(),
+  productTypes: Joi.array()
+    .items(Joi.string().valid('simple', 'variable', 'grouped', 'external'))
+    .optional(),
+  attributeIds: Joi.array()
+    .items(Joi.string().pattern(objectIdPattern))
+    .optional(),
+  fields: Joi.array().items(CustomFieldJoiSchema).min(1).optional(),
   position: Joi.number().min(0).optional(),
 });
 
 // ==================== QUERY DTO ====================
 
 export class QueryCustomFieldsetDto {
-  @ApiPropertyOptional({ description: 'Store ID' })
   storeId?: string;
-
-  @ApiPropertyOptional({ description: 'Status filter', enum: FieldsetStatus })
   status?: FieldsetStatus;
-
-  @ApiPropertyOptional({ description: 'Assignment type filter', enum: AssignmentType })
+  scope?: FieldsetScope;
   assignmentType?: AssignmentType;
-
-  @ApiPropertyOptional({ description: 'Search keyword' })
   keyword?: string;
-
-  @ApiPropertyOptional({ description: 'Page number' })
   page?: number;
-
-  @ApiPropertyOptional({ description: 'Page size' })
   size?: number;
 }
 
 export const QueryCustomFieldsetSchema = Joi.object().keys({
-  storeId: Joi.string()
-    .pattern(/^[0-9a-fA-F]{24}$/)
-    .optional(),
+  storeId: Joi.string().pattern(objectIdPattern).optional(),
   status: Joi.string()
     .valid(...Object.values(FieldsetStatus))
+    .optional(),
+  scope: Joi.string()
+    .valid(...Object.values(FieldsetScope))
     .optional(),
   assignmentType: Joi.string()
     .valid(...Object.values(AssignmentType))

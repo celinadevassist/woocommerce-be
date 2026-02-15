@@ -1,5 +1,6 @@
 import {
   Injectable,
+  Logger,
   NotFoundException,
   ForbiddenException,
   Inject,
@@ -32,6 +33,8 @@ import { SearchAnalyticsService } from '../modules/search-analytics/search-analy
 
 @Injectable()
 export class CustomerService {
+  private readonly logger = new Logger(CustomerService.name);
+
   constructor(
     @InjectModel(Customer.name) private customerModel: Model<CustomerDocument>,
     @InjectModel(CustomerSegment.name)
@@ -317,12 +320,14 @@ export class CustomerService {
       if (query.startDate) filter.createdAt.$gte = new Date(query.startDate);
       if (query.endDate) filter.createdAt.$lte = new Date(query.endDate);
     }
-    if (query.search) {
+    const searchTerm = query.search || query.keyword;
+    if (searchTerm) {
+      const escaped = searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$or = [
-        { email: { $regex: query.search, $options: 'i' } },
-        { firstName: { $regex: query.search, $options: 'i' } },
-        { lastName: { $regex: query.search, $options: 'i' } },
-        { phone: { $regex: query.search, $options: 'i' } },
+        { email: { $regex: escaped, $options: 'i' } },
+        { firstName: { $regex: escaped, $options: 'i' } },
+        { lastName: { $regex: escaped, $options: 'i' } },
+        { phone: { $regex: escaped, $options: 'i' } },
       ];
     }
 
@@ -340,9 +345,9 @@ export class CustomerService {
     ]);
 
     // Track search analytics if search query is provided
-    if (query.search) {
+    if (searchTerm) {
       await this.searchAnalyticsService.saveSearchQuery(
-        query.search,
+        searchTerm,
         'customers',
         total,
         ip,
@@ -1223,7 +1228,7 @@ export class CustomerService {
 
     // Skip creating new customers without a phone number
     if (!existingCustomer && !normalizedPhone) {
-      console.log(
+      this.logger.debug(
         `Skipping WooCommerce customer ${wooCustomer.id} - no valid phone number`,
       );
       return null;
@@ -1319,7 +1324,7 @@ export class CustomerService {
 
     // Skip customers without a valid phone number
     if (!normalizedPhone) {
-      console.log(
+      this.logger.debug(
         `Skipping customer creation - no valid phone number provided`,
       );
       return null;
@@ -1368,7 +1373,7 @@ export class CustomerService {
         }
       } catch (error) {
         // Log but continue - this is an optimization
-        console.warn(
+        this.logger.warn(
           `Failed to lookup customer by phone collection: ${error.message}`,
         );
       }
@@ -1386,7 +1391,7 @@ export class CustomerService {
         }
       } catch (error) {
         // Log but continue - this is an optimization
-        console.warn(
+        this.logger.warn(
           `Failed to lookup customer by email collection: ${error.message}`,
         );
       }
@@ -1503,9 +1508,20 @@ export class CustomerService {
   ): Promise<{ deleted: number }> {
     if (!ids?.length) return { deleted: 0 };
 
+    // Verify user has access to the stores owning these customers
     const objectIds = ids.map((id) => new Types.ObjectId(id));
+    const userStoreIds = await this.getUserStoreIds(userId);
+
+    if (!userStoreIds.length) {
+      throw new ForbiddenException('You do not have access to any store');
+    }
+
     const result = await this.customerModel.updateMany(
-      { _id: { $in: objectIds }, isDeleted: false },
+      {
+        _id: { $in: objectIds },
+        storeId: { $in: userStoreIds },
+        isDeleted: false,
+      },
       { $set: { isDeleted: true } },
     );
     return { deleted: result.modifiedCount };
@@ -1518,6 +1534,7 @@ export class CustomerService {
   async mergeCustomers(
     primaryCustomerId: string,
     secondaryCustomerId: string,
+    userId: string,
   ): Promise<CustomerDocument> {
     const primary = await this.customerModel.findById(primaryCustomerId);
     const secondary = await this.customerModel.findById(secondaryCustomerId);
@@ -1531,6 +1548,9 @@ export class CustomerService {
         'Cannot merge customers from different stores',
       );
     }
+
+    // Verify user has access to the store
+    await this.verifyStoreAccess(primary.storeId.toString(), userId);
 
     // Merge email (prefer primary, fallback to secondary)
     if (!primary.email && secondary.email) {
@@ -1563,7 +1583,7 @@ export class CustomerService {
         );
       }
     } catch (error) {
-      console.warn(`Failed to transfer phones during merge: ${error.message}`);
+      this.logger.warn(`Failed to transfer phones during merge: ${error.message}`);
     }
 
     // Transfer emails from secondary to primary in emails collection
@@ -1579,7 +1599,7 @@ export class CustomerService {
         );
       }
     } catch (error) {
-      console.warn(`Failed to transfer emails during merge: ${error.message}`);
+      this.logger.warn(`Failed to transfer emails during merge: ${error.message}`);
     }
 
     // Merge tags - combine unique tags

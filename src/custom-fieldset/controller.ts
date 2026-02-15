@@ -90,17 +90,17 @@ export class CustomFieldsetController {
     return this.fieldsetService.delete(user._id.toString(), id);
   }
 
-  @Post(':id/sync')
-  @ApiOperation({ summary: 'Sync a single fieldset to WooCommerce' })
-  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
-  async syncToWoo(@Param('id') id: string, @User() user: any) {
-    return this.fieldsetService.syncToWoo(user._id.toString(), id);
-  }
-
   @Post('sync-all/:storeId')
   @ApiOperation({ summary: 'Sync all active fieldsets for a store to WooCommerce' })
   @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
   async syncAllToWoo(@Param('storeId') storeId: string, @User() user: any) {
     return this.fieldsetService.syncAllToWoo(user._id.toString(), storeId);
+  }
+
+  @Post(':id/sync')
+  @ApiOperation({ summary: 'Sync a single fieldset to WooCommerce' })
+  @UsePipes(new JoiValidationPipe({ param: { lang: LanguageSchema } }))
+  async syncToWoo(@Param('id') id: string, @User() user: any) {
+    return this.fieldsetService.syncToWoo(user._id.toString(), id);
   }
 }

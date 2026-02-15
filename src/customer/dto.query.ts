@@ -7,6 +7,7 @@ export class QueryCustomerDto {
   source?: CustomerSource;
   tier?: CustomerTier;
   search?: string;
+  keyword?: string;
   email?: string;
   phone?: string;
   isPayingCustomer?: boolean;
@@ -35,6 +36,7 @@ export const QueryCustomerSchema = Joi.object({
     .valid(...Object.values(CustomerTier))
     .optional(),
   search: Joi.string().optional(),
+  keyword: Joi.string().optional(),
   email: Joi.string().email().optional(),
   phone: Joi.string().optional(),
   isPayingCustomer: Joi.boolean().optional(),

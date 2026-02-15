@@ -37,11 +37,19 @@ import {
   UpdateSegmentDto,
   UpdateSegmentSchema,
 } from './segment.dto';
+import * as Joi from 'joi';
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
 import { User } from '../decorators/user.decorator';
 import { UserDocument } from '../schema/user.schema';
 import { LanguageSchema } from '../dtos/lang.dto';
 import { CustomerStatus, CustomerSource, CustomerTier } from './enum';
+
+const BulkDeleteSchema = Joi.object({
+  ids: Joi.array()
+    .items(Joi.string().pattern(/^[0-9a-fA-F]{24}$/))
+    .min(1)
+    .required(),
+});
 
 @ApiTags('Customers')
 @ApiBearerAuth()
@@ -246,8 +254,9 @@ export class CustomerController {
   async mergeCustomers(
     @Param('id') primaryId: string,
     @Param('secondaryId') secondaryId: string,
+    @User('_id') userId: string,
   ) {
-    return this.customerService.mergeCustomers(primaryId, secondaryId);
+    return this.customerService.mergeCustomers(primaryId, secondaryId, userId);
   }
 
   // ==================== Phone Number Management ====================
@@ -388,6 +397,12 @@ export class CustomerController {
   @ApiOperation({ summary: 'Bulk soft-delete customers' })
   @ApiParam({ name: 'lang', enum: ['en', 'ar'] })
   @ApiResponse({ status: 200, description: 'Customers deleted' })
+  @UsePipes(
+    new JoiValidationPipe({
+      body: BulkDeleteSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
   async bulkDelete(
     @User('_id') userId: string,
     @Body() dto: { ids: string[] },

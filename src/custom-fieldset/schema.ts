@@ -1,10 +1,16 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema } from 'mongoose';
-import { FieldType, FieldsetStatus, AssignmentType } from './enum';
+import {
+  FieldType,
+  FieldsetStatus,
+  AssignmentType,
+  PriceModifierType,
+  FieldsetScope,
+} from './enum';
 
 const ObjectId = MongooseSchema.Types.ObjectId;
 
-// Sub-schema for image swatch option
+// Sub-schema for option (dropdown, radio, image swatch)
 @Schema({ _id: false })
 export class SwatchOption {
   @Prop({ required: true })
@@ -15,9 +21,30 @@ export class SwatchOption {
 
   @Prop()
   image?: string;
+
+  @Prop({ type: String, enum: Object.values(PriceModifierType), default: PriceModifierType.NONE })
+  priceType?: PriceModifierType;
+
+  @Prop({ default: 0 })
+  priceAmount?: number;
 }
 
 export const SwatchOptionSchema = SchemaFactory.createForClass(SwatchOption);
+
+// Sub-schema for conditional logic
+@Schema({ _id: false })
+export class FieldCondition {
+  @Prop({ required: true })
+  fieldName: string;
+
+  @Prop({ required: true })
+  operator: string; // equals, not_equals, contains, is_empty, is_not_empty
+
+  @Prop({ default: '' })
+  value: string;
+}
+
+export const FieldConditionSchema = SchemaFactory.createForClass(FieldCondition);
 
 // Sub-schema for a custom field
 @Schema({ _id: false })
@@ -40,6 +67,44 @@ export class CustomField {
 
   @Prop()
   placeholder?: string;
+
+  @Prop()
+  min?: number;
+
+  @Prop()
+  max?: number;
+
+  @Prop()
+  checkboxLabel?: string;
+
+  // Price add-on for the field itself (text, textarea, number, checkbox, color, date, file)
+  @Prop({ type: String, enum: Object.values(PriceModifierType), default: PriceModifierType.NONE })
+  priceType?: PriceModifierType;
+
+  @Prop({ default: 0 })
+  priceAmount?: number;
+
+  // Conditional logic
+  @Prop({ type: [FieldConditionSchema], default: [] })
+  conditions: FieldCondition[];
+
+  // Color picker
+  @Prop()
+  defaultColor?: string;
+
+  // Date picker
+  @Prop()
+  minDate?: string;
+
+  @Prop()
+  maxDate?: string;
+
+  // File upload
+  @Prop()
+  allowedFileTypes?: string; // e.g. "jpg,png,pdf"
+
+  @Prop()
+  maxFileSize?: number; // in MB
 
   @Prop({ type: [SwatchOptionSchema], default: [] })
   options: SwatchOption[];
@@ -68,6 +133,13 @@ export class CustomFieldset extends Document {
 
   @Prop({
     type: String,
+    enum: Object.values(FieldsetScope),
+    default: FieldsetScope.PRODUCT,
+  })
+  scope: FieldsetScope;
+
+  @Prop({
+    type: String,
     enum: Object.values(AssignmentType),
     required: true,
   })
@@ -78,6 +150,15 @@ export class CustomFieldset extends Document {
 
   @Prop({ type: [ObjectId], ref: 'Category', default: [] })
   categoryIds: MongooseSchema.Types.ObjectId[];
+
+  @Prop({ type: [ObjectId], ref: 'Tag', default: [] })
+  tagIds: MongooseSchema.Types.ObjectId[];
+
+  @Prop({ type: [String], default: [] })
+  productTypes: string[];
+
+  @Prop({ type: [ObjectId], ref: 'Attribute', default: [] })
+  attributeIds: MongooseSchema.Types.ObjectId[];
 
   @Prop({ type: [CustomFieldSchema], default: [] })
   fields: CustomField[];

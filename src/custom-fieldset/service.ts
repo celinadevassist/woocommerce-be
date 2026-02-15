@@ -10,6 +10,8 @@ import { CustomFieldset } from './schema';
 import { Store } from '../store/schema';
 import { Product } from '../product/schema';
 import { Category } from '../category/schema';
+import { Tag } from '../tag/schema';
+import { Attribute } from '../attribute/schema';
 import {
   CreateCustomFieldsetDto,
   UpdateCustomFieldsetDto,
@@ -40,6 +42,8 @@ export class CustomFieldsetService {
     @InjectModel(Store.name) private storeModel: Model<Store>,
     @InjectModel(Product.name) private productModel: Model<Product>,
     @InjectModel(Category.name) private categoryModel: Model<Category>,
+    @InjectModel(Tag.name) private tagModel: Model<Tag>,
+    @InjectModel(Attribute.name) private attributeModel: Model<Attribute>,
     private readonly wooCommerceService: WooCommerceService,
   ) {}
 
@@ -57,9 +61,13 @@ export class CustomFieldsetService {
       storeId: store._id,
       name: dto.name,
       status: dto.status || 'active',
+      scope: dto.scope || 'product',
       assignmentType: dto.assignmentType,
       productIds: (dto.productIds || []).map((id) => new Types.ObjectId(id)),
       categoryIds: (dto.categoryIds || []).map((id) => new Types.ObjectId(id)),
+      tagIds: (dto.tagIds || []).map((id) => new Types.ObjectId(id)),
+      productTypes: dto.productTypes || [],
+      attributeIds: (dto.attributeIds || []).map((id) => new Types.ObjectId(id)),
       fields: dto.fields,
       position: dto.position || 0,
     });
@@ -90,9 +98,14 @@ export class CustomFieldsetService {
       filter.assignmentType = query.assignmentType;
     }
 
+    if (query.scope) {
+      filter.scope = query.scope;
+    }
+
     if (query.keyword) {
+      const escaped = query.keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       filter.$or = [
-        { name: { $regex: query.keyword, $options: 'i' } },
+        { name: { $regex: escaped, $options: 'i' } },
       ];
     }
 
@@ -108,6 +121,8 @@ export class CustomFieldsetService {
         .limit(size)
         .populate('productIds', 'name externalId')
         .populate('categoryIds', 'name externalId')
+        .populate('tagIds', 'name externalId')
+        .populate('attributeIds', 'name wooId')
         .lean(),
       this.fieldsetModel.countDocuments(filter),
     ]);
@@ -134,6 +149,8 @@ export class CustomFieldsetService {
       })
       .populate('productIds', 'name externalId')
       .populate('categoryIds', 'name externalId')
+      .populate('tagIds', 'name externalId')
+      .populate('attributeIds', 'name wooId')
       .lean();
 
     if (!fieldset) {
@@ -176,11 +193,26 @@ export class CustomFieldsetService {
         (id) => new Types.ObjectId(id),
       );
     }
+    if (dto.tagIds) {
+      updateData.tagIds = dto.tagIds.map(
+        (id) => new Types.ObjectId(id),
+      );
+    }
+    if (dto.productTypes) {
+      updateData.productTypes = dto.productTypes;
+    }
+    if (dto.attributeIds) {
+      updateData.attributeIds = dto.attributeIds.map(
+        (id) => new Types.ObjectId(id),
+      );
+    }
 
     const updated = await this.fieldsetModel
       .findByIdAndUpdate(fieldsetId, updateData, { new: true })
       .populate('productIds', 'name externalId')
       .populate('categoryIds', 'name externalId')
+      .populate('tagIds', 'name externalId')
+      .populate('attributeIds', 'name wooId')
       .lean();
 
     return updated;
@@ -210,6 +242,7 @@ export class CustomFieldsetService {
 
   /**
    * Sync a single fieldset to WooCommerce via CartFlow Bridge
+   * (sends all active fieldsets so WordPress always has the full set)
    */
   async syncToWoo(userId: string, fieldsetId: string) {
     const fieldset = await this.fieldsetModel
@@ -217,8 +250,6 @@ export class CustomFieldsetService {
         _id: new Types.ObjectId(fieldsetId),
         isDeleted: false,
       })
-      .populate('productIds', 'externalId')
-      .populate('categoryIds', 'externalId')
       .lean();
 
     if (!fieldset) {
@@ -230,8 +261,21 @@ export class CustomFieldsetService {
       userId,
     );
 
-    // Build all active fieldsets for this store for a full sync
-    return this.pushFieldsetsToWoo(store, [fieldset]);
+    // Always push ALL active fieldsets so WordPress has the complete sorted set
+    const allFieldsets = await this.fieldsetModel
+      .find({
+        storeId: store._id,
+        isDeleted: false,
+        status: 'active',
+      })
+      .sort({ position: 1 })
+      .populate('productIds', 'externalId')
+      .populate('categoryIds', 'externalId')
+      .populate('tagIds', 'externalId')
+      .populate('attributeIds', 'wooId')
+      .lean();
+
+    return this.pushFieldsetsToWoo(store, allFieldsets);
   }
 
   /**
@@ -249,6 +293,8 @@ export class CustomFieldsetService {
       .sort({ position: 1 })
       .populate('productIds', 'externalId')
       .populate('categoryIds', 'externalId')
+      .populate('tagIds', 'externalId')
+      .populate('attributeIds', 'wooId')
       .lean();
 
     return this.pushFieldsetsToWoo(store, fieldsets);
@@ -269,6 +315,7 @@ export class CustomFieldsetService {
       id: fs._id.toString(),
       name: fs.name,
       status: fs.status,
+      scope: fs.scope || 'product',
       assignmentType: fs.assignmentType,
       productExternalIds: (fs.productIds || [])
         .map((p: any) => p.externalId)
@@ -276,16 +323,40 @@ export class CustomFieldsetService {
       categoryExternalIds: (fs.categoryIds || [])
         .map((c: any) => c.externalId)
         .filter(Boolean),
+      tagExternalIds: (fs.tagIds || [])
+        .map((t: any) => t.externalId)
+        .filter(Boolean),
+      productTypes: fs.productTypes || [],
+      attributeExternalIds: (fs.attributeIds || [])
+        .map((a: any) => a.wooId)
+        .filter(Boolean),
       fields: fs.fields.map((f: any) => ({
         name: f.name,
         label: f.label,
         type: f.type,
         required: f.required,
         placeholder: f.placeholder || '',
+        min: f.min ?? null,
+        max: f.max ?? null,
+        checkboxLabel: f.checkboxLabel || '',
+        priceType: f.priceType || 'none',
+        priceAmount: f.priceAmount || 0,
+        conditions: (f.conditions || []).map((c: any) => ({
+          fieldName: c.fieldName,
+          operator: c.operator,
+          value: c.value || '',
+        })),
+        defaultColor: f.defaultColor || '',
+        minDate: f.minDate || '',
+        maxDate: f.maxDate || '',
+        allowedFileTypes: f.allowedFileTypes || '',
+        maxFileSize: f.maxFileSize || 0,
         options: (f.options || []).map((o: any) => ({
           label: o.label,
           value: o.value,
           image: o.image || '',
+          priceType: o.priceType || 'none',
+          priceAmount: o.priceAmount || 0,
         })),
         position: f.position,
       })),
