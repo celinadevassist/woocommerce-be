@@ -34,6 +34,18 @@ import { LanguageSchema } from '../dtos/lang.dto';
 export class CustomFieldsetController {
   constructor(private readonly fieldsetService: CustomFieldsetService) {}
 
+  @Post('reorder')
+  @ApiOperation({ summary: 'Reorder custom fieldsets' })
+  @UsePipes(
+    new JoiValidationPipe({
+      body: ReorderCustomFieldsetSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async reorder(@Body() dto: ReorderCustomFieldsetDto, @User() user: any) {
+    return this.fieldsetService.reorder(user._id.toString(), dto);
+  }
+
   @Post(':storeId')
   @ApiOperation({ summary: 'Create a new custom fieldset' })
   @UsePipes(
@@ -60,18 +72,6 @@ export class CustomFieldsetController {
   )
   async findAll(@Query() query: QueryCustomFieldsetDto, @User() user: any) {
     return this.fieldsetService.findAll(user._id.toString(), query);
-  }
-
-  @Post('reorder')
-  @ApiOperation({ summary: 'Reorder custom fieldsets' })
-  @UsePipes(
-    new JoiValidationPipe({
-      body: ReorderCustomFieldsetSchema,
-      param: { lang: LanguageSchema },
-    }),
-  )
-  async reorder(@Body() dto: ReorderCustomFieldsetDto, @User() user: any) {
-    return this.fieldsetService.reorder(user._id.toString(), dto);
   }
 
   @Get(':id')
