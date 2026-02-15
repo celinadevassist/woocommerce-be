@@ -56,6 +56,9 @@ const CustomFieldJoiSchema = Joi.object().keys({
   // File upload
   allowedFileTypes: Joi.string().optional().allow(''),
   maxFileSize: Joi.number().optional(),
+  // Demo image & note
+  demoImage: Joi.string().uri().optional().allow(''),
+  demoNote: Joi.string().max(500).optional().allow(''),
   // Options & position
   options: Joi.array().items(SwatchOptionJoiSchema).optional().default([]),
   position: Joi.number().min(0).optional().default(0),

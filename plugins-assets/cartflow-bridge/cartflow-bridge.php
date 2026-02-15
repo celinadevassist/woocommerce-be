@@ -1656,6 +1656,18 @@ class CartFlow_Bridge {
                 echo '<div class="cartflow-field cartflow-field--' . esc_attr($field_type) . '"' . $cond_attr . ' data-field-key="' . esc_attr($field_key) . '" data-field-name="' . esc_attr($field_name) . '">';
                 echo '<label for="' . esc_attr($field_key) . '">' . esc_html($field_label) . $price_display . $required_mark . '</label>';
 
+                // Demo note
+                $demo_note = isset($field['demoNote']) ? trim($field['demoNote']) : '';
+                if ($demo_note) {
+                    echo '<p class="cartflow-demo-note">' . esc_html($demo_note) . '</p>';
+                }
+
+                // Demo image
+                $demo_image = isset($field['demoImage']) ? trim($field['demoImage']) : '';
+                if ($demo_image) {
+                    echo '<div class="cartflow-demo-image"><img src="' . esc_url($demo_image) . '" alt="' . esc_attr($field_label) . ' example" class="cartflow-demo-img" /></div>';
+                }
+
                 if ($field_type === 'text') {
                     $placeholder = isset($field['placeholder']) ? $field['placeholder'] : '';
                     echo '<input type="text" id="' . esc_attr($field_key) . '" name="' . esc_attr($field_key) . '" placeholder="' . esc_attr($placeholder) . '"' . $required_attr . ' class="cartflow-text-input" />';
@@ -1790,6 +1802,21 @@ class CartFlow_Bridge {
                 margin-bottom: 5px;
                 font-weight: 500;
                 font-size: 0.9em;
+            }
+            .cartflow-demo-note {
+                margin: 2px 0 6px 0;
+                font-size: 0.82em;
+                color: #666;
+                font-style: italic;
+            }
+            .cartflow-demo-image {
+                margin: 4px 0 8px 0;
+            }
+            .cartflow-demo-img {
+                max-width: 200px;
+                max-height: 150px;
+                border-radius: 4px;
+                border: 1px solid #eee;
             }
             .cartflow-field .required {
                 color: #e00;

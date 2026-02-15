@@ -352,6 +352,8 @@ export class CustomFieldsetService {
         maxDate: f.maxDate || '',
         allowedFileTypes: f.allowedFileTypes || '',
         maxFileSize: f.maxFileSize || 0,
+        demoImage: f.demoImage || '',
+        demoNote: f.demoNote || '',
         options: (f.options || []).map((o: any) => ({
           label: o.label,
           value: o.value,

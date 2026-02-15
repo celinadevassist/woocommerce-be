@@ -106,6 +106,13 @@ export class CustomField {
   @Prop()
   maxFileSize?: number; // in MB
 
+  // Demo image & note
+  @Prop()
+  demoImage?: string;
+
+  @Prop()
+  demoNote?: string;
+
   @Prop({ type: [SwatchOptionSchema], default: [] })
   options: SwatchOption[];
 
