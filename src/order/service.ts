@@ -881,7 +881,7 @@ export class OrderService {
       wooOrder.meta_data || [],
     );
     if (conversionMeta) {
-      const { originalCurrency, exchangeRate } = conversionMeta;
+      const { originalCurrency, originalTotal, exchangeRate } = conversionMeta;
       const d = 2;
 
       // Save payment gateway info
@@ -905,8 +905,11 @@ export class OrderService {
       const discountTaxFromLines = (wooOrder.coupon_lines || [])
         .reduce((sum, line) => sum + parseFloat(line.discount_tax || '0'), 0);
 
-      // Reverse-convert all totals
-      orderData.total = this.reverseConvertAmount(wooOrder.total, exchangeRate, d);
+      // Use the exact original total stored by the bridge (avoids double-rounding),
+      // fall back to reverse conversion if original not available
+      orderData.total = originalTotal > 0
+        ? originalTotal.toFixed(d)
+        : this.reverseConvertAmount(wooOrder.total, exchangeRate, d);
       orderData.discountTotal = this.reverseConvertAmount(discountFromLines, exchangeRate, d);
       orderData.discountTax = this.reverseConvertAmount(discountTaxFromLines, exchangeRate, d);
       orderData.shippingTotal = this.reverseConvertAmount(shippingFromLines, exchangeRate, d);
