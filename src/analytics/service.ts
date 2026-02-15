@@ -22,6 +22,9 @@ import {
 } from './interface';
 import { ReviewStatus } from '../review/enum';
 
+// Statuses that should not count toward revenue/financial metrics
+const EXCLUDED_REVENUE_STATUSES = ['cancelled', 'refunded', 'failed'];
+
 @Injectable()
 export class AnalyticsService {
   constructor(
@@ -109,9 +112,13 @@ export class AnalyticsService {
     delete productFilter.isDeleted;
     productFilter.deletedAt = { $exists: false };
 
+    const revenueFilter = { ...orderFilter, status: { $nin: EXCLUDED_REVENUE_STATUSES } };
+
     const [
       totalOrders,
+      validOrderCount,
       revenueData,
+      refundsData,
       ordersByStatus,
       totalCustomers,
       newCustomers,
@@ -122,10 +129,20 @@ export class AnalyticsService {
       avgRating,
       pendingReviews,
     ] = await Promise.all([
+      // Total orders including all statuses (for the "Total Orders" card)
       this.orderModel.countDocuments(orderFilter),
+      // Valid order count excluding cancelled/refunded/failed (for average calculation)
+      this.orderModel.countDocuments(revenueFilter),
+      // Gross revenue from valid orders only
       this.orderModel.aggregate([
-        { $match: orderFilter },
+        { $match: revenueFilter },
         { $group: { _id: null, total: { $sum: { $toDouble: '$total' } } } },
+      ]),
+      // Total refunds to deduct from revenue (only from valid orders, not fully-refunded/cancelled/failed)
+      this.orderModel.aggregate([
+        { $match: revenueFilter },
+        { $unwind: { path: '$refunds', preserveNullAndEmptyArrays: false } },
+        { $group: { _id: null, total: { $sum: { $toDouble: '$refunds.total' } } } },
       ]),
       this.orderModel.aggregate([
         { $match: orderFilter },
@@ -158,6 +175,10 @@ export class AnalyticsService {
       }),
     ]);
 
+    const grossRevenue = revenueData[0]?.total || 0;
+    const totalRefunds = refundsData[0]?.total || 0;
+    const netRevenue = grossRevenue - totalRefunds;
+
     const statusMap: Record<string, number> = {};
     ordersByStatus.forEach((item: any) => {
       statusMap[item._id] = item.count;
@@ -166,9 +187,9 @@ export class AnalyticsService {
     return {
       orders: {
         total: totalOrders,
-        revenue: revenueData[0]?.total || 0,
+        revenue: netRevenue,
         averageOrderValue:
-          totalOrders > 0 ? (revenueData[0]?.total || 0) / totalOrders : 0,
+          validOrderCount > 0 ? netRevenue / validOrderCount : 0,
         byStatus: statusMap,
       },
       customers: {
@@ -223,8 +244,9 @@ export class AnalyticsService {
         dateFormat = '%Y-%m';
     }
 
+    const revenueFilter = { ...orderFilter, status: { $nin: EXCLUDED_REVENUE_STATUSES } };
     const result = await this.orderModel.aggregate([
-      { $match: orderFilter },
+      { $match: revenueFilter },
       {
         $group: {
           _id: {
@@ -259,8 +281,9 @@ export class AnalyticsService {
       orderFilter.dateCreatedWoo = dateFilter;
     }
 
+    const revenueFilter = { ...orderFilter, status: { $nin: EXCLUDED_REVENUE_STATUSES } };
     const result = await this.orderModel.aggregate([
-      { $match: orderFilter },
+      { $match: revenueFilter },
       { $unwind: '$lineItems' },
       {
         $group: {
@@ -305,8 +328,9 @@ export class AnalyticsService {
       orderFilter.dateCreatedWoo = dateFilter;
     }
 
+    const revenueFilter = { ...orderFilter, status: { $nin: EXCLUDED_REVENUE_STATUSES } };
     const result = await this.orderModel.aggregate([
-      { $match: orderFilter },
+      { $match: revenueFilter },
       {
         $group: {
           _id: '$billing.email',
@@ -371,8 +395,9 @@ export class AnalyticsService {
       orderFilter.dateCreatedWoo = dateFilter;
     }
 
+    const revenueFilter = { ...orderFilter, status: { $nin: EXCLUDED_REVENUE_STATUSES } };
     const result = await this.orderModel.aggregate([
-      { $match: orderFilter },
+      { $match: revenueFilter },
       {
         $group: {
           _id: '$storeId',

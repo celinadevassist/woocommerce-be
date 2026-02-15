@@ -528,9 +528,9 @@ export class OrderService {
           },
         },
       ]),
-      // Calculate total refunds to deduct from revenue
+      // Calculate total refunds to deduct from revenue (only from valid orders)
       this.orderModel.aggregate([
-        { $match: baseFilter },
+        { $match: countFilter },
         { $unwind: { path: '$refunds', preserveNullAndEmptyArrays: false } },
         {
           $group: {
