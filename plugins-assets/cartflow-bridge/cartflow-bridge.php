@@ -3,7 +3,7 @@
  * Plugin Name: CartFlow Bridge
  * Plugin URI: https://cartflow.app
  * Description: REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, checkout currency conversion, and custom product fields
- * Version: 1.5.0
+ * Version: 1.6.0
  * Author: CartFlow
  * Author URI: https://cartflow.app
  * License: GPL v2 or later
