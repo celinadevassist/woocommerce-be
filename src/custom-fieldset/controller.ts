@@ -20,6 +20,8 @@ import {
   UpdateCustomFieldsetSchema,
   QueryCustomFieldsetDto,
   QueryCustomFieldsetSchema,
+  ReorderCustomFieldsetDto,
+  ReorderCustomFieldsetSchema,
 } from './dto';
 import { JoiValidationPipe } from '../pipes/joi-validator.pipe';
 import { User } from '../decorators/user.decorator';
@@ -58,6 +60,18 @@ export class CustomFieldsetController {
   )
   async findAll(@Query() query: QueryCustomFieldsetDto, @User() user: any) {
     return this.fieldsetService.findAll(user._id.toString(), query);
+  }
+
+  @Post('reorder')
+  @ApiOperation({ summary: 'Reorder custom fieldsets' })
+  @UsePipes(
+    new JoiValidationPipe({
+      body: ReorderCustomFieldsetSchema,
+      param: { lang: LanguageSchema },
+    }),
+  )
+  async reorder(@Body() dto: ReorderCustomFieldsetDto, @User() user: any) {
+    return this.fieldsetService.reorder(user._id.toString(), dto);
   }
 
   @Get(':id')

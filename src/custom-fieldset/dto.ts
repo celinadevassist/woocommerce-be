@@ -162,6 +162,26 @@ export const UpdateCustomFieldsetSchema = Joi.object().keys({
   position: Joi.number().min(0).optional(),
 });
 
+// ==================== REORDER DTO ====================
+
+export class ReorderCustomFieldsetDto {
+  items: { id: string; position: number }[];
+  storeId: string;
+}
+
+export const ReorderCustomFieldsetSchema = Joi.object().keys({
+  storeId: Joi.string().pattern(objectIdPattern).required(),
+  items: Joi.array()
+    .items(
+      Joi.object().keys({
+        id: Joi.string().pattern(objectIdPattern).required(),
+        position: Joi.number().min(0).required(),
+      }),
+    )
+    .min(1)
+    .required(),
+});
+
 // ==================== QUERY DTO ====================
 
 export class QueryCustomFieldsetDto {

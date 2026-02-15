@@ -16,6 +16,7 @@ import {
   CreateCustomFieldsetDto,
   UpdateCustomFieldsetDto,
   QueryCustomFieldsetDto,
+  ReorderCustomFieldsetDto,
 } from './dto';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 
@@ -387,6 +388,28 @@ export class CustomFieldsetService {
       );
       throw error;
     }
+  }
+
+  /**
+   * Reorder fieldsets by updating their positions
+   */
+  async reorder(userId: string, dto: ReorderCustomFieldsetDto) {
+    await this.getStoreWithAccess(dto.storeId, userId);
+
+    const bulkOps = dto.items.map((item) => ({
+      updateOne: {
+        filter: {
+          _id: new Types.ObjectId(item.id),
+          storeId: new Types.ObjectId(dto.storeId),
+          isDeleted: false,
+        },
+        update: { $set: { position: item.position } },
+      },
+    }));
+
+    await this.fieldsetModel.bulkWrite(bulkOps);
+
+    return { message: `Reordered ${dto.items.length} fieldset(s)` };
   }
 
   /**

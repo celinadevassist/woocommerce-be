@@ -1893,6 +1893,25 @@ class CartFlow_Bridge {
                 line-height: 1.2;
                 word-break: break-word;
             }
+            @media (max-width: 480px) {
+                .cartflow-swatch-options {
+                    gap: 4px;
+                }
+                .cartflow-swatch-option {
+                    padding: 3px;
+                    max-width: calc((100% - 16px) / 5);
+                    box-sizing: border-box;
+                }
+                .cartflow-swatch-image {
+                    width: 100%;
+                    height: auto;
+                    aspect-ratio: 1;
+                }
+                .cartflow-swatch-label {
+                    font-size: 0.65em;
+                    margin-top: 2px;
+                }
+            }
             .cartflow-color-picker {
                 width: 60px;
                 height: 40px;
