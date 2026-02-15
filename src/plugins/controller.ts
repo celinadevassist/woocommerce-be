@@ -28,7 +28,7 @@ export class PluginsController {
 
   // Latest plugin versions - update these when releasing new versions
   private readonly latestVersions = {
-    'cartflow-bridge': '1.4.0',
+    'cartflow-bridge': '1.6.0',
   };
 
   @Get()
@@ -41,8 +41,9 @@ export class PluginsController {
         name: 'CartFlow Bridge',
         version: this.latestVersions['cartflow-bridge'],
         description:
-          'REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, and checkout currency conversion',
+          'REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, checkout currency conversion, and custom product fields',
         features: [
+          'Custom Product Fields: 10 field types with price add-ons, conditional logic, demo image/note',
           'Checkout Currency Conversion: Convert order totals to payment gateway currency',
           'Smart Shipping: Auto-hide paid shipping when free shipping qualifies',
           'Manage Site Title, Tagline, Admin Email',
@@ -135,10 +136,37 @@ export class PluginsController {
         name: 'CartFlow Bridge',
         version: this.latestVersions['cartflow-bridge'],
         description:
-          'REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, and checkout currency conversion',
+          'REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, checkout currency conversion, and custom product fields',
         author: 'CartFlow',
         license: 'GPL v2 or later',
         changelog: [
+          {
+            version: '1.6.0',
+            changes: [
+              'Added demo image support for custom fields — display an example image above the field input on product pages',
+              'Added demo note support for custom fields — display an italic hint/description above the field input',
+            ],
+          },
+          {
+            version: '1.5.0',
+            changes: [
+              'Custom product fields with 10 field types (text, textarea, number, checkbox, radio, dropdown, image swatch, color picker, date picker, file upload)',
+              'Price add-ons per field and per option (flat fee or percentage)',
+              'Conditional logic — show/hide fields based on other field values',
+              'Order-level custom fields rendered at checkout',
+              'Image swatch responsive layout (5 per row on small screens)',
+              'Fieldset reordering support',
+              'Field assignment by product, category, tag, product type, or attribute',
+            ],
+          },
+          {
+            version: '1.4.0',
+            changes: [
+              'Checkout currency conversion with notice display',
+              'Support for both classic and block checkout hooks',
+              'Preserve original order total in meta',
+            ],
+          },
           {
             version: '1.3.0',
             changes: [
@@ -196,6 +224,13 @@ export class PluginsController {
             path: '/wp-json/cartflow/v1/features/currency/live-rate',
             description:
               'Get live exchange rate between base and target currencies',
+          },
+          {
+            category: 'Custom Fieldsets',
+            methods: ['POST'],
+            path: '/wp-json/cartflow/v1/custom-fieldsets/sync',
+            description:
+              'Sync custom field configurations from CartFlow to WooCommerce',
           },
           {
             category: 'General Settings',
