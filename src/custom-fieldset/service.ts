@@ -220,7 +220,7 @@ export class CustomFieldsetService {
   }
 
   /**
-   * Soft delete a fieldset
+   * Delete a fieldset: sync removal to WooCommerce first, then soft-delete locally
    */
   async delete(userId: string, fieldsetId: string) {
     const fieldset = await this.fieldsetModel.findOne({
@@ -232,13 +232,44 @@ export class CustomFieldsetService {
       throw new NotFoundException('Custom fieldset not found');
     }
 
-    await this.getStoreWithAccess(fieldset.storeId.toString(), userId);
+    const store = await this.getStoreWithAccess(
+      fieldset.storeId.toString(),
+      userId,
+    );
 
+    // Soft-delete first so the re-sync excludes this fieldset
     await this.fieldsetModel.findByIdAndUpdate(fieldsetId, {
       isDeleted: true,
     });
 
-    return { message: 'Custom fieldset deleted successfully' };
+    // Re-sync remaining active fieldsets to WooCommerce (removes deleted one)
+    try {
+      const remaining = await this.fieldsetModel
+        .find({
+          storeId: store._id,
+          isDeleted: false,
+          status: 'active',
+        })
+        .sort({ position: 1 })
+        .populate('productIds', 'externalId')
+        .populate('categoryIds', 'externalId')
+        .populate('tagIds', 'externalId')
+        .populate('attributeIds', 'wooId')
+        .lean();
+
+      await this.pushFieldsetsToWoo(store, remaining);
+    } catch (error) {
+      // Rollback: restore the fieldset if WooCommerce sync failed
+      await this.fieldsetModel.findByIdAndUpdate(fieldsetId, {
+        isDeleted: false,
+      });
+      this.logger.error(
+        `Failed to sync deletion to WooCommerce, rolled back: ${error.message}`,
+      );
+      throw error;
+    }
+
+    return { message: 'Custom fieldset deleted and removed from WooCommerce' };
   }
 
   /**
