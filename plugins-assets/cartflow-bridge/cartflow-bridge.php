@@ -3,7 +3,7 @@
  * Plugin Name: CartFlow Bridge
  * Plugin URI: https://cartflow.app
  * Description: REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, checkout currency conversion, and custom product fields
- * Version: 1.6.0
+ * Version: 1.6.1
  * Author: CartFlow
  * Author URI: https://cartflow.app
  * License: GPL v2 or later
@@ -1662,10 +1662,10 @@ class CartFlow_Bridge {
                     echo '<p class="cartflow-demo-note">' . esc_html($demo_note) . '</p>';
                 }
 
-                // Demo image
+                // Demo image (clickable to enlarge)
                 $demo_image = isset($field['demoImage']) ? trim($field['demoImage']) : '';
                 if ($demo_image) {
-                    echo '<div class="cartflow-demo-image"><img src="' . esc_url($demo_image) . '" alt="' . esc_attr($field_label) . ' example" class="cartflow-demo-img" /></div>';
+                    echo '<div class="cartflow-demo-image"><img src="' . esc_url($demo_image) . '" alt="' . esc_attr($field_label) . ' example" class="cartflow-demo-img" data-full="' . esc_url($demo_image) . '" /></div>';
                 }
 
                 if ($field_type === 'text') {
@@ -1817,6 +1817,29 @@ class CartFlow_Bridge {
                 max-height: 150px;
                 border-radius: 4px;
                 border: 1px solid #eee;
+                cursor: pointer;
+                transition: opacity 0.2s;
+            }
+            .cartflow-demo-img:hover {
+                opacity: 0.8;
+            }
+            .cartflow-lightbox {
+                position: fixed;
+                inset: 0;
+                z-index: 999999;
+                background: rgba(0,0,0,0.85);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                cursor: pointer;
+                backdrop-filter: blur(4px);
+                -webkit-backdrop-filter: blur(4px);
+            }
+            .cartflow-lightbox img {
+                max-width: 90vw;
+                max-height: 90vh;
+                object-fit: contain;
+                border-radius: 8px;
             }
             .cartflow-field .required {
                 color: #e00;
@@ -1981,6 +2004,21 @@ class CartFlow_Bridge {
         </style>
         <script>
             (function() {
+                /* Demo image lightbox */
+                document.addEventListener('click', function(e) {
+                    if (e.target.classList.contains('cartflow-demo-img')) {
+                        var src = e.target.getAttribute('data-full');
+                        if (!src) return;
+                        var overlay = document.createElement('div');
+                        overlay.className = 'cartflow-lightbox';
+                        overlay.innerHTML = '<img src="' + src + '" alt="Demo image" />';
+                        overlay.addEventListener('click', function() {
+                            overlay.remove();
+                        });
+                        document.body.appendChild(overlay);
+                    }
+                });
+
                 /* Swatch selection */
                 document.addEventListener('change', function(e) {
                     if (e.target.classList.contains('cartflow-swatch-radio')) {
