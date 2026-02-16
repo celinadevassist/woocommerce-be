@@ -28,7 +28,7 @@ export class PluginsController {
 
   // Latest plugin versions - update these when releasing new versions
   private readonly latestVersions = {
-    'cartflow-bridge': '1.6.1',
+    'cartflow-bridge': '1.6.2',
   };
 
   @Get()
@@ -140,6 +140,13 @@ export class PluginsController {
         author: 'CartFlow',
         license: 'GPL v2 or later',
         changelog: [
+          {
+            version: '1.6.2',
+            changes: [
+              'Demo image displayed to the right of field label and note (flex layout)',
+              'Reduced demo image size to 80x60 max for cleaner product page appearance',
+            ],
+          },
           {
             version: '1.6.1',
             changes: [

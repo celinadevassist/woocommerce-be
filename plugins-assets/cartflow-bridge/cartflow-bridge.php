@@ -3,7 +3,7 @@
  * Plugin Name: CartFlow Bridge
  * Plugin URI: https://cartflow.app
  * Description: REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, checkout currency conversion, and custom product fields
- * Version: 1.6.1
+ * Version: 1.6.2
  * Author: CartFlow
  * Author URI: https://cartflow.app
  * License: GPL v2 or later
@@ -1654,18 +1654,28 @@ class CartFlow_Bridge {
                 }
 
                 echo '<div class="cartflow-field cartflow-field--' . esc_attr($field_type) . '"' . $cond_attr . ' data-field-key="' . esc_attr($field_key) . '" data-field-name="' . esc_attr($field_name) . '">';
+
+                // Demo note & image
+                $demo_note = isset($field['demoNote']) ? trim($field['demoNote']) : '';
+                $demo_image = isset($field['demoImage']) ? trim($field['demoImage']) : '';
+
+                if ($demo_note || $demo_image) {
+                    echo '<div class="cartflow-field-header">';
+                    echo '<div class="cartflow-field-header-left">';
+                }
+
                 echo '<label for="' . esc_attr($field_key) . '">' . esc_html($field_label) . $price_display . $required_mark . '</label>';
 
-                // Demo note
-                $demo_note = isset($field['demoNote']) ? trim($field['demoNote']) : '';
                 if ($demo_note) {
                     echo '<p class="cartflow-demo-note">' . esc_html($demo_note) . '</p>';
                 }
 
-                // Demo image (clickable to enlarge)
-                $demo_image = isset($field['demoImage']) ? trim($field['demoImage']) : '';
-                if ($demo_image) {
-                    echo '<div class="cartflow-demo-image"><img src="' . esc_url($demo_image) . '" alt="' . esc_attr($field_label) . ' example" class="cartflow-demo-img" data-full="' . esc_url($demo_image) . '" /></div>';
+                if ($demo_note || $demo_image) {
+                    echo '</div>'; // close header-left
+                    if ($demo_image) {
+                        echo '<div class="cartflow-demo-image"><img src="' . esc_url($demo_image) . '" alt="' . esc_attr($field_label) . ' example" class="cartflow-demo-img" data-full="' . esc_url($demo_image) . '" /></div>';
+                    }
+                    echo '</div>'; // close header
                 }
 
                 if ($field_type === 'text') {
@@ -1803,6 +1813,15 @@ class CartFlow_Bridge {
                 font-weight: 500;
                 font-size: 0.9em;
             }
+            .cartflow-field-header {
+                display: flex;
+                align-items: flex-start;
+                justify-content: space-between;
+                gap: 10px;
+            }
+            .cartflow-field-header-left {
+                flex: 1;
+            }
             .cartflow-demo-note {
                 margin: 2px 0 6px 0;
                 font-size: 0.82em;
@@ -1810,12 +1829,13 @@ class CartFlow_Bridge {
                 font-style: italic;
             }
             .cartflow-demo-image {
-                margin: 4px 0 8px 0;
+                flex-shrink: 0;
             }
             .cartflow-demo-img {
-                max-width: 200px;
-                max-height: 150px;
-                border-radius: 4px;
+                max-width: 80px;
+                max-height: 60px;
+                object-fit: cover;
+                border-radius: 3px;
                 border: 1px solid #eee;
                 cursor: pointer;
                 transition: opacity 0.2s;
