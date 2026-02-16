@@ -3,7 +3,7 @@
  * Plugin Name: CartFlow Bridge
  * Plugin URI: https://cartflow.app
  * Description: REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, checkout currency conversion, and custom product fields
- * Version: 1.6.2
+ * Version: 1.6.3
  * Author: CartFlow
  * Author URI: https://cartflow.app
  * License: GPL v2 or later
@@ -1817,10 +1817,11 @@ class CartFlow_Bridge {
                 display: flex;
                 align-items: flex-start;
                 justify-content: space-between;
-                gap: 10px;
+                gap: clamp(8px, 2vw, 16px);
             }
             .cartflow-field-header-left {
                 flex: 1;
+                min-width: 0;
             }
             .cartflow-demo-note {
                 margin: 2px 0 6px 0;
@@ -1830,18 +1831,23 @@ class CartFlow_Bridge {
             }
             .cartflow-demo-image {
                 flex-shrink: 0;
+                align-self: center;
             }
             .cartflow-demo-img {
-                max-width: 80px;
-                max-height: 60px;
+                width: clamp(48px, 8vw, 96px);
+                height: auto;
+                aspect-ratio: 4 / 3;
                 object-fit: cover;
-                border-radius: 3px;
-                border: 1px solid #eee;
+                border-radius: 6px;
+                border: 1px solid rgba(0, 0, 0, 0.08);
+                box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
                 cursor: pointer;
-                transition: opacity 0.2s;
+                transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
             }
             .cartflow-demo-img:hover {
-                opacity: 0.8;
+                opacity: 0.9;
+                transform: scale(1.04);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
             }
             .cartflow-lightbox {
                 position: fixed;
@@ -1964,6 +1970,13 @@ class CartFlow_Bridge {
                 word-break: break-word;
             }
             @media (max-width: 480px) {
+                .cartflow-field-header {
+                    gap: 6px;
+                }
+                .cartflow-demo-img {
+                    width: 40px;
+                    border-radius: 4px;
+                }
                 .cartflow-swatch-options {
                     gap: 4px;
                 }
