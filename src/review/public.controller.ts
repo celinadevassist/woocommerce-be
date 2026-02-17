@@ -310,15 +310,16 @@ export class PublicReviewController {
     return cl(doc.body);
   }
   var css=\`
-.cfr-container{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:900px;margin:0 auto}
+.cfr-container{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:1200px;margin:0 auto}
 .cfr-header{text-align:center;margin-bottom:24px}
 .cfr-header h2{font-size:32px;margin:0 0 10px 0;color:#1a1a1a}
 .cfr-summary{display:flex;align-items:center;justify-content:center;gap:15px;margin:20px 0}
 .cfr-big-rating{font-size:56px;font-weight:700;color:#1a1a1a;line-height:1}
 .cfr-stars-large{color:#FFB800;font-size:28px;letter-spacing:2px}
 .cfr-review-count{color:#666;font-size:14px;margin-top:5px}
-.cfr-reviews-list{display:grid;grid-template-columns:repeat(2,1fr);gap:20px}
-@media(max-width:768px){.cfr-reviews-list{grid-template-columns:1fr}}
+.cfr-reviews-list{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}
+@media(max-width:1024px){.cfr-reviews-list{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.cfr-reviews-list{grid-template-columns:1fr}}
 .cfr-review{background:#fff;border:1px solid #e5e5e5;border-radius:12px;padding:24px;transition:box-shadow .2s,transform .2s}
 .cfr-review:hover{box-shadow:0 4px 12px rgba(0,0,0,.08);transform:translateY(-2px)}
 .cfr-review-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px}
