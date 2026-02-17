@@ -18,6 +18,18 @@ const FieldConditionJoiSchema = Joi.object().keys({
   value: Joi.string().optional().allow('').default(''),
 });
 
+const ChildOptionJoiSchema = Joi.object().keys({
+  label: Joi.string().required(),
+  value: Joi.string().required(),
+  image: Joi.string().uri().optional().allow(''),
+  priceType: Joi.string()
+    .valid(...Object.values(PriceModifierType))
+    .optional()
+    .default(PriceModifierType.NONE),
+  priceAmount: Joi.number().optional().default(0),
+  visible: Joi.boolean().optional().default(true),
+});
+
 const SwatchOptionJoiSchema = Joi.object().keys({
   label: Joi.string().required(),
   value: Joi.string().required(),
@@ -27,6 +39,8 @@ const SwatchOptionJoiSchema = Joi.object().keys({
     .optional()
     .default(PriceModifierType.NONE),
   priceAmount: Joi.number().optional().default(0),
+  visible: Joi.boolean().optional().default(true),
+  children: Joi.array().items(ChildOptionJoiSchema).optional().default([]),
 });
 
 const CustomFieldJoiSchema = Joi.object().keys({
@@ -59,9 +73,23 @@ const CustomFieldJoiSchema = Joi.object().keys({
   // Demo image & note
   demoImage: Joi.string().uri().optional().allow(''),
   demoNote: Joi.string().max(500).optional().allow(''),
+  // Compound field config
+  parentLabel: Joi.string().max(255).optional().allow(''),
+  parentType: Joi.string().valid('radio', 'dropdown', 'image_swatch').optional().allow(''),
+  childLabel: Joi.string().max(255).optional().allow(''),
+  childType: Joi.string().valid('radio', 'dropdown', 'image_swatch').optional().allow(''),
   // Options & position
   options: Joi.array().items(SwatchOptionJoiSchema).optional().default([]),
+  visible: Joi.boolean().optional().default(true),
   position: Joi.number().min(0).optional().default(0),
+}).when(Joi.object({ type: Joi.string().valid(FieldType.COMPOUND) }).unknown(), {
+  then: Joi.object({
+    parentLabel: Joi.string().min(1).max(255).required(),
+    parentType: Joi.string().valid('radio', 'dropdown', 'image_swatch').required(),
+    childLabel: Joi.string().min(1).max(255).required(),
+    childType: Joi.string().valid('radio', 'dropdown', 'image_swatch').required(),
+    options: Joi.array().items(SwatchOptionJoiSchema).min(1).required(),
+  }),
 });
 
 const objectIdPattern = /^[0-9a-fA-F]{24}$/;

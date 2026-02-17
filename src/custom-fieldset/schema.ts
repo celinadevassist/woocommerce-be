@@ -10,6 +10,23 @@ import {
 
 const ObjectId = MongooseSchema.Types.ObjectId;
 
+// Inline sub-schema for compound child options (avoids self-reference)
+const ChildOptionSchema = new MongooseSchema(
+  {
+    label: { type: String, required: true },
+    value: { type: String, required: true },
+    image: { type: String },
+    priceType: {
+      type: String,
+      enum: Object.values(PriceModifierType),
+      default: PriceModifierType.NONE,
+    },
+    priceAmount: { type: Number, default: 0 },
+    visible: { type: Boolean, default: true },
+  },
+  { _id: false },
+);
+
 // Sub-schema for option (dropdown, radio, image swatch)
 @Schema({ _id: false })
 export class SwatchOption {
@@ -27,6 +44,18 @@ export class SwatchOption {
 
   @Prop({ default: 0 })
   priceAmount?: number;
+
+  @Prop({ default: true })
+  visible?: boolean;
+
+  @Prop({ type: [ChildOptionSchema], default: [] })
+  children?: Array<{
+    label: string;
+    value: string;
+    image?: string;
+    priceType?: PriceModifierType;
+    priceAmount?: number;
+  }>;
 }
 
 export const SwatchOptionSchema = SchemaFactory.createForClass(SwatchOption);
@@ -113,8 +142,24 @@ export class CustomField {
   @Prop()
   demoNote?: string;
 
+  // Compound field config
+  @Prop()
+  parentLabel?: string;
+
+  @Prop()
+  parentType?: string; // radio, dropdown, image_swatch
+
+  @Prop()
+  childLabel?: string;
+
+  @Prop()
+  childType?: string; // radio, dropdown, image_swatch
+
   @Prop({ type: [SwatchOptionSchema], default: [] })
   options: SwatchOption[];
+
+  @Prop({ default: true })
+  visible?: boolean;
 
   @Prop({ default: 0 })
   position: number;

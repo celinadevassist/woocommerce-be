@@ -9,6 +9,7 @@ export enum FieldType {
   COLOR_PICKER = 'color_picker',
   DATE_PICKER = 'date_picker',
   FILE_UPLOAD = 'file_upload',
+  COMPOUND = 'compound',
 }
 
 export enum PriceModifierType {

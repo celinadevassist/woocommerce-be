@@ -28,7 +28,7 @@ export class PluginsController {
 
   // Latest plugin versions - update these when releasing new versions
   private readonly latestVersions = {
-    'cartflow-bridge': '1.6.3',
+    'cartflow-bridge': '1.7.0',
   };
 
   @Get()
@@ -43,7 +43,7 @@ export class PluginsController {
         description:
           'REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, checkout currency conversion, and custom product fields',
         features: [
-          'Custom Product Fields: 10 field types with price add-ons, conditional logic, demo image/note',
+          'Custom Product Fields: 11 field types with price add-ons, conditional logic, demo image/note (includes compound parent-child fields)',
           'Checkout Currency Conversion: Convert order totals to payment gateway currency',
           'Smart Shipping: Auto-hide paid shipping when free shipping qualifies',
           'Manage Site Title, Tagline, Admin Email',
@@ -136,10 +136,20 @@ export class PluginsController {
         name: 'CartFlow Bridge',
         version: this.latestVersions['cartflow-bridge'],
         description:
-          'REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, checkout currency conversion, and custom product fields',
+          'REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, checkout currency conversion, and custom product fields (including compound parent-child fields)',
         author: 'CartFlow',
         license: 'GPL v2 or later',
         changelog: [
+          {
+            version: '1.7.0',
+            changes: [
+              'New compound field type: linked parent-child option selectors (e.g., Size → Color)',
+              'Parent and child selectors independently support radio, dropdown, or image swatch display',
+              'Combined pricing: both parent and child options have independent price add-ons that stack',
+              'Child options dynamically update when parent selection changes',
+              'Child area disabled/grayed until a parent is selected',
+            ],
+          },
           {
             version: '1.6.3',
             changes: [

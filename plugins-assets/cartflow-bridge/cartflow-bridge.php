@@ -3,7 +3,7 @@
  * Plugin Name: CartFlow Bridge
  * Plugin URI: https://cartflow.app
  * Description: REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, checkout currency conversion, and custom product fields
- * Version: 1.6.3
+ * Version: 1.7.0
  * Author: CartFlow
  * Author URI: https://cartflow.app
  * License: GPL v2 or later
@@ -1628,6 +1628,11 @@ class CartFlow_Bridge {
             }
 
             foreach ($fields as $field) {
+                // Skip hidden fields
+                if (isset($field['visible']) && $field['visible'] === false) {
+                    continue;
+                }
+
                 $field_name = sanitize_title($field['name'] ?? '');
                 $field_key = 'cartflow_' . $fieldset_name . '_' . $field_name;
                 $field_type = isset($field['type']) ? $field['type'] : 'text';
@@ -1704,13 +1709,16 @@ class CartFlow_Bridge {
                             $opt_label = isset($option['label']) ? $option['label'] : '';
                             $opt_price_type = isset($option['priceType']) ? $option['priceType'] : 'none';
                             $opt_price_amt = isset($option['priceAmount']) ? floatval($option['priceAmount']) : 0;
+                            $opt_unavailable = isset($option['visible']) && $option['visible'] === false;
                             $opt_price_str = '';
                             if ($opt_price_type !== 'none' && $opt_price_amt > 0) {
                                 $opt_price_str = $opt_price_type === 'percentage' ? ' (+' . $opt_price_amt . '%)' : ' (+' . wc_price($opt_price_amt) . ')';
                             }
                             $opt_id = $field_key . '_' . $idx;
-                            echo '<label class="cartflow-radio-option" for="' . esc_attr($opt_id) . '">';
-                            echo '<input type="radio" id="' . esc_attr($opt_id) . '" name="' . esc_attr($field_key) . '" value="' . esc_attr($opt_value) . '"' . $required_attr . ' class="cartflow-radio" data-price-type="' . esc_attr($opt_price_type) . '" data-price-amount="' . esc_attr($opt_price_amt) . '" />';
+                            $unavail_class = $opt_unavailable ? ' cartflow-option-unavailable' : '';
+                            $disabled_attr = $opt_unavailable ? ' disabled' : '';
+                            echo '<label class="cartflow-radio-option' . $unavail_class . '" for="' . esc_attr($opt_id) . '">';
+                            echo '<input type="radio" id="' . esc_attr($opt_id) . '" name="' . esc_attr($field_key) . '" value="' . esc_attr($opt_value) . '"' . $required_attr . $disabled_attr . ' class="cartflow-radio" data-price-type="' . esc_attr($opt_price_type) . '" data-price-amount="' . esc_attr($opt_price_amt) . '" />';
                             echo ' ' . esc_html($opt_label) . $opt_price_str;
                             echo '</label>';
                         }
@@ -1725,11 +1733,14 @@ class CartFlow_Bridge {
                         $opt_label = isset($option['label']) ? $option['label'] : '';
                         $opt_price_type = isset($option['priceType']) ? $option['priceType'] : 'none';
                         $opt_price_amt = isset($option['priceAmount']) ? floatval($option['priceAmount']) : 0;
+                        $opt_unavailable = isset($option['visible']) && $option['visible'] === false;
                         $opt_price_str = '';
                         if ($opt_price_type !== 'none' && $opt_price_amt > 0) {
                             $opt_price_str = $opt_price_type === 'percentage' ? ' (+' . $opt_price_amt . '%)' : ' (+' . strip_tags(wc_price($opt_price_amt)) . ')';
                         }
-                        echo '<option value="' . esc_attr($opt_value) . '" data-price-type="' . esc_attr($opt_price_type) . '" data-price-amount="' . esc_attr($opt_price_amt) . '">' . esc_html($opt_label) . $opt_price_str . '</option>';
+                        $disabled_attr = $opt_unavailable ? ' disabled' : '';
+                        $unavail_prefix = $opt_unavailable ? '✕ ' : '';
+                        echo '<option value="' . esc_attr($opt_value) . '"' . $disabled_attr . ' data-price-type="' . esc_attr($opt_price_type) . '" data-price-amount="' . esc_attr($opt_price_amt) . '">' . $unavail_prefix . esc_html($opt_label) . $opt_price_str . '</option>';
                     }
                     echo '</select>';
                 } elseif ($field_type === 'image_swatch') {
@@ -1740,10 +1751,13 @@ class CartFlow_Bridge {
                             $opt_value = isset($option['value']) ? $option['value'] : '';
                             $opt_label = isset($option['label']) ? $option['label'] : '';
                             $opt_image = isset($option['image']) ? $option['image'] : '';
+                            $opt_unavailable = isset($option['visible']) && $option['visible'] === false;
                             $opt_id = $field_key . '_' . $idx;
+                            $unavail_class = $opt_unavailable ? ' cartflow-option-unavailable' : '';
+                            $disabled_attr = $opt_unavailable ? ' disabled' : '';
 
-                            echo '<label class="cartflow-swatch-option" for="' . esc_attr($opt_id) . '" title="' . esc_attr($opt_label) . '">';
-                            echo '<input type="radio" id="' . esc_attr($opt_id) . '" name="' . esc_attr($field_key) . '" value="' . esc_attr($opt_value) . '"' . $required_attr . ' class="cartflow-swatch-radio" />';
+                            echo '<label class="cartflow-swatch-option' . $unavail_class . '" for="' . esc_attr($opt_id) . '" title="' . esc_attr($opt_label) . '">';
+                            echo '<input type="radio" id="' . esc_attr($opt_id) . '" name="' . esc_attr($field_key) . '" value="' . esc_attr($opt_value) . '"' . $required_attr . $disabled_attr . ' class="cartflow-swatch-radio" />';
                             if ($opt_image) {
                                 echo '<img src="' . esc_url($opt_image) . '" alt="' . esc_attr($opt_label) . '" class="cartflow-swatch-image" />';
                             }
@@ -1771,6 +1785,97 @@ class CartFlow_Bridge {
                     if ($allowed_types) {
                         echo '<small class="cartflow-file-hint">' . esc_html__('Allowed: ', 'cartflow-bridge') . esc_html($allowed_types) . ' (max ' . esc_html($max_size) . 'MB)</small>';
                     }
+                } elseif ($field_type === 'compound') {
+                    $parent_type = isset($field['parentType']) ? $field['parentType'] : 'radio';
+                    $child_type = isset($field['childType']) ? $field['childType'] : 'radio';
+                    $parent_label_text = isset($field['parentLabel']) ? $field['parentLabel'] : 'Parent';
+                    $child_label_text = isset($field['childLabel']) ? $field['childLabel'] : 'Child';
+                    $options = isset($field['options']) ? $field['options'] : array();
+                    $child_key = $field_key . '_child';
+
+                    // Build children map with visible flag preserved for JS
+                    $children_map = array();
+                    foreach ($options as $opt) {
+                        $pv = isset($opt['value']) ? $opt['value'] : '';
+                        $children_map[$pv] = isset($opt['children']) ? $opt['children'] : array();
+                    }
+
+                    echo '<div class="cartflow-compound-wrapper" data-children-map="' . esc_attr(wp_json_encode($children_map)) . '" data-child-type="' . esc_attr($child_type) . '" data-child-key="' . esc_attr($child_key) . '" data-child-label="' . esc_attr($child_label_text) . '">';
+
+                    // Parent selector
+                    echo '<div class="cartflow-compound-parent-section">';
+                    echo '<span class="cartflow-compound-section-label">' . esc_html($parent_label_text) . '</span>';
+
+                    if ($parent_type === 'radio') {
+                        echo '<div class="cartflow-radio-options">';
+                        foreach ($options as $idx => $option) {
+                            $opt_value = isset($option['value']) ? $option['value'] : '';
+                            $opt_label = isset($option['label']) ? $option['label'] : '';
+                            $opt_price_type = isset($option['priceType']) ? $option['priceType'] : 'none';
+                            $opt_price_amt = isset($option['priceAmount']) ? floatval($option['priceAmount']) : 0;
+                            $opt_unavailable = isset($option['visible']) && $option['visible'] === false;
+                            $opt_price_str = '';
+                            if ($opt_price_type !== 'none' && $opt_price_amt > 0) {
+                                $opt_price_str = $opt_price_type === 'percentage' ? ' (+' . $opt_price_amt . '%)' : ' (+' . wc_price($opt_price_amt) . ')';
+                            }
+                            $opt_id = $field_key . '_' . $idx;
+                            $unavail_class = $opt_unavailable ? ' cartflow-option-unavailable' : '';
+                            $disabled_attr = $opt_unavailable ? ' disabled' : '';
+                            echo '<label class="cartflow-radio-option' . $unavail_class . '" for="' . esc_attr($opt_id) . '">';
+                            echo '<input type="radio" id="' . esc_attr($opt_id) . '" name="' . esc_attr($field_key) . '" value="' . esc_attr($opt_value) . '"' . $required_attr . $disabled_attr . ' class="cartflow-radio cartflow-compound-parent-input" data-price-type="' . esc_attr($opt_price_type) . '" data-price-amount="' . esc_attr($opt_price_amt) . '" />';
+                            echo ' ' . esc_html($opt_label) . $opt_price_str;
+                            echo '</label>';
+                        }
+                        echo '</div>';
+                    } elseif ($parent_type === 'dropdown') {
+                        echo '<select id="' . esc_attr($field_key) . '" name="' . esc_attr($field_key) . '"' . $required_attr . ' class="cartflow-dropdown cartflow-compound-parent-input">';
+                        echo '<option value="">' . esc_html(sprintf(__('Select %s...', 'cartflow-bridge'), $parent_label_text)) . '</option>';
+                        foreach ($options as $option) {
+                            $opt_value = isset($option['value']) ? $option['value'] : '';
+                            $opt_label = isset($option['label']) ? $option['label'] : '';
+                            $opt_price_type = isset($option['priceType']) ? $option['priceType'] : 'none';
+                            $opt_price_amt = isset($option['priceAmount']) ? floatval($option['priceAmount']) : 0;
+                            $opt_unavailable = isset($option['visible']) && $option['visible'] === false;
+                            $opt_price_str = '';
+                            if ($opt_price_type !== 'none' && $opt_price_amt > 0) {
+                                $opt_price_str = $opt_price_type === 'percentage' ? ' (+' . $opt_price_amt . '%)' : ' (+' . strip_tags(wc_price($opt_price_amt)) . ')';
+                            }
+                            $disabled_attr = $opt_unavailable ? ' disabled' : '';
+                            $unavail_prefix = $opt_unavailable ? '✕ ' : '';
+                            echo '<option value="' . esc_attr($opt_value) . '"' . $disabled_attr . ' data-price-type="' . esc_attr($opt_price_type) . '" data-price-amount="' . esc_attr($opt_price_amt) . '">' . $unavail_prefix . esc_html($opt_label) . $opt_price_str . '</option>';
+                        }
+                        echo '</select>';
+                    } elseif ($parent_type === 'image_swatch') {
+                        echo '<div class="cartflow-swatch-options" data-field="' . esc_attr($field_key) . '">';
+                        foreach ($options as $idx => $option) {
+                            $opt_value = isset($option['value']) ? $option['value'] : '';
+                            $opt_label = isset($option['label']) ? $option['label'] : '';
+                            $opt_image = isset($option['image']) ? $option['image'] : '';
+                            $opt_unavailable = isset($option['visible']) && $option['visible'] === false;
+                            $opt_id = $field_key . '_' . $idx;
+                            $unavail_class = $opt_unavailable ? ' cartflow-option-unavailable' : '';
+                            $disabled_attr = $opt_unavailable ? ' disabled' : '';
+                            echo '<label class="cartflow-swatch-option' . $unavail_class . '" for="' . esc_attr($opt_id) . '" title="' . esc_attr($opt_label) . '">';
+                            echo '<input type="radio" id="' . esc_attr($opt_id) . '" name="' . esc_attr($field_key) . '" value="' . esc_attr($opt_value) . '"' . $required_attr . $disabled_attr . ' class="cartflow-swatch-radio cartflow-compound-parent-input" />';
+                            if ($opt_image) {
+                                echo '<img src="' . esc_url($opt_image) . '" alt="' . esc_attr($opt_label) . '" class="cartflow-swatch-image" />';
+                            }
+                            echo '<span class="cartflow-swatch-label">' . esc_html($opt_label) . '</span>';
+                            echo '</label>';
+                        }
+                        echo '</div>';
+                    }
+                    echo '</div>'; // close parent section
+
+                    // Child container (initially disabled)
+                    echo '<div class="cartflow-compound-child-container cartflow-compound-disabled">';
+                    echo '<span class="cartflow-compound-section-label">' . esc_html($child_label_text) . '</span>';
+                    echo '<div class="cartflow-compound-child-options">';
+                    echo '<p class="cartflow-compound-child-placeholder">' . esc_html(sprintf(__('Select a %s first', 'cartflow-bridge'), strtolower($parent_label_text))) . '</p>';
+                    echo '</div>';
+                    echo '</div>'; // close child container
+
+                    echo '</div>'; // close compound wrapper
                 }
 
                 echo '</div>';
@@ -2034,6 +2139,52 @@ class CartFlow_Bridge {
             .cartflow-field[data-conditions]:not([data-conditions="[]"]).cartflow-hidden {
                 display: none;
             }
+            /* Unavailable option styles (visible but not selectable) */
+            .cartflow-option-unavailable {
+                opacity: 0.45;
+                pointer-events: none;
+                position: relative;
+                text-decoration: line-through;
+                text-decoration-color: #c00;
+            }
+            .cartflow-swatch-option.cartflow-option-unavailable::after {
+                content: '';
+                position: absolute;
+                inset: 0;
+                background: linear-gradient(135deg, transparent 45%, #c00 45%, #c00 55%, transparent 55%);
+                opacity: 0.35;
+                border-radius: 6px;
+                pointer-events: none;
+            }
+            .cartflow-swatch-option.cartflow-option-unavailable {
+                text-decoration: none;
+            }
+            /* Compound field styles */
+            .cartflow-compound-wrapper {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+            }
+            .cartflow-compound-section-label {
+                display: block;
+                margin-bottom: 5px;
+                font-weight: 500;
+                font-size: 0.88em;
+                color: #444;
+            }
+            .cartflow-compound-disabled {
+                opacity: 0.4;
+                pointer-events: none;
+            }
+            .cartflow-compound-child-container {
+                transition: opacity 0.2s ease;
+            }
+            .cartflow-compound-child-placeholder {
+                font-size: 0.85em;
+                color: #999;
+                font-style: italic;
+                margin: 0;
+            }
         </style>
         <script>
             (function() {
@@ -2077,6 +2228,98 @@ class CartFlow_Bridge {
                     }
                 });
 
+                /* Compound field: parent change → rebuild child options */
+                function handleCompoundParentChange(e) {
+                    var input = e.target;
+                    if (!input.classList.contains('cartflow-compound-parent-input')) return;
+
+                    var wrapper = input.closest('.cartflow-compound-wrapper');
+                    if (!wrapper) return;
+
+                    var childrenMapStr = wrapper.getAttribute('data-children-map');
+                    var childType = wrapper.getAttribute('data-child-type') || 'radio';
+                    var childKey = wrapper.getAttribute('data-child-key') || '';
+                    var childLabel = wrapper.getAttribute('data-child-label') || 'Child';
+
+                    var selectedValue = '';
+                    if (input.tagName === 'SELECT') {
+                        selectedValue = input.value;
+                    } else if (input.type === 'radio' && input.checked) {
+                        selectedValue = input.value;
+                    }
+
+                    if (!selectedValue) return;
+
+                    var childrenMap = {};
+                    try { childrenMap = JSON.parse(childrenMapStr); } catch(ex) { return; }
+
+                    var children = childrenMap[selectedValue] || [];
+                    var container = wrapper.querySelector('.cartflow-compound-child-container');
+                    var optionsDiv = container.querySelector('.cartflow-compound-child-options');
+
+                    // Remove disabled state
+                    container.classList.remove('cartflow-compound-disabled');
+
+                    if (children.length === 0) {
+                        optionsDiv.innerHTML = '<p class="cartflow-compound-child-placeholder">No options available</p>';
+                        return;
+                    }
+
+                    var html = '';
+                    if (childType === 'radio') {
+                        html += '<div class="cartflow-radio-options">';
+                        children.forEach(function(ch, idx) {
+                            var isUnavail = (ch.visible === false);
+                            var priceStr = '';
+                            if (ch.priceType && ch.priceType !== 'none' && ch.priceAmount > 0) {
+                                priceStr = ch.priceType === 'percentage' ? ' (+' + ch.priceAmount + '%)' : ' (+$' + parseFloat(ch.priceAmount).toFixed(2) + ')';
+                            }
+                            var cid = childKey + '_' + idx;
+                            var unavailClass = isUnavail ? ' cartflow-option-unavailable' : '';
+                            var disabledAttr = isUnavail ? ' disabled' : '';
+                            html += '<label class="cartflow-radio-option' + unavailClass + '" for="' + cid + '">';
+                            html += '<input type="radio" id="' + cid + '" name="' + childKey + '" value="' + ch.value + '"' + disabledAttr + ' class="cartflow-radio" data-price-type="' + (ch.priceType || 'none') + '" data-price-amount="' + (ch.priceAmount || 0) + '" />';
+                            html += ' ' + ch.label + priceStr;
+                            html += '</label>';
+                        });
+                        html += '</div>';
+                    } else if (childType === 'dropdown') {
+                        html += '<select name="' + childKey + '" class="cartflow-dropdown">';
+                        html += '<option value="">Select ' + childLabel + '...</option>';
+                        children.forEach(function(ch) {
+                            var isUnavail = (ch.visible === false);
+                            var priceStr = '';
+                            if (ch.priceType && ch.priceType !== 'none' && ch.priceAmount > 0) {
+                                priceStr = ch.priceType === 'percentage' ? ' (+' + ch.priceAmount + '%)' : ' (+$' + parseFloat(ch.priceAmount).toFixed(2) + ')';
+                            }
+                            var disabledAttr = isUnavail ? ' disabled' : '';
+                            var prefix = isUnavail ? '\u2715 ' : '';
+                            html += '<option value="' + ch.value + '"' + disabledAttr + ' data-price-type="' + (ch.priceType || 'none') + '" data-price-amount="' + (ch.priceAmount || 0) + '">' + prefix + ch.label + priceStr + '</option>';
+                        });
+                        html += '</select>';
+                    } else if (childType === 'image_swatch') {
+                        html += '<div class="cartflow-swatch-options" data-field="' + childKey + '">';
+                        children.forEach(function(ch, idx) {
+                            var isUnavail = (ch.visible === false);
+                            var cid = childKey + '_' + idx;
+                            var unavailClass = isUnavail ? ' cartflow-option-unavailable' : '';
+                            var disabledAttr = isUnavail ? ' disabled' : '';
+                            html += '<label class="cartflow-swatch-option' + unavailClass + '" for="' + cid + '" title="' + ch.label + '">';
+                            html += '<input type="radio" id="' + cid + '" name="' + childKey + '" value="' + ch.value + '"' + disabledAttr + ' class="cartflow-swatch-radio" />';
+                            if (ch.image) {
+                                html += '<img src="' + ch.image + '" alt="' + ch.label + '" class="cartflow-swatch-image" />';
+                            }
+                            html += '<span class="cartflow-swatch-label">' + ch.label + '</span>';
+                            html += '</label>';
+                        });
+                        html += '</div>';
+                    }
+
+                    optionsDiv.innerHTML = html;
+                }
+
+                document.addEventListener('change', handleCompoundParentChange);
+
                 /* Conditional logic */
                 function evaluateConditions() {
                     var fields = document.querySelectorAll('.cartflow-field[data-conditions]');
@@ -2088,21 +2331,41 @@ class CartFlow_Bridge {
                             if (!conditions.length) return;
                             var fieldsetEl = fieldEl.closest('.cartflow-fieldset') || fieldEl.closest('.cartflow-custom-fields');
                             var allMet = conditions.every(function(cond) {
+                                /* Check if condition targets a compound child (fieldName ends with _child) */
+                                var isChildCondition = false;
+                                var rawName = cond.fieldName;
+                                if (rawName.match(/_child$/)) {
+                                    isChildCondition = true;
+                                    rawName = rawName.replace(/_child$/, '');
+                                }
                                 /* Find target field by data-field-name within the same fieldset/container */
-                                var condName = cond.fieldName.replace(/[^a-z0-9_-]/gi, '-').toLowerCase();
+                                var condName = rawName.replace(/[^a-z0-9_-]/gi, '-').toLowerCase();
                                 var scope = fieldsetEl || document;
                                 var targetDiv = scope.querySelector('.cartflow-field[data-field-name="' + condName + '"]');
                                 if (!targetDiv) return false;
-                                var targetEl = targetDiv.querySelector('input, select, textarea');
-                                if (!targetEl) return false;
                                 var val = '';
-                                if (targetEl.type === 'checkbox') {
-                                    val = targetEl.checked ? 'yes' : '';
-                                } else if (targetEl.type === 'radio') {
-                                    var checked = document.querySelector('[name="' + targetEl.name + '"]:checked');
-                                    val = checked ? checked.value : '';
+                                if (isChildCondition) {
+                                    /* For compound child, find input inside the child container */
+                                    var childContainer = targetDiv.querySelector('.cartflow-compound-child-container');
+                                    if (!childContainer) return false;
+                                    var childEl = childContainer.querySelector('input:checked, select');
+                                    if (!childEl) return false;
+                                    if (childEl.tagName === 'SELECT') {
+                                        val = childEl.value || '';
+                                    } else {
+                                        val = childEl.value || '';
+                                    }
                                 } else {
-                                    val = targetEl.value || '';
+                                    var targetEl = targetDiv.querySelector('input, select, textarea');
+                                    if (!targetEl) return false;
+                                    if (targetEl.type === 'checkbox') {
+                                        val = targetEl.checked ? 'yes' : '';
+                                    } else if (targetEl.type === 'radio') {
+                                        var checked = document.querySelector('[name="' + targetEl.name + '"]:checked');
+                                        val = checked ? checked.value : '';
+                                    } else {
+                                        val = targetEl.value || '';
+                                    }
                                 }
                                 switch (cond.operator) {
                                     case 'equals': return val === cond.value;
@@ -2158,6 +2421,11 @@ class CartFlow_Bridge {
             $fields = isset($fieldset['fields']) ? $fieldset['fields'] : array();
 
             foreach ($fields as $field) {
+                // Skip hidden fields
+                if (isset($field['visible']) && $field['visible'] === false) {
+                    continue;
+                }
+
                 if (empty($field['required'])) {
                     continue;
                 }
@@ -2169,6 +2437,7 @@ class CartFlow_Bridge {
 
                 $field_name = sanitize_title($field['name'] ?? '');
                 $field_key = 'cartflow_' . $fieldset_name . '_' . $field_name;
+                $field_type = isset($field['type']) ? $field['type'] : 'text';
                 $value = isset($_POST[$field_key]) ? sanitize_text_field($_POST[$field_key]) : '';
 
                 if (empty($value)) {
@@ -2178,6 +2447,28 @@ class CartFlow_Bridge {
                         'error'
                     );
                     $passed = false;
+                }
+
+                // Compound field: also validate child when parent is selected and has children
+                if ($field_type === 'compound' && !empty($value)) {
+                    $child_key = $field_key . '_child';
+                    $child_value = isset($_POST[$child_key]) ? sanitize_text_field($_POST[$child_key]) : '';
+                    $options = isset($field['options']) ? $field['options'] : array();
+                    $has_children = false;
+                    foreach ($options as $opt) {
+                        if (isset($opt['value']) && $opt['value'] === $value) {
+                            $has_children = !empty($opt['children']);
+                            break;
+                        }
+                    }
+                    if ($has_children && empty($child_value)) {
+                        $child_label_text = isset($field['childLabel']) ? $field['childLabel'] : 'Child option';
+                        wc_add_notice(
+                            sprintf(__('"%s" is a required field.', 'cartflow-bridge'), $child_label_text),
+                            'error'
+                        );
+                        $passed = false;
+                    }
                 }
             }
         }
@@ -2243,17 +2534,75 @@ class CartFlow_Bridge {
             $fields = isset($fieldset['fields']) ? $fieldset['fields'] : array();
 
             foreach ($fields as $field) {
+                // Skip hidden fields
+                if (isset($field['visible']) && $field['visible'] === false) {
+                    continue;
+                }
+
                 $field_name = sanitize_title($field['name'] ?? '');
                 $field_key = 'cartflow_' . $fieldset_name . '_' . $field_name;
                 $value = isset($_POST[$field_key]) ? sanitize_text_field($_POST[$field_key]) : '';
 
+                $field_type = isset($field['type']) ? $field['type'] : '';
+
                 if (!empty($value)) {
+                    // Compound fields: store parent and child as two separate entries
+                    if ($field_type === 'compound') {
+                        $options = isset($field['options']) ? $field['options'] : array();
+                        $parent_price_type = 'none';
+                        $parent_price_amount = 0;
+                        $matched_children = array();
+
+                        foreach ($options as $opt) {
+                            if (isset($opt['value']) && $opt['value'] === $value) {
+                                $parent_price_type = isset($opt['priceType']) ? $opt['priceType'] : 'none';
+                                $parent_price_amount = isset($opt['priceAmount']) ? floatval($opt['priceAmount']) : 0;
+                                $matched_children = isset($opt['children']) ? $opt['children'] : array();
+                                break;
+                            }
+                        }
+
+                        $parent_label_text = isset($field['parentLabel']) ? $field['parentLabel'] : (isset($field['label']) ? $field['label'] : $field_name);
+                        $custom_data[$field_key] = array(
+                            'label' => $parent_label_text,
+                            'value' => $value,
+                            'fieldset' => isset($fieldset['name']) ? $fieldset['name'] : '',
+                            'price_type' => $parent_price_type,
+                            'price_amount' => $parent_price_amount,
+                        );
+
+                        // Child entry
+                        $child_key = $field_key . '_child';
+                        $child_value = isset($_POST[$child_key]) ? sanitize_text_field($_POST[$child_key]) : '';
+                        if (!empty($child_value)) {
+                            $child_price_type = 'none';
+                            $child_price_amount = 0;
+                            foreach ($matched_children as $ch) {
+                                if (isset($ch['value']) && $ch['value'] === $child_value) {
+                                    $child_price_type = isset($ch['priceType']) ? $ch['priceType'] : 'none';
+                                    $child_price_amount = isset($ch['priceAmount']) ? floatval($ch['priceAmount']) : 0;
+                                    break;
+                                }
+                            }
+                            $child_label_text = isset($field['childLabel']) ? $field['childLabel'] : 'Child';
+                            $custom_data[$child_key] = array(
+                                'label' => $child_label_text,
+                                'value' => $child_value,
+                                'fieldset' => isset($fieldset['name']) ? $fieldset['name'] : '',
+                                'price_type' => $child_price_type,
+                                'price_amount' => $child_price_amount,
+                            );
+                        }
+
+                        continue;
+                    }
+
                     $field_price_type = isset($field['priceType']) ? $field['priceType'] : 'none';
                     $field_price_amount = isset($field['priceAmount']) ? floatval($field['priceAmount']) : 0;
 
                     // For option-based fields, get selected option's price
                     $option_types = array('radio', 'dropdown', 'image_swatch');
-                    if (in_array($field_type = (isset($field['type']) ? $field['type'] : ''), $option_types)) {
+                    if (in_array($field_type, $option_types)) {
                         $options = isset($field['options']) ? $field['options'] : array();
                         foreach ($options as $opt) {
                             if (isset($opt['value']) && $opt['value'] === $value) {
