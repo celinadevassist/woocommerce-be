@@ -3,7 +3,7 @@
  * Plugin Name: CartFlow Bridge
  * Plugin URI: https://cartflow.app
  * Description: REST API bridge for CartFlow to manage WordPress & WooCommerce settings, smart shipping, checkout currency conversion, and custom product fields
- * Version: 1.7.0
+ * Version: 1.7.1
  * Author: CartFlow
  * Author URI: https://cartflow.app
  * License: GPL v2 or later
@@ -1867,12 +1867,65 @@ class CartFlow_Bridge {
                     }
                     echo '</div>'; // close parent section
 
-                    // Child container (initially disabled)
-                    echo '<div class="cartflow-compound-child-container cartflow-compound-disabled">';
+                    // Child container — children visible but disabled until parent selected
+                    echo '<div class="cartflow-compound-child-container cartflow-compound-awaiting">';
                     echo '<span class="cartflow-compound-section-label">' . esc_html($child_label_text) . '</span>';
-                    echo '<div class="cartflow-compound-child-options">';
-                    echo '<p class="cartflow-compound-child-placeholder">' . esc_html(sprintf(__('Select a %s first', 'cartflow-bridge'), strtolower($parent_label_text))) . '</p>';
-                    echo '</div>';
+                    echo '<p class="cartflow-compound-hint">' . esc_html(sprintf(__('Please select the %s first', 'cartflow-bridge'), $parent_label_text)) . '</p>';
+                    echo '<div class="cartflow-compound-child-options cartflow-compound-preview-disabled">';
+
+                    // Collect unique children across all parent options for preview
+                    $preview_children = array();
+                    $seen_values = array();
+                    foreach ($options as $opt) {
+                        $opt_children = isset($opt['children']) ? $opt['children'] : array();
+                        foreach ($opt_children as $ch) {
+                            $cv = isset($ch['value']) ? $ch['value'] : '';
+                            if ($cv !== '' && !isset($seen_values[$cv])) {
+                                $seen_values[$cv] = true;
+                                $preview_children[] = $ch;
+                            }
+                        }
+                    }
+
+                    if (empty($preview_children)) {
+                        echo '<p class="cartflow-compound-child-placeholder">' . esc_html__('No options available', 'cartflow-bridge') . '</p>';
+                    } elseif ($child_type === 'radio') {
+                        echo '<div class="cartflow-radio-options">';
+                        foreach ($preview_children as $idx => $ch) {
+                            $cl = isset($ch['label']) ? $ch['label'] : '';
+                            $cid = $child_key . '_preview_' . $idx;
+                            echo '<label class="cartflow-radio-option" for="' . esc_attr($cid) . '">';
+                            echo '<input type="radio" id="' . esc_attr($cid) . '" disabled class="cartflow-radio" />';
+                            echo ' ' . esc_html($cl);
+                            echo '</label>';
+                        }
+                        echo '</div>';
+                    } elseif ($child_type === 'dropdown') {
+                        echo '<select disabled class="cartflow-dropdown">';
+                        echo '<option>' . esc_html(sprintf(__('Select %s...', 'cartflow-bridge'), $child_label_text)) . '</option>';
+                        foreach ($preview_children as $ch) {
+                            $cl = isset($ch['label']) ? $ch['label'] : '';
+                            echo '<option disabled>' . esc_html($cl) . '</option>';
+                        }
+                        echo '</select>';
+                    } elseif ($child_type === 'image_swatch') {
+                        echo '<div class="cartflow-swatch-options">';
+                        foreach ($preview_children as $idx => $ch) {
+                            $cl = isset($ch['label']) ? $ch['label'] : '';
+                            $ci = isset($ch['image']) ? $ch['image'] : '';
+                            $cid = $child_key . '_preview_' . $idx;
+                            echo '<label class="cartflow-swatch-option" for="' . esc_attr($cid) . '" title="' . esc_attr($cl) . '">';
+                            echo '<input type="radio" id="' . esc_attr($cid) . '" disabled class="cartflow-swatch-radio" />';
+                            if ($ci) {
+                                echo '<img src="' . esc_url($ci) . '" alt="' . esc_attr($cl) . '" class="cartflow-swatch-image" />';
+                            }
+                            echo '<span class="cartflow-swatch-label">' . esc_html($cl) . '</span>';
+                            echo '</label>';
+                        }
+                        echo '</div>';
+                    }
+
+                    echo '</div>'; // close child-options
                     echo '</div>'; // close child container
 
                     echo '</div>'; // close compound wrapper
@@ -2172,12 +2225,22 @@ class CartFlow_Bridge {
                 font-size: 0.88em;
                 color: #444;
             }
-            .cartflow-compound-disabled {
-                opacity: 0.4;
-                pointer-events: none;
-            }
             .cartflow-compound-child-container {
                 transition: opacity 0.2s ease;
+            }
+            .cartflow-compound-awaiting .cartflow-compound-preview-disabled {
+                opacity: 0.5;
+                pointer-events: none;
+            }
+            .cartflow-compound-hint {
+                font-size: 0.85em;
+                color: #e67700;
+                font-style: italic;
+                margin: 0 0 6px 0;
+                background: #fff8e1;
+                padding: 4px 10px;
+                border-radius: 4px;
+                border-left: 3px solid #e67700;
             }
             .cartflow-compound-child-placeholder {
                 font-size: 0.85em;
@@ -2229,6 +2292,10 @@ class CartFlow_Bridge {
                 });
 
                 /* Compound field: parent change → rebuild child options */
+                function isOptionUnavailable(opt) {
+                    return ('visible' in opt && !opt.visible);
+                }
+
                 function handleCompoundParentChange(e) {
                     var input = e.target;
                     if (!input.classList.contains('cartflow-compound-parent-input')) return;
@@ -2248,17 +2315,27 @@ class CartFlow_Bridge {
                         selectedValue = input.value;
                     }
 
-                    if (!selectedValue) return;
+                    var container = wrapper.querySelector('.cartflow-compound-child-container');
+                    var optionsDiv = container.querySelector('.cartflow-compound-child-options');
+                    var hint = container.querySelector('.cartflow-compound-hint');
+
+                    // No parent selected — restore awaiting state with hint
+                    if (!selectedValue) {
+                        container.classList.add('cartflow-compound-awaiting');
+                        optionsDiv.classList.add('cartflow-compound-preview-disabled');
+                        if (hint) hint.style.display = '';
+                        return;
+                    }
 
                     var childrenMap = {};
                     try { childrenMap = JSON.parse(childrenMapStr); } catch(ex) { return; }
 
                     var children = childrenMap[selectedValue] || [];
-                    var container = wrapper.querySelector('.cartflow-compound-child-container');
-                    var optionsDiv = container.querySelector('.cartflow-compound-child-options');
 
-                    // Remove disabled state
-                    container.classList.remove('cartflow-compound-disabled');
+                    // Activate child container — remove awaiting state and hint
+                    container.classList.remove('cartflow-compound-awaiting');
+                    optionsDiv.classList.remove('cartflow-compound-preview-disabled');
+                    if (hint) hint.style.display = 'none';
 
                     if (children.length === 0) {
                         optionsDiv.innerHTML = '<p class="cartflow-compound-child-placeholder">No options available</p>';
@@ -2269,7 +2346,7 @@ class CartFlow_Bridge {
                     if (childType === 'radio') {
                         html += '<div class="cartflow-radio-options">';
                         children.forEach(function(ch, idx) {
-                            var isUnavail = (ch.visible === false);
+                            var isUnavail = isOptionUnavailable(ch);
                             var priceStr = '';
                             if (ch.priceType && ch.priceType !== 'none' && ch.priceAmount > 0) {
                                 priceStr = ch.priceType === 'percentage' ? ' (+' + ch.priceAmount + '%)' : ' (+$' + parseFloat(ch.priceAmount).toFixed(2) + ')';
@@ -2287,7 +2364,7 @@ class CartFlow_Bridge {
                         html += '<select name="' + childKey + '" class="cartflow-dropdown">';
                         html += '<option value="">Select ' + childLabel + '...</option>';
                         children.forEach(function(ch) {
-                            var isUnavail = (ch.visible === false);
+                            var isUnavail = isOptionUnavailable(ch);
                             var priceStr = '';
                             if (ch.priceType && ch.priceType !== 'none' && ch.priceAmount > 0) {
                                 priceStr = ch.priceType === 'percentage' ? ' (+' + ch.priceAmount + '%)' : ' (+$' + parseFloat(ch.priceAmount).toFixed(2) + ')';
@@ -2300,7 +2377,7 @@ class CartFlow_Bridge {
                     } else if (childType === 'image_swatch') {
                         html += '<div class="cartflow-swatch-options" data-field="' + childKey + '">';
                         children.forEach(function(ch, idx) {
-                            var isUnavail = (ch.visible === false);
+                            var isUnavail = isOptionUnavailable(ch);
                             var cid = childKey + '_' + idx;
                             var unavailClass = isUnavail ? ' cartflow-option-unavailable' : '';
                             var disabledAttr = isUnavail ? ' disabled' : '';

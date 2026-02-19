@@ -28,7 +28,7 @@ export class PluginsController {
 
   // Latest plugin versions - update these when releasing new versions
   private readonly latestVersions = {
-    'cartflow-bridge': '1.7.0',
+    'cartflow-bridge': '1.7.1',
   };
 
   @Get()
@@ -140,6 +140,15 @@ export class PluginsController {
         author: 'CartFlow',
         license: 'GPL v2 or later',
         changelog: [
+          {
+            version: '1.7.1',
+            changes: [
+              'Compound child options shown as visible preview (disabled) until parent is selected',
+              'Hint banner guides users to select parent option first',
+              'Fixed child option visibility — hidden options now correctly appear as unavailable',
+              'Robust visibility check handles edge cases across WP serialization',
+            ],
+          },
           {
             version: '1.7.0',
             changes: [
