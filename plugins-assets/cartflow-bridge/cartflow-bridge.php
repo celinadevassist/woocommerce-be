@@ -1800,7 +1800,8 @@ class CartFlow_Bridge {
                         $children_map[$pv] = isset($opt['children']) ? $opt['children'] : array();
                     }
 
-                    echo '<div class="cartflow-compound-wrapper" data-children-map="' . esc_attr(wp_json_encode($children_map)) . '" data-child-type="' . esc_attr($child_type) . '" data-child-key="' . esc_attr($child_key) . '" data-child-label="' . esc_attr($child_label_text) . '">';
+                    $compound_required = !empty($field['required']) ? ' data-field-required="1"' : '';
+                    echo '<div class="cartflow-compound-wrapper" data-children-map="' . esc_attr(wp_json_encode($children_map)) . '" data-child-type="' . esc_attr($child_type) . '" data-child-key="' . esc_attr($child_key) . '" data-child-label="' . esc_attr($child_label_text) . '" data-parent-label="' . esc_attr($parent_label_text) . '"' . $compound_required . '>';
 
                     // Parent selector
                     echo '<div class="cartflow-compound-parent-section">';
@@ -2192,6 +2193,18 @@ class CartFlow_Bridge {
             .cartflow-field[data-conditions]:not([data-conditions="[]"]).cartflow-hidden {
                 display: none;
             }
+            .cartflow-client-error {
+                color: #cc0000;
+                background: #fff0f0;
+                border: 1px solid #cc0000;
+                border-radius: 4px;
+                padding: 8px 12px;
+                font-size: 0.9em;
+                list-style: none;
+            }
+            .cartflow-client-error li {
+                margin: 2px 0;
+            }
             /* Unavailable option styles (visible but not selectable) */
             .cartflow-option-unavailable {
                 opacity: 0.45;
@@ -2491,6 +2504,107 @@ class CartFlow_Bridge {
                         evaluateConditions();
                     }
                 });
+
+                /* Client-side validation for required fields before add-to-cart */
+                var addToCartForm = document.querySelector('form.cart');
+                if (addToCartForm) {
+                    addToCartForm.addEventListener('submit', function(e) {
+                        var errors = [];
+
+                        /* Validate all required standard fields */
+                        var requiredFields = document.querySelectorAll('.cartflow-field');
+                        requiredFields.forEach(function(fieldEl) {
+                            /* Skip hidden (visibility or conditional) fields */
+                            if (fieldEl.classList.contains('cartflow-hidden')) return;
+                            if (fieldEl.style.display === 'none') return;
+
+                            var fieldKey = fieldEl.getAttribute('data-field-key') || '';
+                            var isCompound = fieldEl.classList.contains('cartflow-field--compound');
+
+                            if (isCompound) {
+                                var wrapper = fieldEl.querySelector('.cartflow-compound-wrapper');
+                                if (!wrapper || !wrapper.hasAttribute('data-field-required')) return;
+
+                                var childKey = wrapper.getAttribute('data-child-key') || '';
+                                var childLabel = wrapper.getAttribute('data-child-label') || 'Child option';
+                                var parentLabel = wrapper.getAttribute('data-parent-label') || 'Parent option';
+                                var childrenMapStr = wrapper.getAttribute('data-children-map') || '{}';
+
+                                /* Check parent selection */
+                                var parentValue = '';
+                                var parentInput = wrapper.querySelector('.cartflow-compound-parent-input:checked, select.cartflow-compound-parent-input');
+                                if (parentInput) {
+                                    parentValue = parentInput.tagName === 'SELECT' ? parentInput.value : (parentInput.checked ? parentInput.value : '');
+                                }
+
+                                if (!parentValue) {
+                                    errors.push('"' + parentLabel + '" is a required field.');
+                                    return;
+                                }
+
+                                /* Check child selection only when parent has children */
+                                var childrenMap = {};
+                                try { childrenMap = JSON.parse(childrenMapStr); } catch(ex) {}
+                                var children = childrenMap[parentValue];
+                                if (!Array.isArray(children) || children.length === 0) return;
+
+                                var childValue = '';
+                                var childInput = wrapper.querySelector('.cartflow-compound-child-container input[name="' + childKey + '"]:checked, .cartflow-compound-child-container select[name="' + childKey + '"]');
+                                if (childInput) {
+                                    childValue = childInput.tagName === 'SELECT' ? childInput.value : (childInput.checked ? childInput.value : '');
+                                }
+
+                                if (!childValue) {
+                                    errors.push('"' + childLabel + '" is a required field. Please select an option.');
+                                }
+                            } else {
+                                /* Standard required field validation */
+                                var input = fieldEl.querySelector('input[required], select[required], textarea[required]');
+                                if (!input) return;
+                                var val = '';
+                                if (input.type === 'radio') {
+                                    var checked = fieldEl.querySelector('input[name="' + input.name + '"]:checked');
+                                    val = checked ? checked.value : '';
+                                } else if (input.type === 'checkbox') {
+                                    val = input.checked ? 'yes' : '';
+                                } else {
+                                    val = (input.value || '').trim();
+                                }
+                                if (!val) {
+                                    var label = fieldEl.querySelector('label');
+                                    var labelText = label ? label.textContent.replace(/\s*\*\s*$/, '').trim() : fieldKey;
+                                    errors.push('"' + labelText + '" is a required field.');
+                                }
+                            }
+                        });
+
+                        if (errors.length > 0) {
+                            e.preventDefault();
+                            e.stopImmediatePropagation();
+
+                            /* Remove any existing error notices */
+                            var existing = document.querySelectorAll('.cartflow-client-error');
+                            existing.forEach(function(el) { el.remove(); });
+
+                            /* Show errors above the add-to-cart button */
+                            var errorHtml = '<div class="cartflow-client-error woocommerce-error" role="alert" style="margin-bottom: 12px;">';
+                            errors.forEach(function(msg) {
+                                errorHtml += '<li>' + escapeHtml(msg) + '</li>';
+                            });
+                            errorHtml += '</div>';
+
+                            var btn = addToCartForm.querySelector('.single_add_to_cart_button');
+                            if (btn) {
+                                btn.insertAdjacentHTML('beforebegin', errorHtml);
+                                /* Scroll error into view */
+                                var errorEl = addToCartForm.querySelector('.cartflow-client-error');
+                                if (errorEl) errorEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            } else {
+                                alert(errors.join('\n'));
+                            }
+                        }
+                    });
+                }
             })();
         </script>
         <?php
