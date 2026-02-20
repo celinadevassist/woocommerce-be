@@ -2292,8 +2292,20 @@ class CartFlow_Bridge {
                 });
 
                 /* Compound field: parent change → rebuild child options */
-                function isOptionUnavailable(opt) {
-                    return ('visible' in opt && !opt.visible);
+                function escapeHtml(str) {
+                    if (!str) return '';
+                    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+                }
+
+                function isOptionHidden(opt) {
+                    return (opt && 'visible' in opt && opt.visible === false);
+                }
+
+                function formatPriceSuffix(opt) {
+                    if (!opt || !opt.priceType || opt.priceType === 'none') return '';
+                    var amt = parseFloat(opt.priceAmount) || 0;
+                    if (amt <= 0) return '';
+                    return opt.priceType === 'percentage' ? ' (+' + amt + '%)' : ' (+$' + amt.toFixed(2) + ')';
                 }
 
                 function handleCompoundParentChange(e) {
@@ -2305,8 +2317,8 @@ class CartFlow_Bridge {
 
                     var childrenMapStr = wrapper.getAttribute('data-children-map');
                     var childType = wrapper.getAttribute('data-child-type') || 'radio';
-                    var childKey = wrapper.getAttribute('data-child-key') || '';
-                    var childLabel = wrapper.getAttribute('data-child-label') || 'Child';
+                    var childKey = escapeHtml(wrapper.getAttribute('data-child-key') || '');
+                    var childLabel = escapeHtml(wrapper.getAttribute('data-child-label') || 'Child');
 
                     var selectedValue = '';
                     if (input.tagName === 'SELECT') {
@@ -2316,7 +2328,9 @@ class CartFlow_Bridge {
                     }
 
                     var container = wrapper.querySelector('.cartflow-compound-child-container');
+                    if (!container) return;
                     var optionsDiv = container.querySelector('.cartflow-compound-child-options');
+                    if (!optionsDiv) return;
                     var hint = container.querySelector('.cartflow-compound-hint');
 
                     // No parent selected — restore awaiting state with hint
@@ -2330,7 +2344,8 @@ class CartFlow_Bridge {
                     var childrenMap = {};
                     try { childrenMap = JSON.parse(childrenMapStr); } catch(ex) { return; }
 
-                    var children = childrenMap[selectedValue] || [];
+                    var children = childrenMap[selectedValue];
+                    if (!Array.isArray(children)) children = [];
 
                     // Activate child container — remove awaiting state and hint
                     container.classList.remove('cartflow-compound-awaiting');
@@ -2346,17 +2361,14 @@ class CartFlow_Bridge {
                     if (childType === 'radio') {
                         html += '<div class="cartflow-radio-options">';
                         children.forEach(function(ch, idx) {
-                            var isUnavail = isOptionUnavailable(ch);
-                            var priceStr = '';
-                            if (ch.priceType && ch.priceType !== 'none' && ch.priceAmount > 0) {
-                                priceStr = ch.priceType === 'percentage' ? ' (+' + ch.priceAmount + '%)' : ' (+$' + parseFloat(ch.priceAmount).toFixed(2) + ')';
-                            }
+                            var isUnavail = isOptionHidden(ch);
+                            var priceStr = escapeHtml(formatPriceSuffix(ch));
                             var cid = childKey + '_' + idx;
                             var unavailClass = isUnavail ? ' cartflow-option-unavailable' : '';
                             var disabledAttr = isUnavail ? ' disabled' : '';
                             html += '<label class="cartflow-radio-option' + unavailClass + '" for="' + cid + '">';
-                            html += '<input type="radio" id="' + cid + '" name="' + childKey + '" value="' + ch.value + '"' + disabledAttr + ' class="cartflow-radio" data-price-type="' + (ch.priceType || 'none') + '" data-price-amount="' + (ch.priceAmount || 0) + '" />';
-                            html += ' ' + ch.label + priceStr;
+                            html += '<input type="radio" id="' + cid + '" name="' + childKey + '" value="' + escapeHtml(ch.value) + '"' + disabledAttr + ' class="cartflow-radio" data-price-type="' + escapeHtml(ch.priceType || 'none') + '" data-price-amount="' + (parseFloat(ch.priceAmount) || 0) + '" />';
+                            html += ' ' + escapeHtml(ch.label) + priceStr;
                             html += '</label>';
                         });
                         html += '</div>';
@@ -2364,29 +2376,26 @@ class CartFlow_Bridge {
                         html += '<select name="' + childKey + '" class="cartflow-dropdown">';
                         html += '<option value="">Select ' + childLabel + '...</option>';
                         children.forEach(function(ch) {
-                            var isUnavail = isOptionUnavailable(ch);
-                            var priceStr = '';
-                            if (ch.priceType && ch.priceType !== 'none' && ch.priceAmount > 0) {
-                                priceStr = ch.priceType === 'percentage' ? ' (+' + ch.priceAmount + '%)' : ' (+$' + parseFloat(ch.priceAmount).toFixed(2) + ')';
-                            }
+                            var isUnavail = isOptionHidden(ch);
+                            var priceStr = escapeHtml(formatPriceSuffix(ch));
                             var disabledAttr = isUnavail ? ' disabled' : '';
                             var prefix = isUnavail ? '\u2715 ' : '';
-                            html += '<option value="' + ch.value + '"' + disabledAttr + ' data-price-type="' + (ch.priceType || 'none') + '" data-price-amount="' + (ch.priceAmount || 0) + '">' + prefix + ch.label + priceStr + '</option>';
+                            html += '<option value="' + escapeHtml(ch.value) + '"' + disabledAttr + ' data-price-type="' + escapeHtml(ch.priceType || 'none') + '" data-price-amount="' + (parseFloat(ch.priceAmount) || 0) + '">' + prefix + escapeHtml(ch.label) + priceStr + '</option>';
                         });
                         html += '</select>';
                     } else if (childType === 'image_swatch') {
                         html += '<div class="cartflow-swatch-options" data-field="' + childKey + '">';
                         children.forEach(function(ch, idx) {
-                            var isUnavail = isOptionUnavailable(ch);
+                            var isUnavail = isOptionHidden(ch);
                             var cid = childKey + '_' + idx;
                             var unavailClass = isUnavail ? ' cartflow-option-unavailable' : '';
                             var disabledAttr = isUnavail ? ' disabled' : '';
-                            html += '<label class="cartflow-swatch-option' + unavailClass + '" for="' + cid + '" title="' + ch.label + '">';
-                            html += '<input type="radio" id="' + cid + '" name="' + childKey + '" value="' + ch.value + '"' + disabledAttr + ' class="cartflow-swatch-radio" />';
+                            html += '<label class="cartflow-swatch-option' + unavailClass + '" for="' + cid + '" title="' + escapeHtml(ch.label) + '">';
+                            html += '<input type="radio" id="' + cid + '" name="' + childKey + '" value="' + escapeHtml(ch.value) + '"' + disabledAttr + ' class="cartflow-swatch-radio" />';
                             if (ch.image) {
-                                html += '<img src="' + ch.image + '" alt="' + ch.label + '" class="cartflow-swatch-image" />';
+                                html += '<img src="' + escapeHtml(ch.image) + '" alt="' + escapeHtml(ch.label) + '" class="cartflow-swatch-image" />';
                             }
-                            html += '<span class="cartflow-swatch-label">' + ch.label + '</span>';
+                            html += '<span class="cartflow-swatch-label">' + escapeHtml(ch.label) + '</span>';
                             html += '</label>';
                         });
                         html += '</div>';

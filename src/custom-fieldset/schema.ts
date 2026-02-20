@@ -55,6 +55,7 @@ export class SwatchOption {
     image?: string;
     priceType?: PriceModifierType;
     priceAmount?: number;
+    visible?: boolean;
   }>;
 }
 
@@ -236,4 +237,4 @@ export const CustomFieldsetSchema =
 
 // Indexes
 CustomFieldsetSchema.index({ storeId: 1, isDeleted: 1 });
-CustomFieldsetSchema.index({ storeId: 1, status: 1 });
+CustomFieldsetSchema.index({ storeId: 1, status: 1, isDeleted: 1 });

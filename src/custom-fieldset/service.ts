@@ -5,22 +5,18 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { Model, Document, Types } from 'mongoose';
 import { CustomFieldset } from './schema';
 import { Store } from '../store/schema';
-import { Product } from '../product/schema';
-import { Category } from '../category/schema';
-import { Tag } from '../tag/schema';
-import { Attribute } from '../attribute/schema';
 import {
   CreateCustomFieldsetDto,
   UpdateCustomFieldsetDto,
   QueryCustomFieldsetDto,
   ReorderCustomFieldsetDto,
 } from './dto';
+import { FieldsetStatus, FieldsetScope, PriceModifierType } from './enum';
 import { WooCommerceService } from '../integrations/woocommerce/woocommerce.service';
 
-type CustomFieldsetDocument = CustomFieldset & Document;
 type StoreDocument = Store & Document & {
   ownerId: Types.ObjectId;
   members: Array<{ userId: Types.ObjectId; role: string }>;
@@ -41,10 +37,6 @@ export class CustomFieldsetService {
     @InjectModel(CustomFieldset.name)
     private fieldsetModel: Model<CustomFieldset>,
     @InjectModel(Store.name) private storeModel: Model<Store>,
-    @InjectModel(Product.name) private productModel: Model<Product>,
-    @InjectModel(Category.name) private categoryModel: Model<Category>,
-    @InjectModel(Tag.name) private tagModel: Model<Tag>,
-    @InjectModel(Attribute.name) private attributeModel: Model<Attribute>,
     private readonly wooCommerceService: WooCommerceService,
   ) {}
 
@@ -61,8 +53,8 @@ export class CustomFieldsetService {
     const fieldset = await this.fieldsetModel.create({
       storeId: store._id,
       name: dto.name,
-      status: dto.status || 'active',
-      scope: dto.scope || 'product',
+      status: dto.status || FieldsetStatus.ACTIVE,
+      scope: dto.scope || FieldsetScope.PRODUCT,
       assignmentType: dto.assignmentType,
       productIds: (dto.productIds || []).map((id) => new Types.ObjectId(id)),
       categoryIds: (dto.categoryIds || []).map((id) => new Types.ObjectId(id)),
@@ -248,7 +240,7 @@ export class CustomFieldsetService {
         .find({
           storeId: store._id,
           isDeleted: false,
-          status: 'active',
+          status: FieldsetStatus.ACTIVE,
         })
         .sort({ position: 1 })
         .populate('productIds', 'externalId')
@@ -298,7 +290,7 @@ export class CustomFieldsetService {
       .find({
         storeId: store._id,
         isDeleted: false,
-        status: 'active',
+        status: FieldsetStatus.ACTIVE,
       })
       .sort({ position: 1 })
       .populate('productIds', 'externalId')
@@ -320,7 +312,7 @@ export class CustomFieldsetService {
       .find({
         storeId: store._id,
         isDeleted: false,
-        status: 'active',
+        status: FieldsetStatus.ACTIVE,
       })
       .sort({ position: 1 })
       .populate('productIds', 'externalId')
@@ -335,7 +327,7 @@ export class CustomFieldsetService {
   /**
    * Push fieldsets data to WordPress via CartFlow Bridge REST API
    */
-  private async pushFieldsetsToWoo(store: any, fieldsets: any[]) {
+  private async pushFieldsetsToWoo(store: StoreDocument, fieldsets: any[]) {
     const credentials = {
       url: store.url,
       consumerKey: store.credentials.consumerKey,
@@ -347,7 +339,7 @@ export class CustomFieldsetService {
       id: fs._id.toString(),
       name: fs.name,
       status: fs.status,
-      scope: fs.scope || 'product',
+      scope: fs.scope || FieldsetScope.PRODUCT,
       assignmentType: fs.assignmentType,
       productExternalIds: (fs.productIds || [])
         .map((p: any) => p.externalId)
@@ -371,7 +363,7 @@ export class CustomFieldsetService {
         min: f.min ?? null,
         max: f.max ?? null,
         checkboxLabel: f.checkboxLabel || '',
-        priceType: f.priceType || 'none',
+        priceType: f.priceType || PriceModifierType.NONE,
         priceAmount: f.priceAmount || 0,
         conditions: (f.conditions || []).map((c: any) => ({
           fieldName: c.fieldName,
@@ -394,14 +386,14 @@ export class CustomFieldsetService {
           label: o.label,
           value: o.value,
           image: o.image || '',
-          priceType: o.priceType || 'none',
+          priceType: o.priceType || PriceModifierType.NONE,
           priceAmount: o.priceAmount || 0,
           visible: o.visible !== false,
           children: (o.children || []).map((c: any) => ({
             label: c.label,
             value: c.value,
             image: c.image || '',
-            priceType: c.priceType || 'none',
+            priceType: c.priceType || PriceModifierType.NONE,
             priceAmount: c.priceAmount || 0,
             visible: c.visible !== false,
           })),
