@@ -73,3 +73,33 @@ export interface IAnalyticsQuery {
   endDate?: string;
   period?: 'day' | 'week' | 'month' | 'year';
 }
+
+export interface IProfitPeriod {
+  period: string;
+  revenue: number;
+  costs: number;
+  refunds: number;
+  profit: number;
+  margin: number;
+  orders: number;
+}
+
+export interface ICostByCategory {
+  category: string;
+  amount: number;
+}
+
+export interface IProfitSummaryTotals {
+  totalRevenue: number;
+  totalCosts: number;
+  totalRefunds: number;
+  totalProfit: number;
+  avgMargin: number;
+  avgOrderValue: number;
+}
+
+export interface IProfitSummary {
+  periods: IProfitPeriod[];
+  costsByCategory: ICostByCategory[];
+  summary: IProfitSummaryTotals;
+}

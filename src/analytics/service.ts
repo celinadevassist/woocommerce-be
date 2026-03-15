@@ -10,7 +10,8 @@ import { Customer, CustomerDocument } from '../customer/schema';
 import { Product, ProductDocument } from '../product/schema';
 import { Review, ReviewDocument } from '../review/schema';
 import { Store, StoreDocument } from '../store/schema';
-import { QueryAnalyticsDto } from './dto.query';
+import { CostEntry } from '../running-costs/schema';
+import { QueryAnalyticsDto, QueryProfitSummaryDto } from './dto.query';
 import {
   IDashboardAnalytics,
   IAnalyticsSummary,
@@ -19,6 +20,7 @@ import {
   ITopCustomer,
   IOrdersByStatus,
   IRevenueByStore,
+  IProfitSummary,
 } from './interface';
 import { ReviewStatus } from '../review/enum';
 
@@ -33,6 +35,7 @@ export class AnalyticsService {
     @InjectModel(Product.name) private productModel: Model<ProductDocument>,
     @InjectModel(Review.name) private reviewModel: Model<ReviewDocument>,
     @InjectModel(Store.name) private storeModel: Model<StoreDocument>,
+    @InjectModel(CostEntry.name) private costEntryModel: Model<CostEntry>,
   ) {}
 
   /**
@@ -464,6 +467,211 @@ export class AnalyticsService {
       status: review.status,
       date: review.wooCreatedAt,
     }));
+  }
+
+  /**
+   * Get profit summary combining revenue, refunds, and running costs
+   */
+  async getProfitSummary(
+    userId: string,
+    query: QueryProfitSummaryDto,
+  ): Promise<IProfitSummary> {
+    // Verify user has access to the store
+    await this.getStoreWithAccess(query.storeId, userId);
+
+    const storeObjectId = new Types.ObjectId(query.storeId);
+    const months = query.months || 12;
+    const period = query.period || 'month';
+
+    // Calculate the start date based on months parameter
+    const now = new Date();
+    const startDate = new Date(
+      now.getFullYear(),
+      now.getMonth() - months + 1,
+      1,
+    );
+
+    // Build date format string for MongoDB aggregation
+    let dateFormat: string;
+    switch (period) {
+      case 'day':
+        dateFormat = '%Y-%m-%d';
+        break;
+      case 'week':
+        dateFormat = '%Y-%V';
+        break;
+      case 'year':
+        dateFormat = '%Y';
+        break;
+      default:
+        dateFormat = '%Y-%m';
+    }
+
+    const orderFilter = {
+      storeId: storeObjectId,
+      isDeleted: false,
+      status: { $nin: EXCLUDED_REVENUE_STATUSES },
+      dateCreatedWoo: { $gte: startDate },
+    };
+
+    // Run all aggregations in parallel
+    const [revenueByPeriod, refundsByPeriod, costsByPeriod, costsByCategory] =
+      await Promise.all([
+        // Revenue per period (excluding cancelled/refunded/failed)
+        this.orderModel.aggregate([
+          { $match: orderFilter },
+          {
+            $group: {
+              _id: {
+                $dateToString: {
+                  format: dateFormat,
+                  date: '$dateCreatedWoo',
+                },
+              },
+              revenue: { $sum: { $toDouble: '$total' } },
+              orders: { $sum: 1 },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ]),
+
+        // Refunds per period
+        this.orderModel.aggregate([
+          {
+            $match: {
+              storeId: storeObjectId,
+              isDeleted: false,
+              status: { $nin: EXCLUDED_REVENUE_STATUSES },
+              dateCreatedWoo: { $gte: startDate },
+              'refunds.0': { $exists: true },
+            },
+          },
+          { $unwind: '$refunds' },
+          {
+            $group: {
+              _id: {
+                $dateToString: {
+                  format: dateFormat,
+                  date: '$dateCreatedWoo',
+                },
+              },
+              refunds: { $sum: { $toDouble: '$refunds.total' } },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ]),
+
+        // Costs per period from CostEntry (month field is already 'YYYY-MM')
+        this.costEntryModel.aggregate([
+          {
+            $match: {
+              storeId: storeObjectId,
+              isDeleted: false,
+              month: { $gte: this.formatMonth(startDate) },
+            },
+          },
+          {
+            $group: {
+              _id: '$month',
+              costs: { $sum: '$amount' },
+            },
+          },
+          { $sort: { _id: 1 } },
+        ]),
+
+        // Costs by category (total across all periods)
+        this.costEntryModel.aggregate([
+          {
+            $match: {
+              storeId: storeObjectId,
+              isDeleted: false,
+              month: { $gte: this.formatMonth(startDate) },
+            },
+          },
+          {
+            $group: {
+              _id: '$category',
+              amount: { $sum: '$amount' },
+            },
+          },
+          { $sort: { amount: -1 } },
+        ]),
+      ]);
+
+    // Build maps for quick lookup
+    const revenueMap = new Map(
+      revenueByPeriod.map((r: any) => [r._id, r]),
+    );
+    const refundsMap = new Map(
+      refundsByPeriod.map((r: any) => [r._id, Math.abs(r.refunds)]),
+    );
+    const costsMap = new Map(
+      costsByPeriod.map((c: any) => [c._id, c.costs]),
+    );
+
+    // Collect all unique period keys
+    const allPeriodKeys = new Set<string>();
+    revenueByPeriod.forEach((r: any) => allPeriodKeys.add(r._id));
+    costsByPeriod.forEach((c: any) => allPeriodKeys.add(c._id));
+    refundsByPeriod.forEach((r: any) => allPeriodKeys.add(r._id));
+
+    // Build the periods array sorted chronologically
+    const sortedKeys = Array.from(allPeriodKeys).sort();
+    const periods = sortedKeys.map((key) => {
+      const revenue = revenueMap.get(key)?.revenue || 0;
+      const orders = revenueMap.get(key)?.orders || 0;
+      const refunds = refundsMap.get(key) || 0;
+      const costs = costsMap.get(key) || 0;
+      const netRevenue = revenue - refunds;
+      const profit = netRevenue - costs;
+      const margin = netRevenue > 0 ? (profit / netRevenue) * 100 : 0;
+
+      return {
+        period: key,
+        revenue: Math.round(revenue * 100) / 100,
+        costs: Math.round(costs * 100) / 100,
+        refunds: Math.round(refunds * 100) / 100,
+        profit: Math.round(profit * 100) / 100,
+        margin: Math.round(margin * 10) / 10,
+        orders,
+      };
+    });
+
+    // Calculate totals
+    const totalRevenue = periods.reduce((sum, p) => sum + p.revenue, 0);
+    const totalCosts = periods.reduce((sum, p) => sum + p.costs, 0);
+    const totalRefunds = periods.reduce((sum, p) => sum + p.refunds, 0);
+    const totalOrders = periods.reduce((sum, p) => sum + p.orders, 0);
+    const totalNetRevenue = totalRevenue - totalRefunds;
+    const totalProfit = totalNetRevenue - totalCosts;
+    const avgMargin =
+      totalNetRevenue > 0 ? (totalProfit / totalNetRevenue) * 100 : 0;
+    const avgOrderValue = totalOrders > 0 ? totalNetRevenue / totalOrders : 0;
+
+    return {
+      periods,
+      costsByCategory: costsByCategory.map((c: any) => ({
+        category: c._id,
+        amount: Math.round(c.amount * 100) / 100,
+      })),
+      summary: {
+        totalRevenue: Math.round(totalRevenue * 100) / 100,
+        totalCosts: Math.round(totalCosts * 100) / 100,
+        totalRefunds: Math.round(totalRefunds * 100) / 100,
+        totalProfit: Math.round(totalProfit * 100) / 100,
+        avgMargin: Math.round(avgMargin * 10) / 10,
+        avgOrderValue: Math.round(avgOrderValue * 100) / 100,
+      },
+    };
+  }
+
+  /**
+   * Format a Date to 'YYYY-MM' string for cost entry month comparison
+   */
+  private formatMonth(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    return `${year}-${month}`;
   }
 
   // Helper methods

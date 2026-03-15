@@ -16,3 +16,18 @@ export const QueryAnalyticsSchema = Joi.object({
     .optional()
     .default('month'),
 });
+
+export class QueryProfitSummaryDto {
+  storeId: string;
+  period?: 'day' | 'week' | 'month' | 'year';
+  months?: number;
+}
+
+export const QueryProfitSummarySchema = Joi.object({
+  storeId: Joi.string().required(),
+  period: Joi.string()
+    .valid('day', 'week', 'month', 'year')
+    .optional()
+    .default('month'),
+  months: Joi.number().integer().min(1).max(60).optional().default(12),
+});
