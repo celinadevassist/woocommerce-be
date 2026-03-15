@@ -2,6 +2,8 @@ export interface IAnalyticsSummary {
   orders: {
     total: number;
     revenue: number;
+    grossRevenue: number;
+    totalRefunds: number;
     averageOrderValue: number;
     byStatus: Record<string, number>;
   };

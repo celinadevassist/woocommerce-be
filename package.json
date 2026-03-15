@@ -1,8 +1,8 @@
 {
-  "name": "project-yarn",
+  "name": "woocommerce-backend",
   "version": "0.0.1",
-  "description": "",
-  "author": "",
+  "description": "WooCommerce backend API",
+  "author": "celinadevassist",
   "private": true,
   "license": "UNLICENSED",
   "scripts": {

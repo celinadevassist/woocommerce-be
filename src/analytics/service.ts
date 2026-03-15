@@ -191,6 +191,8 @@ export class AnalyticsService {
       orders: {
         total: totalOrders,
         revenue: netRevenue,
+        grossRevenue,
+        totalRefunds,
         averageOrderValue:
           validOrderCount > 0 ? netRevenue / validOrderCount : 0,
         byStatus: statusMap,
