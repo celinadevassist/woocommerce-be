@@ -1175,6 +1175,17 @@ export class CustomerService {
       },
     ]);
 
+    // Calculate averages from per-customer stats
+    let analyticsSpentSum = 0;
+    let analyticsOrdersSum = 0;
+    for (const stat of customerOrderStats) {
+      analyticsSpentSum += stat.totalSpent;
+      analyticsOrdersSum += stat.ordersCount;
+    }
+    const buyerCount = customerOrderStats.length;
+    const analyticsAvgSpent = buyerCount > 0 ? analyticsSpentSum / buyerCount : 0;
+    const analyticsAvgOrders = buyerCount > 0 ? analyticsOrdersSum / buyerCount : 0;
+
     return {
       overview: {
         totalCustomers,
@@ -1182,6 +1193,8 @@ export class CustomerService {
         newInPeriod,
         repeatCustomers,
         payingCustomers,
+        avgSpentPerCustomer: Math.round(analyticsAvgSpent * 100) / 100,
+        avgOrdersPerCustomer: Math.round(analyticsAvgOrders * 10) / 10,
         repeatRate:
           totalCustomers > 0
             ? Math.round((repeatCustomers / totalCustomers) * 100)
