@@ -72,6 +72,8 @@ export interface ICustomerAggregateStats {
   totalCustomers: number;
   activeCustomers: number;
   newCustomersThisMonth: number;
+  customersWithOrders: number;
+  customersWithoutOrders: number;
   repeatCustomers: number;
   totalRevenue: number;
   totalOrders: number;

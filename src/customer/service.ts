@@ -678,7 +678,7 @@ export class CustomerService {
           },
         },
       ]),
-      // Calculate per-customer stats from orders (for repeat customers and averages)
+      // Calculate per-customer stats from orders (for repeat customers, averages, and with-orders count)
       this.orderModel.aggregate([
         {
           $match: {
@@ -696,6 +696,7 @@ export class CustomerService {
         {
           $group: {
             _id: null,
+            customersWithOrders: { $sum: 1 },
             repeatCustomers: {
               $sum: { $cond: [{ $gte: ['$ordersCount', 2] }, 1, 0] },
             },
@@ -708,6 +709,7 @@ export class CustomerService {
 
     const stats = orderStats[0] || { totalOrders: 0, totalRevenue: 0 };
     const custStats = customerOrderStats[0] || {
+      customersWithOrders: 0,
       repeatCustomers: 0,
       avgOrdersPerCustomer: 0,
       avgSpentPerCustomer: 0,
@@ -760,10 +762,15 @@ export class CustomerService {
       })
       .filter(Boolean);
 
+    const customersWithOrders = custStats.customersWithOrders || 0;
+    const customersWithoutOrders = totalCustomers - customersWithOrders;
+
     return {
       totalCustomers,
       activeCustomers,
       newCustomersThisMonth,
+      customersWithOrders,
+      customersWithoutOrders,
       repeatCustomers: custStats.repeatCustomers || 0,
       totalRevenue: stats.totalRevenue || 0,
       totalOrders: stats.totalOrders || 0,
