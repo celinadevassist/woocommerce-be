@@ -331,36 +331,86 @@ export class CustomerService {
       ];
     }
 
+    const hasStatsFilter =
+      query.minOrders !== undefined ||
+      query.maxOrders !== undefined ||
+      query.minSpent !== undefined ||
+      query.maxSpent !== undefined;
+
     const page = query.page || 1;
     const size = query.size || 20;
-    const skip = (page - 1) * size;
 
     const sortField = query.sortBy || 'createdAt';
     const sortOrder = query.sortOrder === 'asc' ? 1 : -1;
     const sort: any = { [sortField]: sortOrder };
+
+    // When stats-based filters are active, we need to fetch all matching
+    // customers first, calculate stats, filter, then paginate in-memory
+    if (hasStatsFilter) {
+      const allCustomers = await this.customerModel.find(filter).sort(sort);
+      const allIds = allCustomers.map((c) => c._id);
+      const statsMap = await this.calculateBulkCustomerStats(allIds);
+
+      let allWithStats = allCustomers.map((c) => {
+        const customer = this.toInterface(c);
+        customer.stats = statsMap.get(c._id.toString()) || {
+          ordersCount: 0,
+          totalSpent: 0,
+          averageOrderValue: 0,
+          lastOrderDate: null,
+          firstOrderDate: null,
+        };
+        return customer;
+      });
+
+      if (query.minOrders !== undefined) {
+        allWithStats = allWithStats.filter((c) => c.stats.ordersCount >= query.minOrders);
+      }
+      if (query.maxOrders !== undefined) {
+        allWithStats = allWithStats.filter((c) => c.stats.ordersCount <= query.maxOrders);
+      }
+      if (query.minSpent !== undefined) {
+        allWithStats = allWithStats.filter((c) => c.stats.totalSpent >= query.minSpent);
+      }
+      if (query.maxSpent !== undefined) {
+        allWithStats = allWithStats.filter((c) => c.stats.totalSpent <= query.maxSpent);
+      }
+
+      const filteredTotal = allWithStats.length;
+      const skip = (page - 1) * size;
+      const paginatedCustomers = allWithStats.slice(skip, skip + size);
+
+      if (searchTerm) {
+        await this.searchAnalyticsService.saveSearchQuery(searchTerm, 'customers', filteredTotal, ip, userId);
+      }
+
+      return {
+        customers: paginatedCustomers,
+        pagination: {
+          total: filteredTotal,
+          page,
+          size,
+          pages: Math.ceil(filteredTotal / size),
+        },
+      };
+    }
+
+    // Normal path: no stats-based filters
+    const skip = (page - 1) * size;
 
     const [customers, total] = await Promise.all([
       this.customerModel.find(filter).sort(sort).skip(skip).limit(size),
       this.customerModel.countDocuments(filter),
     ]);
 
-    // Track search analytics if search query is provided
     if (searchTerm) {
-      await this.searchAnalyticsService.saveSearchQuery(
-        searchTerm,
-        'customers',
-        total,
-        ip,
-        userId,
-      );
+      await this.searchAnalyticsService.saveSearchQuery(searchTerm, 'customers', total, ip, userId);
     }
 
-    // Calculate dynamic stats for all customers in bulk
     const customerIds = customers.map((c) => c._id);
     const statsMap = await this.calculateBulkCustomerStats(customerIds);
 
-    // Map customers with their dynamic stats
-    let customersWithStats = customers.map((c) => {
+    const customersWithStats = customers.map((c) => {
       const customer = this.toInterface(c);
       customer.stats = statsMap.get(c._id.toString()) || {
         ordersCount: 0,
@@ -371,28 +421,6 @@ export class CustomerService {
       };
       return customer;
     });
-
-    // Apply stats-based filters (post-fetch filtering)
-    if (query.minOrders !== undefined) {
-      customersWithStats = customersWithStats.filter(
-        (c) => c.stats.ordersCount >= query.minOrders,
-      );
-    }
-    if (query.maxOrders !== undefined) {
-      customersWithStats = customersWithStats.filter(
-        (c) => c.stats.ordersCount <= query.maxOrders,
-      );
-    }
-    if (query.minSpent !== undefined) {
-      customersWithStats = customersWithStats.filter(
-        (c) => c.stats.totalSpent >= query.minSpent,
-      );
-    }
-    if (query.maxSpent !== undefined) {
-      customersWithStats = customersWithStats.filter(
-        (c) => c.stats.totalSpent <= query.maxSpent,
-      );
-    }
 
     return {
       customers: customersWithStats,
