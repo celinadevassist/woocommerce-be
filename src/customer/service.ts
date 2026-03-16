@@ -1685,6 +1685,64 @@ export class CustomerService {
   }
 
   /**
+   * Deduplicate customers by email within a store.
+   * Keeps the one with the most orders, merges the rest.
+   */
+  async deduplicateCustomers(
+    storeId: string,
+    userId: string,
+  ): Promise<{ merged: number; duplicateGroups: number }> {
+    await this.verifyStoreAccess(storeId, userId);
+
+    const storeObjId = new Types.ObjectId(storeId);
+
+    // Find duplicate emails
+    const duplicates = await this.customerModel.aggregate([
+      { $match: { storeId: storeObjId, isDeleted: false, email: { $nin: [null, ''] } } },
+      { $group: { _id: { email: { $toLower: '$email' } }, ids: { $push: '$_id' }, count: { $sum: 1 } } },
+      { $match: { count: { $gt: 1 } } },
+    ]);
+
+    let merged = 0;
+
+    for (const group of duplicates) {
+      const customerIds = group.ids;
+
+      // Get all customers in this group with their order counts
+      const customers = await this.customerModel.find({ _id: { $in: customerIds } });
+      const orderCounts = await Promise.all(
+        customers.map(async (c) => {
+          const count = await this.orderModel.countDocuments({
+            $or: [
+              { localCustomerId: c._id },
+              { 'billing.email': { $regex: new RegExp(`^${c.email}$`, 'i') } },
+            ],
+            storeId: storeObjId,
+            isDeleted: false,
+          });
+          return { customer: c, orderCount: count };
+        }),
+      );
+
+      // Sort by order count desc — keep the one with most orders
+      orderCounts.sort((a, b) => b.orderCount - a.orderCount);
+      const primary = orderCounts[0].customer;
+
+      // Merge all others into primary
+      for (let i = 1; i < orderCounts.length; i++) {
+        try {
+          await this.mergeCustomers(primary._id.toString(), orderCounts[i].customer._id.toString(), userId);
+          merged++;
+        } catch (error) {
+          this.logger.warn(`Failed to merge customer ${orderCounts[i].customer._id}: ${error.message}`);
+        }
+      }
+    }
+
+    return { merged, duplicateGroups: duplicates.length };
+  }
+
+  /**
    * Verify or unverify a customer phone number (uses phones collection)
    */
   async setPhoneVerification(

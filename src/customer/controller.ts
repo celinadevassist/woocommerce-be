@@ -259,6 +259,16 @@ export class CustomerController {
     return this.customerService.mergeCustomers(primaryId, secondaryId, userId);
   }
 
+  @Post('deduplicate')
+  @ApiOperation({ summary: 'Deduplicate customers by email within a store' })
+  @ApiResponse({ status: 200, description: 'Deduplication results' })
+  async deduplicateCustomers(
+    @Query('storeId') storeId: string,
+    @User('_id') userId: string,
+  ) {
+    return this.customerService.deduplicateCustomers(storeId, userId);
+  }
+
   // ==================== Phone Number Management ====================
 
   @Post(':id/phones')
