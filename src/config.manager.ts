@@ -25,9 +25,11 @@ export const developmentConfig = (app) => {
     ? process.env.FRONTEND_URL.split(',').map((url) => url.trim())
     : null; // Will allow any localhost when null
 
+  const isProduction = process.env.NODE_ENV === 'production';
+
   app.enableCors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, Postman, server-to-server)
+      // Allow requests with no origin (mobile apps, server-to-server)
       if (!origin) {
         return callback(null, true);
       }
@@ -35,24 +37,26 @@ export const developmentConfig = (app) => {
       // If FRONTEND_URL is set, check against allowed origins
       if (allowedOrigins && Array.isArray(allowedOrigins)) {
         const isAllowed = allowedOrigins.some((allowedUrl) => {
-          const domain = allowedUrl
+          const normalizedAllowed = allowedUrl
             .replace(/^https?:\/\//, '')
             .replace(/\/$/, '');
-          return origin.includes(domain);
+          const normalizedOrigin = origin
+            .replace(/^https?:\/\//, '')
+            .replace(/\/$/, '');
+          return normalizedOrigin === normalizedAllowed;
         });
         if (isAllowed) {
           return callback(null, true);
         }
       }
 
-      // Allow any localhost origin for development
-      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      // Allow localhost only in non-production environments
+      if (
+        !isProduction &&
+        (origin.includes('localhost') || origin.includes('127.0.0.1'))
+      ) {
         return callback(null, true);
       }
-
-      // Log blocked origins for debugging
-      console.log(`[CORS] Blocked origin: ${origin}`);
-      console.log(`[CORS] Allowed origins: ${JSON.stringify(allowedOrigins)}`);
 
       // Block other origins
       callback(new Error('Not allowed by CORS'));

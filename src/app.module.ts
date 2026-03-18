@@ -3,6 +3,8 @@ import { AuthModule } from './auth/auth.module';
 import { config } from './config.manager';
 import { Module, ValidationPipe } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { APP_GUARD } from '@nestjs/core';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { RoleModule, UserModule } from './modules';
 import { HealthController } from './controllers/health.controller';
 
@@ -55,6 +57,23 @@ import { CustomFieldsetModule } from './custom-fieldset/module';
       isGlobal: true,
       envFilePath: '.env',
     }),
+    ThrottlerModule.forRoot([
+      {
+        name: 'short',
+        ttl: 1000,    // 1 second
+        limit: 10,    // 10 requests per second
+      },
+      {
+        name: 'medium',
+        ttl: 60000,   // 1 minute
+        limit: 100,   // 100 requests per minute
+      },
+      {
+        name: 'long',
+        ttl: 3600000, // 1 hour
+        limit: 1000,  // 1000 requests per hour
+      },
+    ]),
     RoleModule,
     AuthModule,
     UserModule,
@@ -105,6 +124,12 @@ import { CustomFieldsetModule } from './custom-fieldset/module';
     CustomFieldsetModule,
   ],
   controllers: [HealthController],
-  providers: [ValidationPipe],
+  providers: [
+    ValidationPipe,
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
+  ],
 })
 export class AppModule {}
